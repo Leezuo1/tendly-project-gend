@@ -68,14 +68,14 @@ img, svg { display: block; max-width: 100%; }
 .stagger .reveal:nth-child(8) { transition-delay: 0.7s; }
 
 /* ========== NAV ========== */
-nav {
+nav#nav {
   position: sticky; top: 0; z-index: 50;
   background: rgba(250, 249, 248, 0.88);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
   transition: box-shadow 0.3s ease;
 }
-nav.scrolled {
+nav#nav.scrolled {
   box-shadow: 0 4px 20px rgba(43, 33, 30, 0.08);
 }
 .nav-inner {
