@@ -8,16 +8,18 @@ interface BaseButtonProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
   className?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
-interface AnchorButtonProps extends BaseButtonProps, React.AnchorHTMLAttributes<HTMLAnchorElement> {
-  href: string;
-}
+export type AnchorButtonProps = BaseButtonProps &
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, keyof BaseButtonProps> & {
+    href: string;
+  };
 
-interface NativeButtonProps extends BaseButtonProps, React.ButtonHTMLAttributes<HTMLButtonElement> {
-  href?: undefined;
-}
+export type NativeButtonProps = BaseButtonProps &
+  Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, keyof BaseButtonProps> & {
+    href?: undefined;
+  };
 
 export type ButtonProps = AnchorButtonProps | NativeButtonProps;
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { UrgentItem } from '@/lib/types/dashboard';
 
 interface UrgentQueueProps {
@@ -46,14 +47,13 @@ export function UrgentQueue({ urgentItems, onOpenModal, onToast }: UrgentQueuePr
         ))
       )}
 
-      <button
-        type="button"
+      <Link
+        href="/hop-thoai"
         className="card-foot-link"
-        style={{ background: 'none', border: 'none', width: '100%', cursor: 'pointer' }}
-        onClick={() => onToast('Mở danh sách 12 hội thoại đang chờ')}
+        style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}
       >
         Xem tất cả hội thoại đang chờ →
-      </button>
+      </Link>
     </div>
   );
 }
