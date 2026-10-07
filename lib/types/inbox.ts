@@ -1,0 +1,68 @@
+// ============================================================
+// DOMAIN TYPES — Hộp thoại (Inbox & Omni-channel Chat)
+// ============================================================
+
+export type InboxFilter = 'all' | 'urgent' | 'unreplied';
+
+export type Channel = 'facebook' | 'zalo';
+
+export type TagType = 'high' | 'vip' | 'risk' | 'loop';
+
+export interface ConversationTag {
+  label: string;
+  type: TagType;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'in' | 'out';
+  text: string;
+  time: string;
+  isAiReply?: boolean;
+  aiSource?: string;
+  isDivider?: boolean;
+}
+
+export interface AISuggestion {
+  label: string;
+  source: string;
+  text: string;
+}
+
+export interface TimelineEvent {
+  id: string;
+  text: string;
+  time: string;
+}
+
+export interface CustomerProfile {
+  avatar: string;
+  name: string;
+  since: string;
+  tags: ConversationTag[];
+  channel: string;
+  orderCount: string;
+  shippingArea: string;
+  totalSpent?: string;
+  timeline: TimelineEvent[];
+}
+
+export interface Conversation {
+  id: string;
+  name: string;
+  avatar: string;
+  channel: Channel;
+  time: string;
+  preview: string;
+  tags: ConversationTag[];
+  isUrgent?: boolean;
+  isUnreplied?: boolean;
+  threadWho: {
+    name: string;
+    sub: string;
+    badgeTag?: ConversationTag;
+  };
+  messages: ChatMessage[];
+  aiSuggestion?: AISuggestion;
+  profile: CustomerProfile;
+}
