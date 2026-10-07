@@ -1,0 +1,95 @@
+/* Scoped under .admin-root — CSS toàn cục của Next.js không bị gỡ khi chuyển trang */
+.admin-root .logo-row { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.admin-root .logo-circle {
+  width: 72px; height: 72px; border-radius: 12px; background: var(--sand);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0; border: 1px solid var(--line);
+}
+.admin-root .logo-circle img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+.admin-root .logo-circle img.custom { object-fit: cover; padding: 0; }
+.admin-root .logo-hint { font-size: 12px; color: var(--ink-soft); }
+.admin-root .dirty-note { font-size: 12.5px; color: var(--amber); font-weight: 600; margin-right: auto; }
+.admin-root .plan-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.admin-root .plan-name { font-size: 15px; font-weight: 800; }
+.admin-root .plan-price { color: var(--ink-soft); font-size: 13.5px; margin-top: 2px; }
+.admin-root .usage { margin-top: 20px; }
+.admin-root .usage-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; }
+.admin-root .usage-bar { height: 8px; border-radius: 20px; background: var(--sand); overflow: hidden; }
+.admin-root .usage-fill { height: 100%; background: var(--coral); border-radius: 20px; transition: width 0.5s ease; }
+.admin-root .usage-fill.warn { background: var(--amber); }
+.admin-root .plan-renew { margin-top: 12px; font-size: 13px; color: var(--ink-soft); }
+.admin-root .plan-options { display: flex; flex-direction: column; gap: 10px; }
+.admin-root .plan-option {
+  display: flex; gap: 14px; align-items: flex-start; text-align: left;
+  border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px;
+  background: var(--paper); width: 100%; transition: border-color 0.2s ease, background 0.2s ease;
+}
+.admin-root .plan-option:hover { border-color: var(--coral); }
+.admin-root .plan-option.selected { border-color: var(--coral); background: #FFF7F6; }
+.admin-root .plan-option .radio {
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line);
+  flex-shrink: 0; margin-top: 2px; position: relative;
+}
+.admin-root .plan-option.selected .radio { border-color: var(--coral); }
+.admin-root .plan-option.selected .radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--coral); }
+.admin-root .plan-option .po-body { flex: 1; }
+.admin-root .plan-option .po-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 14.5px; }
+.admin-root .plan-option .po-price { color: var(--coral-deep); }
+.admin-root .plan-option .po-quota { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.admin-root .plan-option ul { margin-top: 6px; padding-left: 16px; font-size: 12.5px; color: var(--ink-soft); }
+.admin-root .current-chip { font-size: 10.5px; font-weight: 700; background: var(--moss-soft); color: var(--moss); padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
+.admin-root .team-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--sand); }
+.admin-root .team-row:last-of-type { border-bottom: none; }
+.admin-root .avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: var(--sand); color: var(--ink-soft);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px;
+}
+.admin-root .team-info { flex: 1; min-width: 0; }
+.admin-root .team-info .t-name { font-size: 14px; font-weight: 700; }
+.admin-root .team-info .t-email { font-size: 12.5px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-root .team-row .status { min-width: 160px; }
+.admin-root .team-actions { display: flex; gap: 6px; align-items: center; min-width: 96px; justify-content: flex-end; }
+.admin-root .role-select {
+  border: 1px solid transparent; background: transparent; border-radius: 20px;
+  font-size: 11px; font-weight: 700; padding: 3px 8px; cursor: pointer; outline: none;
+}
+.admin-root .role-select.owner { background: var(--coral-soft); color: var(--coral-deep); }
+.admin-root .role-select.staff { background: var(--sand); color: var(--ink-soft); }
+.admin-root .role-select:hover, .admin-root .role-select:focus { border-color: var(--line); }
+.admin-root .invite-row { display: flex; gap: 10px; margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--line); align-items: flex-start; }
+.admin-root .invite-row .invite-input { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.admin-root .invite-row select { width: 150px; }
+.admin-root .channel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.admin-root .channel-card {
+  border: 1px solid var(--line); border-radius: 16px; padding: 22px;
+  display: flex; flex-direction: column; gap: 14px; background: var(--paper);
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+.admin-root .channel-card.disabled { opacity: 0.55; }
+.admin-root .channel-card.paused { background: var(--canvas); }
+.admin-root .channel-top { display: flex; align-items: center; gap: 12px; }
+.admin-root .channel-icon {
+  width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 17px; font-weight: 800;
+}
+.admin-root .ic-messenger { background: #1877F2; }
+.admin-root .ic-zalo { background: #0068FF; }
+.admin-root .ic-tiktok { background: #000; }
+.admin-root .channel-name { font-size: 15px; font-weight: 700; }
+.admin-root .channel-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 1px; }
+.admin-root .channel-status { display: flex; align-items: center; justify-content: space-between; margin-top: auto; gap: 10px; flex-wrap: wrap; }
+.admin-root .channel-controls { display: flex; align-items: center; gap: 10px; }
+.admin-root .soon-tag { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); background: var(--sand); padding: 3px 10px; border-radius: 20px; }
+.admin-root .channel-note { font-size: 13px; color: var(--ink-soft); background: var(--sand); border-radius: 12px; padding: 14px 16px; }
+.admin-root .reset-box { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.admin-root .reset-box p { font-size: 13px; color: var(--ink-soft); max-width: 560px; }
+@media (max-width: 880px) {
+  .admin-root .channel-grid { grid-template-columns: 1fr; }
+  .admin-root .team-row { flex-wrap: wrap; }
+  .admin-root .team-row .status { min-width: 0; }
+  .admin-root .invite-row { flex-direction: column; align-items: stretch; }
+  .admin-root .invite-row select { width: 100%; }
+}

@@ -1,0 +1,132 @@
+/* Scoped under .admin-root — CSS toàn cục của Next.js không bị gỡ khi chuyển trang */
+.admin-root .source-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px; background: var(--canvas); border-radius: 12px; flex-wrap: wrap;
+}
+.admin-root .source-left { display: flex; align-items: center; gap: 12px; }
+.admin-root .source-icon {
+  width: 38px; height: 38px; border-radius: 10px; background: #EE4D2D; color: white;
+  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; flex-shrink: 0;
+}
+.admin-root .source-name { font-size: 14.5px; font-weight: 700; }
+.admin-root .source-meta { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.admin-root .source-right { display: flex; align-items: center; gap: 10px; }
+.admin-root .import-alt { margin-top: 18px; font-size: 13px; }
+.admin-root .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-root .tag-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+.admin-root .tag-status.live { background: var(--moss-soft); color: var(--moss); }
+.admin-root .tag-status.syncing { background: var(--amber-soft); color: var(--amber); }
+.admin-root .tag-status .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.admin-root .table-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 18px 0 14px; flex-wrap: wrap; }
+.admin-root .toolbar-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.admin-root .filter-select {
+  border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; font-size: 13.5px;
+  background: var(--canvas); color: var(--ink); outline: none;
+}
+.admin-root .filter-select:focus { border-color: var(--coral); }
+.admin-root .table-summary { font-size: 13px; color: var(--ink-soft); font-weight: 500; }
+.admin-root .table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.admin-root .data-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 720px; }
+.admin-root .data-table th {
+  background: var(--canvas); color: var(--ink-soft); font-weight: 700; padding: 13px 18px;
+  border-bottom: 1px solid var(--line); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+}
+.admin-root .data-table th.sortable { cursor: pointer; user-select: none; }
+.admin-root .data-table th.sortable:hover { color: var(--ink); }
+.admin-root .data-table td { padding: 14px 18px; border-bottom: 1px solid var(--sand); vertical-align: middle; font-size: 13.5px; }
+.admin-root .data-table tbody tr:last-child td { border-bottom: none; }
+.admin-root .data-table tbody tr:hover { background: #FAF7F4; }
+.admin-root .data-table tr.flash td { animation: td-row-flash 1.6s ease; }
+@keyframes td-row-flash { from { background: var(--amber-soft); } to { background: transparent; } }
+.admin-root .prod-cell { display: flex; align-items: center; gap: 12px; }
+.admin-root .prod-avatar { width: 38px; height: 38px; border-radius: 8px; background: var(--sand); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+.admin-root .prod-title { font-weight: 700; font-size: 14px; color: var(--ink); }
+.admin-root .prod-sku { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.admin-root .cat-pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 16px; font-size: 12px; font-weight: 600; background: var(--sand); color: var(--ink); }
+.admin-root .variant-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+.admin-root .qty-val { font-weight: 800; font-size: 14px; color: var(--ink); }
+.admin-root .price-val { font-weight: 600; color: var(--ink-soft); font-size: 13px; }
+.admin-root .stock-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.admin-root .stock-badge .s-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.admin-root .stock-in { color: var(--moss); }
+.admin-root .stock-low { color: var(--amber); }
+.admin-root .stock-out { color: var(--coral-deep); }
+.admin-root .pagination { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 14px; }
+.admin-root .page-btn {
+  min-width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper);
+  font-size: 13px; font-weight: 600; color: var(--ink-soft); padding: 0 8px;
+}
+.admin-root .page-btn:hover:not(:disabled) { border-color: var(--coral); color: var(--coral-deep); }
+.admin-root .page-btn.active { background: var(--ink); border-color: var(--ink); color: var(--canvas); }
+.admin-root .page-btn:disabled { opacity: 0.4; }
+.admin-root .faq-row { padding: 16px 0; border-bottom: 1px solid var(--sand); display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.admin-root .faq-row:last-child { border-bottom: none; }
+.admin-root .faq-row.inactive .faq-q, .admin-root .faq-row.inactive .faq-a { opacity: 0.5; }
+.admin-root .faq-q { font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.admin-root .faq-tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: var(--sand); color: var(--ink-soft); }
+.admin-root .faq-a { font-size: 13.5px; color: var(--ink-soft); margin-top: 5px; line-height: 1.55; }
+.admin-root .faq-kw { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.admin-root .kw-chip { font-size: 11.5px; padding: 2px 8px; border-radius: 12px; border: 1px dashed var(--line); color: var(--ink-soft); }
+.admin-root .faq-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.admin-root .faq-tip { font-size: 13px; color: var(--ink-soft); background: var(--sand); border-radius: 12px; padding: 14px 16px; }
+.admin-root .trigger-row { display: flex; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--sand); }
+.admin-root .trigger-row:last-child { border-bottom: none; }
+.admin-root .trigger-row.off .trigger-info { opacity: 0.6; }
+.admin-root .trigger-icon {
+  width: 38px; height: 38px; border-radius: 10px; background: var(--sand); color: var(--coral-deep);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.admin-root .trigger-icon svg { width: 18px; height: 18px; }
+.admin-root .trigger-icon.instant { background: var(--coral-soft); }
+.admin-root .trigger-info { flex: 1; min-width: 0; }
+.admin-root .trigger-info .tr-title { font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.admin-root .trigger-info .tr-desc { font-size: 13px; color: var(--ink-soft); margin-top: 3px; max-width: 480px; }
+.admin-root .badge-instant { font-size: 10.5px; font-weight: 700; color: var(--coral-deep); background: var(--coral-soft); padding: 2px 8px; border-radius: 20px; }
+.admin-root .trigger-tail { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
+.admin-root .trigger-tail .link-btn { color: var(--ink-soft); font-size: 13px; }
+.admin-root .trigger-tail .link-btn:hover { color: var(--coral-deep); }
+.admin-root .log-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--sand); font-size: 13.5px; }
+.admin-root .log-row:last-child { border-bottom: none; }
+.admin-root .log-row.new { animation: td-row-flash 1.6s ease; }
+.admin-root .log-icon { width: 30px; height: 30px; border-radius: 50%; background: var(--sand); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11.5px; flex-shrink: 0; }
+.admin-root .log-name { font-weight: 700; min-width: 96px; }
+.admin-root .log-trigger { color: var(--ink-soft); flex: 1; min-width: 0; }
+.admin-root .log-time { color: var(--ink-soft); font-size: 12.5px; flex-shrink: 0; }
+.admin-root .log-status { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--moss); flex-shrink: 0; min-width: 76px; }
+.admin-root .log-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--moss); }
+.admin-root .log-status.sent { color: var(--ink-soft); }
+.admin-root .log-status.sent .dot { background: var(--ink-soft); }
+.admin-root .tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.admin-root .tpl-vars { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.admin-root .var-chip {
+  font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--canvas); color: var(--ink-soft);
+}
+.admin-root .var-chip:hover { border-color: var(--coral); color: var(--coral-deep); }
+.admin-root .delay-row { display: flex; gap: 8px; align-items: center; }
+.admin-root .delay-row input { width: 90px !important; }
+.admin-root .delay-row select { width: 100px !important; }
+.admin-root .tpl-preview { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--paper); align-self: start; }
+.admin-root .tpl-preview-head { padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--canvas); }
+.admin-root .tpl-preview-head .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+.admin-root .tpl-preview-head .subj { font-size: 14.5px; font-weight: 800; margin-top: 4px; }
+.admin-root .tpl-preview-body { padding: 16px 18px; font-size: 13.5px; line-height: 1.65; max-height: 380px; overflow-y: auto; }
+.admin-root .tpl-preview-body p { margin-bottom: 12px; }
+@media (max-width: 880px) {
+  .admin-root .source-row, .admin-root .trigger-row { flex-direction: column; align-items: flex-start; }
+  .admin-root .trigger-tail { width: 100%; justify-content: space-between; }
+  .admin-root .tpl-grid { grid-template-columns: 1fr; }
+  .admin-root .log-row { flex-wrap: wrap; }
+  .admin-root .log-trigger { flex-basis: 100%; order: 5; padding-left: 42px; }
+}
+.admin-root .product-card {
+  display: flex; gap: 14px; background: var(--canvas); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px; margin: 16px 0 20px; align-items: center;
+}
+.admin-root .product-thumb {
+  width: 68px; height: 68px; border-radius: 10px; background: var(--sand); color: var(--ink-soft);
+  display: flex; align-items: center; justify-content: center; font-size: 30px; flex-shrink: 0;
+}
+.admin-root .product-info .p-name { font-size: 14px; font-weight: 700; }
+.admin-root .product-info .p-attr { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.admin-root .product-info .p-price { font-size: 14px; font-weight: 800; color: var(--coral-deep); margin-top: 4px; }
