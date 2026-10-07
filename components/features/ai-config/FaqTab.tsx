@@ -5,8 +5,10 @@ import { IconEdit, IconSearch, IconTrash } from '@/components/ui/Icons';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { Switch } from '@/components/ui/Switch';
 import { errorMessage, useToast } from '@/components/shared/ToastProvider';
-import { faqApi, snapshot, type FaqInput } from '@/lib/services/api';
-import { botReply, emptyCtx } from '@/lib/services/chatBot';
+import { faqApi, type FaqInput } from '@/lib/services/api';
+import { askShopAi } from '@/lib/services/aiChat';
+import type { AiChatReply } from '@/lib/types/ai';
+import { EMOTION_LABELS, PRIORITY_LABELS } from '@/lib/services/inboxAi';
 import type { Faq } from '@/lib/types/admin';
 import { normalize } from '@/lib/utils/format';
 
@@ -92,18 +94,23 @@ function FaqFormModal({ initial, onClose, onSaved }: { initial: Faq | 'new'; onC
 
 function AskAiBox() {
   const [q, setQ] = useState('');
-  const [result, setResult] = useState<{ text: string; faq?: Faq; handoff?: boolean } | null>(null);
+  const [result, setResult] = useState<AiChatReply | null>(null);
+  const [error, setError] = useState('');
   const [thinking, setThinking] = useState(false);
 
-  const ask = (e: FormEvent) => {
+  const ask = async (e: FormEvent) => {
     e.preventDefault();
-    if (!q.trim()) return;
+    if (!q.trim() || thinking) return;
     setThinking(true);
-    setTimeout(() => {
-      const r = botReply(q, snapshot.faqs(), snapshot.products(), emptyCtx());
-      setResult({ text: r.text, faq: r.matchedFaq, handoff: !!r.handoff });
+    setResult(null);
+    setError('');
+    try {
+      setResult(await askShopAi(q.trim()));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
       setThinking(false);
-    }, 500);
+    }
   };
 
   return (
@@ -111,7 +118,7 @@ function AskAiBox() {
       <div className="card-head">
         <div>
           <h2>Thử hỏi AI</h2>
-          <p className="card-desc">Gõ thử một câu khách hay hỏi để xem AI sẽ trả lời thế nào với bộ FAQ & sản phẩm hiện tại.</p>
+          <p className="card-desc">Thử câu hỏi của khách với sản phẩm, FAQ và kịch bản email đang bật đã lưu. Hộp thoại dùng cùng nguồn dữ liệu này.</p>
         </div>
       </div>
       <form onSubmit={ask} style={{ display: 'flex', gap: 10 }}>
@@ -121,15 +128,15 @@ function AskAiBox() {
           Hỏi
         </button>
       </form>
+      {error && <p className="field-error" role="alert" style={{ marginTop: 14 }}>{error}</p>}
       {result && (
         <div className="faq-tip" style={{ marginTop: 14 }}>
-          <div style={{ color: 'var(--ink)', fontWeight: 600 }}>🤖 {result.text}</div>
+          <div style={{ color: 'var(--ink)', fontWeight: 600 }}>🤖 {result.reply}</div>
           <div style={{ marginTop: 6, fontSize: 12 }}>
-            {result.handoff
-              ? '→ AI sẽ chuyển tiếp cho nhân viên thật.'
-              : result.faq
-                ? `→ Dựa trên FAQ: “${result.faq.question}”`
-                : '→ Không dựa trên FAQ nào (trả lời từ dữ liệu sản phẩm hoặc câu mặc định).'}
+            {EMOTION_LABELS[result.analysis.emotion]} · {PRIORITY_LABELS[result.analysis.priority]} — {result.analysis.reason}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12 }}>
+            Nguồn dữ liệu đã cung cấp: {result.sourceSummary}
           </div>
         </div>
       )}

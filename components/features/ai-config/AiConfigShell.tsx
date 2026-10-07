@@ -21,7 +21,7 @@ export function AiConfigShell() {
       <div className="page-head">
         <div>
           <h1>Cấu hình AI</h1>
-          <p>Dạy AI hiểu sản phẩm và cách phản ứng tự động với khách.</p>
+          <p>AI dùng sản phẩm, FAQ và kịch bản email đang bật đã lưu để trả lời khách. Thay đổi đã lưu áp dụng từ câu hỏi tiếp theo.</p>
         </div>
       </div>
 

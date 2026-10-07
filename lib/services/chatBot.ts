@@ -48,6 +48,13 @@ export function detectNegative(text: string): boolean {
   return hasAny(normalize(text), NEGATIVE);
 }
 
+export function detectHandoff(text: string): 'negative' | 'request' | undefined {
+  const t = normalize(text);
+  if (hasAny(t, NEGATIVE)) return 'negative';
+  if (hasAny(t, HUMAN)) return 'request';
+  return undefined;
+}
+
 export function findProduct(t: string, products: Product[]): Product | null {
   let best: Product | null = null;
   let bestScore = 0;

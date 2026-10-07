@@ -11,7 +11,7 @@ function ShellLayout({ currentPath, children }: { currentPath: AdminPath; childr
   const toast = useToast();
   return (
     <div className="shell">
-      <Sidebar currentPath={currentPath} onToast={(msg) => toast(msg, 'info')} showCustomerPreviews />
+      <Sidebar currentPath={currentPath} onToast={(msg) => toast(msg, 'info')} />
       <main className="main">{children}</main>
     </div>
   );

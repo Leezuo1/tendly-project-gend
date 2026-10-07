@@ -31,6 +31,7 @@ export function ConversationList({
   return (
     <div className="conv-pane">
       <div className="conv-search">
+        <div className="conv-queue-title">Hàng chờ trả lời</div>
         <input
           type="text"
           value={searchQuery}
@@ -38,6 +39,7 @@ export function ConversationList({
           placeholder="Tìm khách hàng, mã đơn..."
           aria-label="Tìm kiếm hội thoại"
         />
+        <p className="conv-queue-note">Sắp theo mức độ cần hỗ trợ · Ưu tiên cao trước</p>
       </div>
 
       <div className="conv-filter-row">
@@ -105,6 +107,8 @@ export function ConversationList({
                   <div className="conv-preview">{conv.preview}</div>
                   {conv.tags && conv.tags.length > 0 && (
                     <div className="conv-tags">
+                    {conv.aiStatus === 'analyzing' && <span className="tag tag-neutral">Đang phân tích...</span>}
+                    {conv.aiStatus === 'error' && <span className="tag tag-risk">Cần phân tích lại</span>}
                       {conv.tags.map((tag, idx) => (
                         <span key={idx} className={`tag tag-${tag.type}`}>
                           {tag.label}

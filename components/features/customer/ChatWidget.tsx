@@ -5,8 +5,9 @@ import { IconChat, IconClose, IconSend } from '@/components/ui/Icons';
 import { useShop } from '@/components/shared/ShopProvider';
 import { AGENT, CUSTOMER, LAST_ORDER } from '@/lib/data/customer';
 import { emailApi, snapshot } from '@/lib/services/api';
-import { agentReply, botReply, summarizeIssue, type ConversationCtx } from '@/lib/services/chatBot';
-import { clockTime, initials, uid } from '@/lib/utils/format';
+import { agentReply, findProduct, summarizeIssue, type ConversationCtx } from '@/lib/services/chatBot';
+import { askShopAi } from '@/lib/services/aiChat';
+import { clockTime, initials, normalize, uid } from '@/lib/utils/format';
 
 export type ChatItem =
   | { kind: 'divider'; id: string; label: string }
@@ -114,27 +115,37 @@ export function ChatWidget({ seed }: { seed: ChatSeed }) {
     setBusy(true);
     push(msg('customer', text));
 
-    if (mode === 'agent') {
-      await wait(600);
-      setTyping('agent');
-      await wait(jitter(1400));
-      const r = agentReply(text);
+    try {
+      if (mode === 'agent') {
+        await wait(600);
+        setTyping('agent');
+        await wait(jitter(1400));
+        const r = agentReply(text);
+        setTyping(null);
+        push(msg('agent', r.text));
+        setQuickReplies(r.quickReplies);
+      } else {
+        await wait(350);
+        setTyping('bot');
+        const product = findProduct(normalize(text), snapshot.products());
+        if (product) ctxRef.current = { productId: product.id, size: null, color: null };
+        const context = items.flatMap((item) => item.kind === 'msg' ? [{
+          role: item.from === 'customer' ? 'user' as const : 'model' as const,
+          text: item.text.slice(0, 2000),
+        }] : []).slice(-10);
+        const r = await askShopAi(text, context);
+        const reason = r.analysis.needsHuman ? (r.analysis.sentiment === 'negative' ? 'negative' : 'request') : undefined;
+        setTyping(null);
+        push(msg('bot', r.reply, 'ai'));
+        if (reason) await handoff(text, reason);
+      }
+    } catch (error) {
+      push({ kind: 'system', id: uid('sys'), text: error instanceof Error ? error.message : 'AI chưa thể trả lời. Vui lòng thử lại.' });
+    } finally {
       setTyping(null);
-      push(msg('agent', r.text));
-      setQuickReplies(r.quickReplies);
-    } else {
-      await wait(350);
-      setTyping('bot');
-      await wait(jitter(900));
-      const r = botReply(text, snapshot.faqs(), snapshot.products(), ctxRef.current);
-      ctxRef.current = r.ctx;
-      setTyping(null);
-      push(msg('bot', r.text, 'ai'));
-      if (r.handoff) await handoff(text, r.handoff);
-      else setQuickReplies(r.quickReplies);
+      setBusy(false);
+      inputRef.current?.focus();
     }
-    setBusy(false);
-    inputRef.current?.focus();
   };
 
   const onSubmit = (e: FormEvent) => {

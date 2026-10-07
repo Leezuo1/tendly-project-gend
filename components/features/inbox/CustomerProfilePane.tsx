@@ -2,13 +2,18 @@
 
 import React from 'react';
 import { CustomerProfile } from '@/lib/types/inbox';
+import type { AiMessageAnalysis } from '@/lib/types/ai';
+import { EMOTION_LABELS, PRIORITY_LABELS } from '@/lib/services/inboxAi';
 
 interface CustomerProfilePaneProps {
   profile: CustomerProfile;
   onToast: (msg: string) => void;
+  analysis?: AiMessageAnalysis;
+  aiStatus?: 'analyzing' | 'ready' | 'error';
+  isUnreplied: boolean;
 }
 
-export function CustomerProfilePane({ profile, onToast }: CustomerProfilePaneProps) {
+export function CustomerProfilePane({ profile, onToast, analysis, aiStatus, isUnreplied }: CustomerProfilePaneProps) {
   return (
     <div className="profile-pane">
       {/* Profile Head */}
@@ -25,6 +30,28 @@ export function CustomerProfilePane({ profile, onToast }: CustomerProfilePanePro
             ))}
           </div>
         )}
+      </div>
+
+      <div className="profile-section emotion-analysis" aria-label="Phân tích cảm xúc của AI">
+        <div className="profile-section-title">Cảm xúc &amp; ưu tiên</div>
+        {aiStatus === 'analyzing' ? (
+          <p className="emotion-analysis-note" role="status">Đang phân tích tin nhắn mới...</p>
+        ) : analysis ? (
+          <>
+            <div className="emotion-analysis-tags">
+              <span className={`tag tag-${analysis.sentiment === 'negative' ? 'high' : analysis.sentiment === 'positive' ? 'positive' : 'neutral'}`}>
+                {EMOTION_LABELS[analysis.emotion]}
+              </span>
+              <span className={`tag tag-${isUnreplied && analysis.priority === 'high' ? 'high' : 'neutral'}`}>
+                {isUnreplied ? PRIORITY_LABELS[analysis.priority] : 'Đã trả lời'}
+              </span>
+            </div>
+            <p className="emotion-analysis-reason">{analysis.reason}</p>
+            {isUnreplied && analysis.needsHuman && <p className="emotion-analysis-note">Nên để nhân viên hỗ trợ trực tiếp.</p>}
+            <p className="emotion-analysis-note">Đánh giá từ tin nhắn gần nhất và ngữ cảnh trong phiên.</p>
+          </>
+        ) : <p className="emotion-analysis-note">Chưa có phân tích AI. Gửi tin mới hoặc bấm Phân tích AI.</p>}
+        {aiStatus === 'error' && <p className="emotion-analysis-note">Phân tích tin mới chưa thành công; chưa cập nhật nhãn.</p>}
       </div>
 
       {/* Profile Info */}

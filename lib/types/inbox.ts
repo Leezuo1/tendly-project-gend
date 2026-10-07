@@ -2,15 +2,19 @@
 // DOMAIN TYPES — Hộp thoại (Inbox & Omni-channel Chat)
 // ============================================================
 
+import type { AiMessageAnalysis } from './ai';
+
 export type InboxFilter = 'all' | 'urgent' | 'unreplied';
 
 export type Channel = 'facebook' | 'zalo';
 
-export type TagType = 'high' | 'vip' | 'risk' | 'loop';
+export type TagType = 'high' | 'vip' | 'risk' | 'loop' | 'positive' | 'neutral';
 
 export interface ConversationTag {
   label: string;
   type: TagType;
+  source?: 'ai';
+  kind?: 'emotion' | 'priority';
 }
 
 export interface ChatMessage {
@@ -64,5 +68,9 @@ export interface Conversation {
   };
   messages: ChatMessage[];
   aiSuggestion?: AISuggestion;
+  analysis?: AiMessageAnalysis & { messageId: string };
+  aiStatus?: 'analyzing' | 'ready' | 'error';
+  aiError?: string;
+  pendingSince?: number;
   profile: CustomerProfile;
 }
