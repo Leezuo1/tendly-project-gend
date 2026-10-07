@@ -1,0 +1,693 @@
+/* ========== MARKETING MODULE STYLES (matches marketing.html) ========== */
+
+.marketing-root {
+  --canvas: #FAF9F8;
+  --coral: #F06A6A;
+  --coral-deep: #D8514F;
+  --ink: #2B211E;
+  --ink-soft: #6B5F5A;
+  --sand: #F1EAE3;
+  --line: #E7DED7;
+  --moss: #4B6358;
+  --moss-soft: #DCE6E1;
+  --paper: #FFFFFF;
+  --amber: #B8790A;
+  --amber-soft: #F5E7CC;
+  --alert-bg: #FCE4E2;
+
+  font-family: 'Inter', sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.marketing-root .shell {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  min-height: 100vh;
+}
+
+.marketing-root .sidebar {
+  background: var(--paper);
+  border-right: 1px solid var(--line);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.marketing-root .brand {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px 28px;
+}
+
+.marketing-root .brand img {
+  height: 32px;
+  width: auto;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.marketing-root .brand:hover img {
+  filter: drop-shadow(0 3px 8px rgba(240, 106, 106, 0.4));
+}
+
+.marketing-root .nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marketing-root .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  position: relative;
+  transition: background 0.2s ease, color 0.2s ease;
+  border: none;
+  background: none;
+  text-decoration: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.marketing-root .nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.marketing-root .nav-item:hover {
+  background: var(--sand);
+  color: var(--ink);
+}
+
+.marketing-root .nav-item.active {
+  background: var(--sand);
+  color: var(--ink);
+}
+
+.marketing-root .nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--coral);
+}
+
+.marketing-root .nav-badge {
+  margin-left: auto;
+  background: var(--coral);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 20px;
+}
+
+.marketing-root .sidebar-foot {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 8px;
+}
+
+.marketing-root .sidebar-foot .avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sand);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.marketing-root .sidebar-foot .who .name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.marketing-root .sidebar-foot .who .role {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.marketing-root .sidebar-foot .logout-btn {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.marketing-root .sidebar-foot .logout-btn:hover {
+  color: var(--coral-deep);
+  background: var(--sand);
+}
+
+.marketing-root .main {
+  padding: 40px 56px 80px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.marketing-root .page-head h1 {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.marketing-root .page-head p {
+  margin-top: 6px;
+  font-size: 14.5px;
+  color: var(--ink-soft);
+}
+
+.marketing-root .tabs {
+  display: flex;
+  gap: 28px;
+  margin-top: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.marketing-root .tab-btn {
+  background: none;
+  border: none;
+  padding: 0 2px 13px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  position: relative;
+  transition: color 0.2s ease;
+  cursor: pointer;
+}
+
+.marketing-root .tab-btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--coral);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+
+.marketing-root .tab-btn:hover {
+  color: var(--ink);
+}
+
+.marketing-root .tab-btn.active {
+  color: var(--ink);
+}
+
+.marketing-root .tab-btn.active::after {
+  transform: scaleX(1);
+}
+
+.marketing-root .tab-panel {
+  display: none;
+  margin-top: 24px;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.marketing-root .tab-panel.active {
+  display: flex;
+}
+
+.marketing-root .card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 26px;
+}
+
+.marketing-root .card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.marketing-root .card-head h2 {
+  font-size: 16.5px;
+  font-weight: 700;
+}
+
+.marketing-root .card-head .hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.marketing-root .card-desc {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin-top: -10px;
+  margin-bottom: 18px;
+  max-width: 640px;
+}
+
+.marketing-root .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border: none;
+  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+
+.marketing-root .btn-primary {
+  background: var(--coral);
+  color: white;
+}
+
+.marketing-root .btn-primary:hover:not([disabled]) {
+  background: var(--coral-deep);
+  box-shadow: 0 6px 18px rgba(240, 106, 106, 0.3);
+}
+
+.marketing-root .btn-outline {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.marketing-root .btn-outline:hover:not([disabled]) {
+  border-color: var(--coral);
+  color: var(--coral-deep);
+}
+
+.marketing-root .btn-sm {
+  padding: 7px 13px;
+  font-size: 12.5px;
+}
+
+.marketing-root .btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.marketing-root .tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.marketing-root .tag-loop {
+  background: var(--moss-soft);
+  color: var(--moss);
+}
+
+.marketing-root .tag-rfm {
+  background: var(--sand);
+  color: var(--ink-soft);
+}
+
+.marketing-root .tag-vip {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+/* ---- Stat / KPI row ---- */
+.marketing-root .stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.marketing-root .stat-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.marketing-root .stat-card:hover {
+  border-color: var(--coral);
+}
+
+.marketing-root .stat-card.selected {
+  border-color: var(--coral);
+  background: var(--alert-bg);
+}
+
+.marketing-root .stat-card .label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.marketing-root .stat-card .value {
+  font-size: 28px;
+  font-weight: 800;
+  margin-top: 8px;
+}
+
+.marketing-root .stat-card .sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+/* ---- Approval queue rows ---- */
+.marketing-root .approval-row {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--sand);
+  display: flex;
+  gap: 16px;
+}
+
+.marketing-root .approval-row:last-child {
+  border-bottom: none;
+}
+
+.marketing-root .approval-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--sand);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.marketing-root .approval-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.marketing-root .approval-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.marketing-root .approval-name {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.marketing-root .approval-channel {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.marketing-root .approval-context {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  background: var(--canvas);
+  border-left: 3px solid var(--moss);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.marketing-root .approval-context b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.marketing-root .approval-draft {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  background: var(--sand);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.marketing-root .approval-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.marketing-root .approval-tail {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.marketing-root .approval-time {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* ---- Chip filter ---- */
+.marketing-root .chip-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.marketing-root .chip {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--paper);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.marketing-root .chip:hover {
+  border-color: var(--coral);
+  color: var(--coral-deep);
+}
+
+.marketing-root .chip.selected {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--canvas);
+}
+
+/* ---- Segment table ---- */
+.marketing-root .seg-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--sand);
+}
+
+.marketing-root .seg-row:last-child {
+  border-bottom: none;
+}
+
+.marketing-root .seg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.marketing-root .seg-vip {
+  background: var(--amber);
+}
+
+.marketing-root .seg-loyal {
+  background: var(--moss);
+}
+
+.marketing-root .seg-risk {
+  background: var(--coral);
+}
+
+.marketing-root .seg-new {
+  background: #8FA7C7;
+}
+
+.marketing-root .seg-name {
+  font-size: 14px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.marketing-root .seg-count {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  width: 90px;
+}
+
+.marketing-root .seg-bar-wrap {
+  flex: 2;
+  height: 8px;
+  background: var(--sand);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.marketing-root .seg-bar {
+  height: 100%;
+  border-radius: 20px;
+}
+
+/* ---- KPI trend cards ---- */
+.marketing-root .kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.marketing-root .kpi-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.marketing-root .kpi-card .label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.marketing-root .kpi-card .value {
+  font-size: 26px;
+  font-weight: 800;
+  margin-top: 10px;
+}
+
+.marketing-root .trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.marketing-root .trend svg {
+  width: 13px;
+  height: 13px;
+}
+
+.marketing-root .trend.up {
+  color: var(--moss);
+}
+
+.marketing-root .trend-note {
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.marketing-root .compare-bars {
+  margin-top: 20px;
+}
+
+.marketing-root .compare-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.marketing-root .compare-label {
+  width: 260px;
+  font-size: 13.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.marketing-root .compare-track {
+  flex: 1;
+  height: 14px;
+  background: var(--sand);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.marketing-root .compare-fill {
+  height: 100%;
+  border-radius: 20px;
+}
+
+.marketing-root .compare-fill.new {
+  background: var(--moss);
+}
+
+.marketing-root .compare-fill.old {
+  background: #C9BEB6;
+}
+
+.marketing-root .compare-val {
+  width: 54px;
+  text-align: right;
+  font-size: 13.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+@media (max-width: 880px) {
+  .marketing-root .shell {
+    grid-template-columns: 1fr;
+  }
+  .marketing-root .main {
+    padding: 28px 20px 60px;
+  }
+  .marketing-root .stat-grid,
+  .marketing-root .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .marketing-root .approval-row {
+    flex-direction: column;
+  }
+  .marketing-root .compare-label {
+    width: 140px;
+    font-size: 12.5px;
+  }
+}
