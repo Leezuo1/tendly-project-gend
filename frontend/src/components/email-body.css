@@ -1,0 +1,11 @@
+.product-card {
+  display: flex; gap: 14px; background: var(--canvas); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px; margin: 16px 0 20px; align-items: center;
+}
+.product-thumb {
+  width: 68px; height: 68px; border-radius: 10px; background: var(--sand); color: var(--ink-soft);
+  display: flex; align-items: center; justify-content: center; font-size: 30px; flex-shrink: 0;
+}
+.product-info .p-name { font-size: 14px; font-weight: 700; }
+.product-info .p-attr { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.product-info .p-price { font-size: 14px; font-weight: 800; color: var(--coral-deep); margin-top: 4px; }
