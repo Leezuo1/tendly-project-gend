@@ -1,0 +1,96 @@
+/* Tab "Soạn bài AI" — scope .marketing-root + prefix pc- để không đụng CSS các tab khác */
+.marketing-root .pc-root { display: flex; flex-direction: column; gap: 20px; margin-top: 24px; }
+.marketing-root .pc-root code { font-size: 12px; background: var(--sand); padding: 1px 6px; border-radius: 6px; }
+
+.marketing-root .pc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 24px; }
+.marketing-root .pc-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.marketing-root .pc-span { grid-column: 1 / -1; }
+.marketing-root .pc-field > label { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.marketing-root .pc-optional { font-weight: 500; opacity: 0.8; }
+.marketing-root .pc-hint { font-size: 12.5px; color: var(--ink-soft); }
+.marketing-root .pc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.marketing-root .pc-chip-sm { padding: 6px 12px; font-size: 12.5px; }
+
+.marketing-root .pc-input {
+  width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px;
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--canvas); outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.marketing-root textarea.pc-input { resize: vertical; line-height: 1.55; }
+.marketing-root .pc-input:focus { border-color: var(--coral); background: var(--paper); }
+
+.marketing-root .pc-products {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px;
+  max-height: 252px; overflow-y: auto; padding: 2px;
+}
+.marketing-root .pc-product {
+  display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer;
+  border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--paper);
+  font: inherit; color: var(--ink); transition: border-color 0.2s ease, background 0.2s ease;
+}
+.marketing-root .pc-product:hover { border-color: var(--coral); }
+.marketing-root .pc-product.selected { border-color: var(--coral); background: #FFF4F3; }
+.marketing-root .pc-product.out { opacity: 0.6; }
+.marketing-root .pc-product-emoji {
+  width: 34px; height: 34px; border-radius: 8px; background: var(--sand);
+  display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;
+}
+.marketing-root .pc-product-info { display: flex; flex-direction: column; min-width: 0; }
+.marketing-root .pc-product-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.marketing-root .pc-product-meta { font-size: 11.5px; color: var(--ink-soft); }
+
+.marketing-root .pc-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+.marketing-root .pc-error { margin-top: 14px; font-size: 13px; font-weight: 600; color: var(--coral-deep); }
+.marketing-root .pc-spinner {
+  width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  display: inline-block; animation: pc-spin 0.7s linear infinite;
+}
+@keyframes pc-spin { to { transform: rotate(360deg); } }
+
+/* ---- bản nháp ---- */
+.marketing-root .pc-drafts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.marketing-root .pc-draft {
+  border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: var(--canvas);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.marketing-root .pc-draft-head { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--coral-deep); }
+.marketing-root .pc-mini-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-top: 6px; display: flex; justify-content: space-between; }
+.marketing-root .pc-count { font-weight: 600; }
+.marketing-root .pc-count.over { color: var(--coral-deep); }
+.marketing-root .pc-idea { margin-top: 6px; font-size: 12.5px; color: var(--ink-soft); background: var(--paper); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; }
+.marketing-root .pc-draft-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* ---- bài đã lưu ---- */
+.marketing-root .pc-post { padding: 16px 0; border-bottom: 1px solid var(--sand); display: flex; flex-direction: column; gap: 8px; }
+.marketing-root .pc-post:last-child { border-bottom: none; }
+.marketing-root .pc-post-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+.marketing-root .pc-status { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; }
+.marketing-root .pc-status.draft { background: var(--amber-soft); color: var(--amber); }
+.marketing-root .pc-status.published { background: var(--moss-soft); color: var(--moss); }
+.marketing-root .pc-channel { font-weight: 700; }
+.marketing-root .pc-goal { color: var(--ink-soft); }
+.marketing-root .pc-time { margin-left: auto; color: var(--ink-soft); }
+.marketing-root .pc-post-title { font-weight: 700; font-size: 14px; }
+.marketing-root .pc-post-content { font-size: 13.5px; line-height: 1.6; white-space: pre-line; background: var(--sand); border-radius: 10px; padding: 12px 14px; }
+.marketing-root .pc-tags { margin-top: 8px; color: #3B5998; font-weight: 600; }
+.marketing-root .pc-danger:hover:not(:disabled) { border-color: var(--coral-deep); color: var(--coral-deep); }
+.marketing-root .pc-empty { text-align: center; padding: 28px 12px; color: var(--ink-soft); font-size: 13.5px; }
+.marketing-root .pc-notice {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px;
+  background: var(--amber-soft); color: var(--ink); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+}
+.marketing-root .pc-fb-hint { margin-bottom: 4px; }
+
+/* ---- mã quản trị ---- */
+.marketing-root .pc-key { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border-color: var(--amber); }
+.marketing-root .pc-key h2 { font-size: 16px; font-weight: 700; }
+.marketing-root .pc-key p { font-size: 13px; color: var(--ink-soft); max-width: 560px; margin-top: 4px; }
+.marketing-root .pc-key-form { display: flex; gap: 8px; }
+.marketing-root .pc-key-form input {
+  border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; font: inherit; font-size: 14px; outline: none;
+}
+
+@media (max-width: 880px) {
+  .marketing-root .pc-grid { grid-template-columns: 1fr; }
+  .marketing-root .pc-time { margin-left: 0; width: 100%; }
+}

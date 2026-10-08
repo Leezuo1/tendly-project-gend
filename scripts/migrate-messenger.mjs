@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import pg from 'pg';
@@ -14,16 +14,18 @@ if (!process.env.DATABASE_URL?.trim()) {
     max: 1, connectionTimeoutMillis: 10000, statement_timeout: 30000 });
   let client;
   try {
-    const sql = await readFile(fileURLToPath(new URL('../db/migrations/001-messenger.sql', import.meta.url)), 'utf8');
+    // Áp dụng mọi file trong db/migrations theo thứ tự tên (001-messenger, 002-marketing-posts...).
+    const dir = fileURLToPath(new URL('../db/migrations/', import.meta.url));
+    const files = (await readdir(dir)).filter((name) => name.endsWith('.sql')).sort();
     client = await pool.connect();
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(727364101)");
-    await client.query(sql);
+    for (const file of files) await client.query(await readFile(`${dir}${file}`, 'utf8'));
     await client.query('COMMIT');
-    console.log('Messenger Postgres tables are ready. Existing data was preserved.');
+    console.log(`Postgres tables are ready (${files.join(', ')}). Existing data was preserved.`);
   } catch {
     if (client) { try { await client.query('ROLLBACK'); } catch { /* connection unavailable */ } }
-    console.error('Messenger migration failed. Check DATABASE_URL, network access and database permissions.');
+    console.error('Migration failed. Check DATABASE_URL, network access and database permissions.');
     process.exitCode = 1;
   } finally { client?.release(); await pool.end(); }
 }
