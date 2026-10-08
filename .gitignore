@@ -190,4 +190,5 @@ vite.config.ts.timestamp-*
 .turbo
 *.html
 
-.env.example
+# Local npm cache
+/.npm-cache/
