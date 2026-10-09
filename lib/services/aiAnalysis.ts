@@ -12,8 +12,9 @@ export const AI_RESPONSE_SCHEMA = {
         priority: { type: 'string', enum: ['high', 'normal', 'low'] },
         reason: { type: 'string', description: 'Lý do ngắn gọn bằng tiếng Việt, dựa vào tin nhắn.' },
         needsHuman: { type: 'boolean' },
+        communicationStyle: { type: 'string', description: 'Phong cách giao tiếp quan sát được trong tin khách và ngữ cảnh, tối đa 200 ký tự. Không đủ căn cứ thì để chuỗi trống; không gán tính cách cố định hay chẩn đoán.' },
       },
-      required: ['sentiment', 'emotion', 'priority', 'reason', 'needsHuman'],
+      required: ['sentiment', 'emotion', 'priority', 'reason', 'needsHuman', 'communicationStyle'],
       additionalProperties: false,
     },
     reply: { type: 'string', description: 'Câu trả lời cho khách, giọng điệu phù hợp với analysis.' },
@@ -29,7 +30,8 @@ export const EMOTION_RESPONSE_PROMPT = `PHÂN TÍCH CẢM XÚC VÀ ƯU TIÊN TR�
 4. needsHuman=true khi khách yêu cầu người thật hoặc sự cố cần nhân viên xử lý trực tiếp. Thiếu thông tin sản phẩm đơn thuần không tự động là high hoặc cần chuyển người thật. reason nêu bằng tiếng Việt căn cứ trong tin nhắn và vì sao cần mức ưu tiên đó; không bịa sự cố hay thông tin khách.
 5. Nếu ngữ cảnh có khiếu nại chưa được xử lý, câu hỏi tiếp tục cùng vấn đề vẫn ưu tiên xử lý. Lời cảm ơn sau khi shop giải đáp thì hạ mức ưu tiên; không giữ nhãn tức giận mãi chỉ vì tin cũ. Nếu khách đã chuyển sang chủ đề khác, xét tin mới.
 6. SAU KHI xác định analysis, tạo reply dựa vào cảm xúc đó và NGUỒN TRI THỨC: angry/disappointed → ghi nhận bất tiện, xin lỗi ngắn gọn khi có sự cố với shop, đề xuất bước kiểm tra/hỗ trợ, không tranh cãi hoặc dùng emoji vui vẻ; worried → bình tĩnh, rõ ràng, không hứa điều chưa xác nhận; happy → thân thiện, có thể đáp lại lời cảm ơn; neutral → trực tiếp, lịch sự. Không nói thẳng khách bị gán nhãn nào, không tiết lộ điểm ưu tiên. Đồng cảm không được thay thế sự thật: vẫn không tự tạo đơn, cam kết hoàn tiền/giao gấp, cấp voucher hay hứa đã chuyển nhân viên. needsHuman chỉ là ĐỀ XUẤT trong hệ thống, không phải thao tác chuyển tiếp đã thực hiện. Khi khách yêu cầu nhân viên/hoàn tiền do sự cố, dùng kiểu câu: "Shop xin lỗi vì sự bất tiện này. Bạn gửi mã đơn để nhân viên kiểm tra và hỗ trợ yêu cầu của bạn nhé." Tuyệt đối không viết "đã ghi nhận và chuyển ngay", "đã chuyển cho nhân viên" hay "đã tạo yêu cầu hoàn tiền".
-7. Chỉ xuất một JSON có analysis trước, reply sau theo schema. Tất cả quy tắc về sản phẩm không có, xã giao, nguồn dữ liệu và câu hỏi ngoài phạm vi vẫn áp dụng cho reply.`;
+7. communicationStyle mô tả ngắn phong cách giao tiếp thể hiện trong lời khách và ngữ cảnh: mức chi tiết, cách đặt câu hỏi, mong muốn được giải thích hoặc nhu cầu trấn an nếu có căn cứ. Không gán tính cách cố định hay đặc điểm nhạy cảm, không dùng từ xúc phạm, không suy diễn từ giới tính/ảnh/tên. Chưa đủ căn cứ thì để chuỗi trống.
+8. Chỉ xuất một JSON có analysis trước, reply sau theo schema. Tất cả quy tắc về sản phẩm không có, xã giao, nguồn dữ liệu và câu hỏi ngoài phạm vi vẫn áp dụng cho reply.`;
 
 export function parseAiAnalysis(value: unknown): AiMessageAnalysis {
   if (!value || typeof value !== 'object') throw new Error('AI không trả về phân tích cảm xúc hợp lệ.');
@@ -48,7 +50,9 @@ export function parseAiAnalysis(value: unknown): AiMessageAnalysis {
   const priority = a.needsHuman || emotion === 'angry' ? 'high' : a.priority as AiMessageAnalysis['priority'];
   const priorityScore = (priority === 'high' ? 80 : priority === 'normal' ? 40 : 10)
     + (sentiment === 'negative' ? 5 : 0) + (emotion === 'angry' ? 15 : 0);
-  return { sentiment, emotion, priority, priorityScore, reason: a.reason.trim(), needsHuman: a.needsHuman };
+  return { sentiment, emotion, priority, priorityScore, reason: a.reason.trim(), needsHuman: a.needsHuman,
+    ...(typeof a.communicationStyle === 'string' && a.communicationStyle.trim()
+      ? { communicationStyle: a.communicationStyle.trim().slice(0, 200) } : {}) };
 }
 
 export function parseAiChatOutput(text: string): { analysis: AiMessageAnalysis; reply: string } {

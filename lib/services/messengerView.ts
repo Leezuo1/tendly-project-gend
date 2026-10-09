@@ -1,6 +1,7 @@
 import type { Conversation, ChatMessage } from '@/lib/types/inbox';
 import type { MessengerThread } from '@/lib/types/messengerInbox';
 import type { MessengerMessage } from '@/lib/types/messenger';
+import { applyConversationAnalysis } from '@/lib/services/inboxAi';
 
 const time = (timestamp: number) => new Date(timestamp).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 export function messengerChatMessage(m: MessengerMessage): ChatMessage {
@@ -36,6 +37,7 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     : 'FB';
   const avatarUrl = thread.customer?.avatarUrl || undefined;
   const base: Conversation = {
+    memory: thread.memory || previous?.memory || [],
     id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid,
       hasOlder: previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
         ? false : thread.hasOlder },
@@ -62,6 +64,12 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   } else if (previous?.aiStatus && [...previous.messages].reverse().find((m) => m.sender === 'in')?.id === latestIn?.id && unanswered) {
     base.aiStatus = previous.aiStatus;
     base.aiError = previous.aiError;
+  }
+  const saved = base.memory?.find((m) => m.messageId === latestIn?.id);
+  if (saved && !sameQuestion) {
+    const restored = applyConversationAnalysis({ ...base, isUnreplied: true }, saved.messageId, saved);
+    return unanswered ? restored : { ...restored, isUnreplied: false, isUrgent: false, aiSuggestion: undefined,
+      tags: restored.tags.filter((t) => t.kind !== 'priority') };
   }
   return base;
 }
