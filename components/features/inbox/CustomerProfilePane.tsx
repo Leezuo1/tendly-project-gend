@@ -4,23 +4,25 @@ import React from 'react';
 import { CustomerProfile } from '@/lib/types/inbox';
 import type { AiMessageAnalysis } from '@/lib/types/ai';
 import { EMOTION_LABELS, PRIORITY_LABELS } from '@/lib/services/inboxAi';
+import { CustomerAvatar } from './CustomerAvatar';
 
 interface CustomerProfilePaneProps {
   profile: CustomerProfile;
-  onToast: (msg: string) => void;
   analysis?: AiMessageAnalysis;
   aiStatus?: 'analyzing' | 'ready' | 'error';
   isUnreplied: boolean;
 }
 
-export function CustomerProfilePane({ profile, onToast, analysis, aiStatus, isUnreplied }: CustomerProfilePaneProps) {
+export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied }: CustomerProfilePaneProps) {
   return (
     <div className="profile-pane">
       {/* Profile Head */}
       <div className="profile-head">
-        <div className="profile-avatar">{profile.avatar}</div>
+        <CustomerAvatar className="profile-avatar" name={profile.name} initials={profile.avatar} url={profile.avatarUrl} />
         <div className="profile-name">{profile.name}</div>
         <div className="profile-sub">{profile.since}</div>
+        {profile.identityStatus === 'pending' && <p className="emotion-analysis-note">Đang lấy tên và ảnh từ Messenger...</p>}
+        {profile.identityStatus === 'unavailable' && <p className="emotion-analysis-note">Messenger chưa cung cấp tên và ảnh cho khách này. Hội thoại vẫn được đồng bộ.</p>}
         {profile.tags && profile.tags.length > 0 && (
           <div className="profile-tags">
             {profile.tags.map((tag, idx) => (
@@ -61,6 +63,10 @@ export function CustomerProfilePane({ profile, onToast, analysis, aiStatus, isUn
           <span className="k">Kênh chính</span>
           <span className="v">{profile.channel}</span>
         </div>
+        {profile.messengerId && <div className="profile-kv">
+          <span className="k">Messenger ID</span>
+          <span className="v messenger-customer-id">{profile.messengerId}</span>
+        </div>}
         <div className="profile-kv">
           <span className="k">Số đơn đã mua</span>
           <span className="v">{profile.orderCount}</span>
@@ -101,15 +107,6 @@ export function CustomerProfilePane({ profile, onToast, analysis, aiStatus, isUn
         </div>
       </div>
 
-      {/* Action footer button */}
-      <button
-        type="button"
-        className="btn btn-outline btn-sm"
-        style={{ width: '100%', justifyContent: 'center' }}
-        onClick={() => onToast(`Đang mở hồ sơ 360 chi tiết của khách hàng ${profile.name}`)}
-      >
-        Xem đầy đủ hồ sơ khách hàng
-      </button>
     </div>
   );
 }

@@ -18,16 +18,23 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   const latestOut = [...messages].reverse().find((m) => m.sender === 'out');
   const unanswered = latestIn !== undefined && (!latestOut || (latestIn.timestamp || 0) > (latestOut.timestamp || 0));
   const sameQuestion = previous?.analysis?.messageId === latestIn?.id;
-  const name = `Khách ${thread.psid.slice(-6)}`;
+  const name = thread.customer?.name || `Khách ${thread.psid.slice(-6)}`;
+  const avatar = thread.customer?.name
+    ? thread.customer.name.split(/\s+/).filter(Boolean).slice(-2).map((part) => Array.from(part)[0]).join('').toUpperCase()
+    : 'FB';
+  const avatarUrl = thread.customer?.avatarUrl || undefined;
   const base: Conversation = {
     id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid,
       hasOlder: previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
         ? false : thread.hasOlder },
-    name, avatar: 'FB', channel: 'facebook', time: latest?.time || '', preview: latest?.text || '', tags: [],
+    name, avatar, avatarUrl, channel: 'facebook', time: latest?.time || '', preview: latest?.text || '', tags: [],
     isUnreplied: unanswered, isUrgent: false, pendingSince: unanswered ? latestIn?.timestamp : undefined,
     threadWho: { name, sub: 'Messenger · Page đã kết nối' }, messages,
-    profile: { name, avatar: 'FB', since: `Nhận tin từ ${time(thread.createdAt)}`, tags: [], channel: 'Messenger',
-      orderCount: 'Chưa có dữ liệu', shippingArea: 'Chưa có dữ liệu', timeline: [] },
+    profile: { name, avatar, avatarUrl, messengerId: thread.psid, identityStatus: thread.customer?.status || 'pending',
+      since: `Nhận tin từ ${time(thread.createdAt)}`, tags: [], channel: 'Messenger',
+      orderCount: 'Chưa có dữ liệu', shippingArea: 'Chưa có dữ liệu', timeline: messages.slice(-3).reverse().map((m) => ({
+        id: m.id, text: `${m.sender === 'in' ? 'Khách nhắn' : 'Shop trả lời'}: ${m.text.slice(0, 160)}${m.text.length > 160 ? '…' : ''}`, time: m.time,
+      })) },
   };
   if (sameQuestion && previous) {
     base.analysis = previous.analysis;

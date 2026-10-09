@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
-import { INITIAL_CONVERSATIONS } from '@/lib/data/inbox';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ConversationList } from './ConversationList';
 import { ThreadPane } from './ThreadPane';
@@ -15,16 +14,13 @@ import type { MessengerInboxSnapshot } from '@/lib/types/messengerInbox';
 import type { MessengerMessage } from '@/lib/types/messenger';
 
 export function InboxShell() {
-  const [conversations, setConversations] = useState<Conversation[]>(() =>
-    []
-  );
-  const [selectedId, setSelectedId] = useState<string>('lan');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [draftText, setDraftText] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const pendingRequests = useRef(new Set<string>());
-  const [source, setSource] = useState<'messenger' | 'demo'>('messenger');
   const [accessKey, setAccessKey] = useState('');
   const [keyInput, setKeyInput] = useState('');
   const [syncStatus, setSyncStatus] = useState('Nhập mã truy cập để kết nối Messenger');
@@ -35,7 +31,7 @@ export function InboxShell() {
   const outboundRequests = useRef(new Map<string, string>());
 
   useEffect(() => {
-    if (source !== 'messenger' || !accessKey) return;
+    if (!accessKey) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let controller: AbortController;
@@ -65,13 +61,7 @@ export function InboxShell() {
     };
     void poll();
     return () => { cancelled = true; clearTimeout(timer); controller?.abort(); };
-  }, [accessKey, source, limit]);
-
-  const changeSource = (next: 'messenger' | 'demo') => {
-    setSource(next);
-    setDraftText('');
-    setConversations(next === 'demo' ? INITIAL_CONVERSATIONS.map((c) => ({ ...c, aiSuggestion: undefined })) : []);
-  };
+  }, [accessKey, limit]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -155,56 +145,6 @@ export function InboxShell() {
     }
   };
 
-  const handleSendMessage = async (text: string): Promise<boolean> => {
-    if (selectedConv?.messenger) return sendLiveMessage(text);
-    if (!selectedConv) return false;
-
-    const newMsg = {
-      id: `msg-${Date.now()}`,
-      sender: 'out' as const,
-      text,
-      time: 'Vừa xong',
-    };
-
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === selectedConv.id) {
-          return markConversationAnswered(c, newMsg);
-        }
-        return c;
-      })
-    );
-
-    showToast(`Đã gửi tin nhắn đến ${selectedConv.name}`);
-    return true;
-  };
-
-  const handleUseAiSuggestion = async (text: string): Promise<boolean> => {
-    if (selectedConv?.messenger) return sendLiveMessage(text);
-    if (!selectedConv) return false;
-
-    const newMsg = {
-      id: `msg-ai-${Date.now()}`,
-      sender: 'out' as const,
-      text,
-      time: 'Vừa xong',
-      isAiReply: true,
-      aiSource: selectedConv.aiSuggestion?.source || 'Cấu hình AI',
-    };
-
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === selectedConv.id) {
-          return markConversationAnswered(c, newMsg);
-        }
-        return c;
-      })
-    );
-
-    showToast(`Đã gửi câu trả lời AI cho ${selectedConv.name}`);
-    return true;
-  };
-
   const analyzeMessage = async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages) => {
     try {
       const data = await askShopAi(text, sessionContext(contextMessages, messageId));
@@ -234,43 +174,6 @@ export function InboxShell() {
     await analyzeMessage(selectedConv, question.id, question.text);
   };
 
-  // Khách nhắn tin -> phân tích, xếp hàng ưu tiên và tạo gợi ý cùng một lượt.
-  const handleCustomerSendMessage = async (text: string) => {
-    if (selectedConv?.messenger) return;
-    if (!selectedConv || pendingRequests.current.has(selectedConv.id)) return;
-    pendingRequests.current.add(selectedConv.id);
-    const receivedAt = Date.now();
-
-    const newInMsg = {
-      id: `msg-in-${crypto.randomUUID()}`,
-      sender: 'in' as const,
-      text,
-      time: 'Vừa xong',
-    };
-
-    // 1. Cập nhật tin nhắn khách vào hội thoại
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === selectedConv.id) {
-          return {
-            ...c,
-            time: 'Vừa xong',
-            preview: text,
-            isUnreplied: true,
-            aiStatus: 'analyzing',
-            aiError: undefined,
-            pendingSince: c.pendingSince ?? receivedAt,
-            aiSuggestion: undefined,
-            messages: [...c.messages, newInMsg],
-          };
-        }
-        return c;
-      })
-    );
-
-    await analyzeMessage(selectedConv, newInMsg.id, text, selectedConv.messages);
-  };
-
   return (
     <div className="inbox-root">
       <div className="shell">
@@ -280,18 +183,12 @@ export function InboxShell() {
           <div className="inbox-shell">
             <ConversationList
               toolbar={<div className="messenger-toolbar">
-                <div className="messenger-source">
-                  <button className={`btn btn-sm ${source === 'messenger' ? 'btn-primary' : 'btn-outline'}`} onClick={() => changeSource('messenger')}>Messenger thật</button>
-                  <button className={`btn btn-sm ${source === 'demo' ? 'btn-primary' : 'btn-outline'}`} onClick={() => changeSource('demo')}>Dữ liệu mẫu</button>
-                </div>
-                {source === 'messenger' && <>
                   <form onSubmit={(e) => { e.preventDefault(); setAccessKey(keyInput.trim()); setKeyInput(''); }}>
                     <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} placeholder="Mã truy cập inbox" aria-label="Mã truy cập inbox" autoComplete="off" required />
                     <button className="btn btn-outline btn-sm" type="submit">Kết nối</button>
                   </form>
                   <p role="status">{syncStatus}</p>
                   {hasMore && limit < 1000 && <button className="btn btn-outline btn-sm" onClick={() => setLimit((n) => n + 100)}>Tải thêm hội thoại</button>}
-                </>}
               </div>}
               conversations={filteredConversations}
               selectedId={selectedConv?.id || ''}
@@ -308,12 +205,11 @@ export function InboxShell() {
                 <ThreadPane
                   key={selectedConv.id}
                   conversation={selectedConv}
-                  onSendMessage={handleSendMessage}
-                  onUseAiSuggestion={handleUseAiSuggestion}
+                  onSendMessage={sendLiveMessage}
+                  onUseAiSuggestion={sendLiveMessage}
                   draftText={draftText}
                   onDraftChange={setDraftText}
                   onToast={showToast}
-                  onCustomerSendMessage={handleCustomerSendMessage}
                   onGenerateAiSuggestion={handleGenerateAiSuggestion}
                   isSending={sendingIds.has(selectedConv.id)}
                   onLoadOlder={async () => {
@@ -338,13 +234,12 @@ export function InboxShell() {
                   analysis={selectedConv.analysis}
                   aiStatus={selectedConv.aiStatus}
                   isUnreplied={Boolean(selectedConv.isUnreplied)}
-                  onToast={showToast}
                 />
               </>
             )}
             {!selectedConv && <div className="messenger-empty">
-              <h2>{source === 'messenger' ? 'Hội thoại Messenger' : 'Chưa có hội thoại'}</h2>
-              <p>{accessKey ? 'Tin mới sẽ hiện ở đây khi khách nhắn vào Page và webhook đã được kết nối.' : 'Nhập mã truy cập ở bên trái để mở inbox, hoặc chọn Dữ liệu mẫu để thử giao diện.'}</p>
+              <h2>Hội thoại Messenger</h2>
+              <p>{accessKey ? 'Tin mới sẽ hiện ở đây khi khách nhắn vào Page và webhook đã được kết nối.' : 'Nhập mã truy cập ở bên trái để mở inbox.'}</p>
             </div>}
           </div>
         </main>

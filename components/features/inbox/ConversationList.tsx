@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
+import { CustomerAvatar } from './CustomerAvatar';
 
 interface ConversationListProps {
   toolbar?: React.ReactNode;
@@ -96,7 +97,7 @@ export function ConversationList({
                 }}
               >
                 <div className="conv-avatar-wrap">
-                  <div className="conv-avatar">{conv.avatar}</div>
+                  <CustomerAvatar className="conv-avatar" name={conv.name} initials={conv.avatar} url={conv.avatarUrl} />
                   <div className={`channel-dot ${isFb ? 'cd-fb' : 'cd-zalo'}`} title={isFb ? 'Facebook Messenger' : 'Zalo OA'}>
                     {isFb ? 'f' : 'Z'}
                   </div>

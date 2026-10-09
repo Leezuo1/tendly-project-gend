@@ -44,6 +44,9 @@ export interface TimelineEvent {
 
 export interface CustomerProfile {
   avatar: string;
+  avatarUrl?: string;
+  messengerId?: string;
+  identityStatus?: 'pending' | 'ready' | 'unavailable';
   name: string;
   since: string;
   tags: ConversationTag[];
@@ -59,6 +62,7 @@ export interface Conversation {
   id: string;
   name: string;
   avatar: string;
+  avatarUrl?: string;
   channel: Channel;
   time: string;
   preview: string;

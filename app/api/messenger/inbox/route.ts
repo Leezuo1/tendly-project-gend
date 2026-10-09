@@ -1,5 +1,6 @@
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { readMessengerInbox, readOlderMessengerMessages } from '@/lib/services/messengerInboxDb';
+import { refreshMessengerProfiles } from '@/lib/services/messengerProfiles';
 
 export const runtime = 'nodejs';
 export async function GET(request: Request) {
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
     }
     const limit = Number(params.get('limit') || 100);
     if (!Number.isInteger(limit) || limit < 1 || limit > 1000) return Response.json({ error: 'Giới hạn hội thoại không hợp lệ.' }, { status: 400 });
-    return Response.json(await readMessengerInbox(pageId, limit), { headers: { 'Cache-Control': 'no-store' } });
+    const snapshot = await readMessengerInbox(pageId, limit);
+    await refreshMessengerProfiles(snapshot);
+    return Response.json(snapshot, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return Response.json({ error: 'Không đọc được hội thoại. Kiểm tra database và chạy npm run db:migrate.' }, { status: 503 });
   }
