@@ -467,6 +467,16 @@
   user-select: none;
 }
 
+.inbox-root .conv-item.has-new-message {
+  background: #fff1ee;
+  border-left-color: var(--coral, #f56565);
+}
+
+.inbox-root .conv-item.has-new-message .conv-preview {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .inbox-root .conv-item:hover {
   background: var(--canvas);
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ConversationList } from './ConversationList';
@@ -8,7 +8,7 @@ import { ThreadPane } from './ThreadPane';
 import { CustomerProfilePane } from './CustomerProfilePane';
 import { Toast } from '@/components/shared/Toast';
 import { askShopAi } from '@/lib/services/aiChat';
-import { applyConversationAnalysis, latestCustomerMessage, markConversationAnswered, sessionContext, sortReplyQueue } from '@/lib/services/inboxAi';
+import { applyConversationAnalysis, automaticAnalysisCandidates, latestCustomerMessage, markConversationAnswered, sessionContext, sortReplyQueue } from '@/lib/services/inboxAi';
 import { mergeMessengerThread, messengerChatMessage } from '@/lib/services/messengerView';
 import type { MessengerInboxSnapshot } from '@/lib/types/messengerInbox';
 import type { MessengerMessage } from '@/lib/types/messenger';
@@ -16,11 +16,14 @@ import type { MessengerMessage } from '@/lib/types/messenger';
 export function InboxShell() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
+  const selectedIdRef = useRef('');
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [draftText, setDraftText] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const pendingRequests = useRef(new Set<string>());
+  const attemptedAnalysis = useRef(new Map<string, string>());
+  const [analysisTick, setAnalysisTick] = useState(0);
   const [accessKey, setAccessKey] = useState('');
   const [keyInput, setKeyInput] = useState('');
   const [syncStatus, setSyncStatus] = useState('Nhập mã truy cập để kết nối Messenger');
@@ -47,9 +50,16 @@ export function InboxShell() {
         if (!response.ok) throw new Error(data.error || 'Không đồng bộ được Messenger.');
         if (cancelled) return;
         const snapshot = data as MessengerInboxSnapshot;
-        setSelectedId((id) => snapshot.conversations.some((c) => c.id === id) ? id : snapshot.conversations[0]?.id || '');
-        setConversations((previous) => snapshot.conversations.map((thread) =>
-          mergeMessengerThread(thread, previous.find((c) => c.id === thread.id))));
+        const nextSelected = snapshot.conversations.some((c) => c.id === selectedIdRef.current)
+          ? selectedIdRef.current : snapshot.conversations[0]?.id || '';
+        selectedIdRef.current = nextSelected;
+        setSelectedId(nextSelected);
+        setConversations((previous) => snapshot.conversations.map((thread) => {
+          const merged = mergeMessengerThread(thread, previous.find((c) => c.id === thread.id));
+          // The visible open thread is already being read; other rows keep their unread marker.
+          return thread.id === selectedIdRef.current && document.visibilityState === 'visible'
+            ? { ...merged, hasNewMessage: false } : merged;
+        }));
         setHasMore(snapshot.hasMore);
         setSyncStatus('Đã kết nối · Tự cập nhật mỗi 2 giây');
       } catch (error) {
@@ -63,12 +73,12 @@ export function InboxShell() {
     return () => { cancelled = true; clearTimeout(timer); controller?.abort(); };
   }, [accessKey, limit]);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
     }, 3200);
-  };
+  }, []);
 
   const counts = useMemo(() => {
     return {
@@ -103,7 +113,9 @@ export function InboxShell() {
   }, [conversations, selectedId]);
 
   const handleSelectConv = (id: string) => {
+    selectedIdRef.current = id;
     setSelectedId(id);
+    setConversations((previous) => previous.map((c) => c.id === id ? { ...c, hasNewMessage: false } : c));
     setDraftText('');
   };
 
@@ -145,21 +157,38 @@ export function InboxShell() {
     }
   };
 
-  const analyzeMessage = async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages) => {
+  const analyzeMessage = useCallback(async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages, automatic = false) => {
     try {
       const data = await askShopAi(text, sessionContext(contextMessages, messageId));
       setConversations((prev) => prev.map((c) => c.id === conversation.id
         ? applyConversationAnalysis(c, messageId, data) : c));
-      showToast('Đã cập nhật cảm xúc, ưu tiên và gợi ý trả lời của AI.');
+      if (!automatic) showToast('Đã cập nhật cảm xúc, ưu tiên và gợi ý trả lời của AI.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không phân tích được tin nhắn.';
       setConversations((prev) => prev.map((c) => c.id === conversation.id && latestCustomerMessage(c)?.id === messageId && c.isUnreplied
         ? { ...c, aiStatus: 'error', aiError: message } : c));
-      showToast(`Lỗi AI: ${message}`);
+      if (!automatic) showToast(`Lỗi AI: ${message}`);
     } finally {
       pendingRequests.current.delete(conversation.id);
+      setAnalysisTick((tick) => tick + 1);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!accessKey) return;
+    const candidates = automaticAnalysisCandidates(conversations, pendingRequests.current, attemptedAnalysis.current);
+    if (!candidates.length) return;
+    for (const conversation of candidates) {
+      const question = latestCustomerMessage(conversation)!;
+      // Reserve synchronously, including in Strict Mode, and never retry a failed message on every poll.
+      pendingRequests.current.add(conversation.id);
+      attemptedAnalysis.current.set(conversation.id, question.id);
+      void analyzeMessage(conversation, question.id, question.text, conversation.messages, true);
+    }
+    const ids = new Set(candidates.map((c) => c.id));
+    setConversations((previous) => previous.map((c) => ids.has(c.id)
+      ? { ...c, aiStatus: 'analyzing', aiError: undefined, aiSuggestion: undefined } : c));
+  }, [accessKey, conversations, analysisTick, analyzeMessage]);
 
   const handleGenerateAiSuggestion = async () => {
     if (!selectedConv || pendingRequests.current.has(selectedConv.id)) return;
@@ -169,6 +198,7 @@ export function InboxShell() {
       return;
     }
     pendingRequests.current.add(selectedConv.id);
+    attemptedAnalysis.current.set(selectedConv.id, question.id);
     setConversations((prev) => prev.map((c) => c.id === selectedConv.id
       ? { ...c, aiStatus: 'analyzing', aiError: undefined, aiSuggestion: undefined } : c));
     await analyzeMessage(selectedConv, question.id, question.text);
@@ -188,6 +218,7 @@ export function InboxShell() {
                     <button className="btn btn-outline btn-sm" type="submit">Kết nối</button>
                   </form>
                   <p role="status">{syncStatus}</p>
+                  {accessKey && <p>AI tự phân tích và tạo gợi ý khi trang này đang mở.</p>}
                   {hasMore && limit < 1000 && <button className="btn btn-outline btn-sm" onClick={() => setLimit((n) => n + 100)}>Tải thêm hội thoại</button>}
               </div>}
               conversations={filteredConversations}
