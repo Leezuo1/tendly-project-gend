@@ -94,3 +94,21 @@
   .marketing-root .pc-grid { grid-template-columns: 1fr; }
   .marketing-root .pc-time { margin-left: 0; width: 100%; }
 }
+
+/* ---- ảnh kèm bài ---- */
+.marketing-root .pc-image { display: flex; flex-direction: column; gap: 8px; }
+.marketing-root .pc-image-empty {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 120px; padding: 12px;
+  border: 1px dashed var(--line); border-radius: 12px; background: var(--paper); color: var(--ink-soft); font-size: 12.5px; text-align: center;
+}
+.marketing-root .pc-image-preview { position: relative; border-radius: 12px; overflow: hidden; background: var(--sand); }
+.marketing-root .pc-image-preview img { display: block; width: 100%; max-height: 360px; object-fit: contain; }
+.marketing-root .pc-image-thumb { max-width: 280px; }
+.marketing-root .pc-image-thumb .pc-hint { display: block; padding: 12px; }
+.marketing-root .pc-image-badge {
+  position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  background: rgba(0, 0, 0, 0.6); color: #fff;
+}
+.marketing-root .pc-image-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.marketing-root .pc-prompt summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.marketing-root .pc-prompt textarea { margin-top: 6px; }

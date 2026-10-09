@@ -4,9 +4,10 @@ import React, { useCallback, useEffect, useMemo, useState, type FormEvent } from
 import { useMockDbVersion } from '@/lib/hooks/useMockDbVersion';
 import { POST_CHANNELS, POST_GOALS, POST_TONES } from '@/lib/services/aiPost';
 import { snapshot } from '@/lib/services/api';
-import { getDashboardKey, postsClient, PostsApiError, setDashboardKey } from '@/lib/services/postsClient';
-import type { MarketingPost, PostChannel, PostDraft, PostGoal, PostTone } from '@/lib/types/posts';
+import { getDashboardKey, postsClient, PostsApiError, prepareUploadImage, setDashboardKey } from '@/lib/services/postsClient';
+import type { GeneratedPostDraft, MarketingPost, PostChannel, PostDraft, PostGoal, PostImageSource, PostTone } from '@/lib/types/posts';
 import { formatMoney, normalize } from '@/lib/utils/format';
+import { PostImageField, SavedPostImage, type ImageBusy } from './PostImageField';
 
 interface PostComposerTabProps {
   onToast: (msg: string) => void;
@@ -16,7 +17,12 @@ const BRAND_STORAGE = 'tendly.brandVoice';
 const MAX_PRODUCTS = 5;
 const TIKTOK_LIMIT = 150;
 
-type EditableDraft = PostDraft & { key: string; saving?: boolean };
+/** Ảnh của bản nháp chưa lưu: giữ blob trên trình duyệt, chỉ gửi lên server khi bấm lưu/đăng. */
+type DraftImage = { blob: Blob; url: string; source: PostImageSource };
+type EditableDraft = GeneratedPostDraft & { key: string; saving?: boolean; image?: DraftImage; imageBusy?: ImageBusy };
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : 'lỗi không rõ');
+const releaseImage = (d: EditableDraft) => d.image && URL.revokeObjectURL(d.image.url);
 
 const titleLabel = (channel: PostChannel) => (channel === 'email' ? 'Tiêu đề email' : channel === 'tiktok' ? 'Tên ý tưởng video' : 'Tiêu đề (nội bộ)');
 const ideaLabel = (channel: PostChannel) => (channel === 'tiktok' ? '🎬 Kịch bản video' : '📸 Gợi ý hình ảnh');
@@ -125,6 +131,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
     setGenerating(true);
     try {
       const { drafts: result } = await postsClient.generate({ channel, goal, tone, productIds, notes, brandVoice, variants });
+      drafts.forEach(releaseImage);
       setDrafts(result.map((d, i) => ({ ...d, key: `${Date.now()}-${i}` })));
       setDraftMeta({
         channel, goal,
@@ -140,6 +147,24 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
 
   const updateDraft = (key: string, patch: Partial<EditableDraft>) =>
     setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+
+  /** Thay ảnh của bản nháp (hoặc bỏ ảnh khi image = undefined), giải phóng ảnh cũ khỏi bộ nhớ. */
+  const replaceDraftImage = (key: string, image: DraftImage | undefined) => {
+    const old = drafts.find((d) => d.key === key)?.image;
+    if (old && old !== image) URL.revokeObjectURL(old.url);
+    updateDraft(key, { image, imageBusy: undefined });
+  };
+
+  const loadDraftImage = async (draft: EditableDraft, kind: 'ai' | 'upload', getBlob: () => Promise<Blob>) => {
+    updateDraft(draft.key, { imageBusy: kind });
+    try {
+      const blob = await getBlob();
+      replaceDraftImage(draft.key, { blob, url: URL.createObjectURL(blob), source: kind });
+    } catch (e) {
+      updateDraft(draft.key, { imageBusy: undefined });
+      handleError(e);
+    }
+  };
 
   const copy = async (value: string) => {
     try {
@@ -157,25 +182,38 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
       onToast('Nội dung bài viết đang trống');
       return;
     }
-    if (publish && !window.confirm('Đăng bài này lên Fanpage thật ngay bây giờ?')) return;
+    if (publish && !window.confirm(draft.image
+      ? 'Đăng bài này kèm ảnh lên Fanpage thật ngay bây giờ?'
+      : 'Đăng bài này lên Fanpage thật ngay bây giờ?')) return;
     updateDraft(draft.key, { saving: true });
     try {
       let post = await postsClient.create({
         channel: draftMeta.channel, goal: draftMeta.goal, productSkus: draftMeta.skus,
         title: draft.title, content: draft.content, hashtags: draft.hashtags, imageIdea: draft.imageIdea,
       });
-      if (publish) {
+      let imageSaved = true;
+      if (draft.image) {
+        try {
+          post = await postsClient.setImage(post.id, draft.image.blob, draft.image.source);
+        } catch (e) {
+          // Không đăng bài thiếu ảnh ngoài ý muốn: giữ nháp để chủ shop gắn lại ảnh rồi đăng.
+          imageSaved = false;
+          onToast(`Đã lưu nháp nhưng chưa lưu được ảnh: ${errorText(e)}`);
+        }
+      }
+      if (publish && imageSaved) {
         try {
           post = await postsClient.publish(post.id, 'page');
           onToast('Đã đăng bài lên Fanpage 🎉');
         } catch (e) {
-          onToast(`Đã lưu nháp nhưng chưa đăng được: ${e instanceof Error ? e.message : 'lỗi không rõ'}`);
+          onToast(`Đã lưu nháp nhưng chưa đăng được: ${errorText(e)}`);
         }
-      } else {
+      } else if (imageSaved) {
         onToast('Đã lưu bản nháp');
       }
       setPosts((prev) => [post, ...(prev ?? []).filter((p) => p.id !== post.id)]);
       setListError(null);
+      releaseImage(draft);
       setDrafts((prev) => prev.filter((d) => d.key !== draft.key));
     } catch (e) {
       updateDraft(draft.key, { saving: false });
@@ -372,14 +410,35 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
                   {d.imageIdea && (
                     <div className="pc-idea"><b>{ideaLabel(draftMeta.channel)}:</b> {d.imageIdea}</div>
                   )}
+                  <label className="pc-mini-label">Ảnh kèm bài</label>
+                  <PostImageField
+                    url={d.image?.url ?? null}
+                    source={d.image?.source ?? null}
+                    busy={d.imageBusy}
+                    disabled={d.saving}
+                    onGenerate={() => loadDraftImage(d, 'ai', () => postsClient.generateImage(d.imagePrompt || d.imageIdea || d.content.slice(0, 300)))}
+                    onUpload={(file) => loadDraftImage(d, 'upload', () => prepareUploadImage(file))}
+                    onRemove={() => replaceDraftImage(d.key, undefined)}
+                  />
+                  <details className="pc-prompt">
+                    <summary>Sửa mô tả cho AI vẽ ảnh</summary>
+                    <textarea
+                      className="pc-input"
+                      rows={3}
+                      maxLength={600}
+                      value={d.imagePrompt}
+                      onChange={(e) => updateDraft(d.key, { imagePrompt: e.target.value })}
+                      placeholder="Mô tả bằng tiếng Anh, VD: white cotton t-shirt on a wooden hanger, beige background"
+                    />
+                  </details>
                   <div className="pc-draft-actions">
                     <button type="button" className="btn btn-outline btn-sm" onClick={() => copy(fullText(d, draftMeta.channel))}>Sao chép</button>
-                    <button type="button" className="btn btn-outline btn-sm" disabled={d.saving} onClick={() => saveDraft(d, false)}>Lưu nháp</button>
+                    <button type="button" className="btn btn-outline btn-sm" disabled={d.saving || Boolean(d.imageBusy)} onClick={() => saveDraft(d, false)}>Lưu nháp</button>
                     {draftMeta.channel === 'facebook' && (
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
-                        disabled={d.saving || !facebookReady}
+                        disabled={d.saving || Boolean(d.imageBusy) || !facebookReady}
                         title={facebookReady ? undefined : 'Chưa cấu hình PAGE_ID / PAGE_ACCESS_TOKEN trên server'}
                         onClick={() => saveDraft(d, true)}
                       >
@@ -431,6 +490,12 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
                 </span>
               </div>
               {p.title && <div className="pc-post-title">{p.title}</div>}
+              <SavedPostImage
+                post={p}
+                editing={isEditing}
+                onChange={(updated) => setPosts((prev) => (prev ?? []).map((x) => (x.id === updated.id ? updated : x)))}
+                onError={handleError}
+              />
               {isEditing ? (
                 <>
                   <textarea className="pc-input" rows={6} value={editing.content} onChange={(e) => setEditing({ ...editing, content: e.target.value })} />
@@ -470,7 +535,9 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
                             type="button"
                             className="btn btn-primary btn-sm"
                             disabled={busy}
-                            onClick={() => window.confirm('Đăng bài này lên Fanpage thật ngay bây giờ?') &&
+                            onClick={() => window.confirm(p.image
+                              ? 'Đăng bài này kèm ảnh lên Fanpage thật ngay bây giờ?'
+                              : 'Đăng bài này lên Fanpage thật ngay bây giờ?') &&
                               runOnPost(p.id, () => postsClient.publish(p.id, 'page'), 'Đã đăng bài lên Fanpage 🎉')}
                           >
                             Đăng Fanpage

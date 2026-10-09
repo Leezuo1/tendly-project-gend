@@ -1,10 +1,10 @@
 import { composePostMessage, InvalidPostRequest } from '@/lib/services/aiPost';
 import { publishToFacebookPage } from '@/lib/services/facebookPage';
 import { postsErrorResponse, readJson, requireDashboardKey } from '@/lib/services/postsApi';
-import { getPost, markPublished, PostLocked } from '@/lib/services/postsPostgres';
+import { getPost, getPostImage, markPublished, PostLocked } from '@/lib/services/postsPostgres';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
  * mode "page": đăng thật lên Fanpage (chỉ bài Facebook).
@@ -25,7 +25,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return Response.json({ post: await markPublished(id, { id: null, url: null }) });
     }
     if (post.channel !== 'facebook') throw new InvalidPostRequest('Chỉ bài Facebook mới đăng thẳng lên Fanpage được.');
-    const published = await publishToFacebookPage(composePostMessage(post));
+    // Có ảnh thì đăng kèm ảnh; đọc bytes ngay lúc đăng để đúng ảnh mới nhất.
+    const image = post.image ? await getPostImage(id) : null;
+    const published = await publishToFacebookPage(composePostMessage(post), image ?? undefined);
     return Response.json({ post: await markPublished(id, published) });
   } catch (error) {
     return postsErrorResponse(error);
