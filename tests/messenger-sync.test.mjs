@@ -11,6 +11,8 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/001-messenger.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/002-messenger-outbound.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
 })();
 const query = async (sql, values) => {
@@ -39,7 +41,7 @@ const m = (messageId, extra = {}) => ({ pageId: '111', psid: '222', messageId, d
   timestamp: Date.now(), text: 'Shop có áo không?', attachments: [], ...extra });
 async function fixture() {
   await ready;
-  await db.exec('TRUNCATE messenger_outbound_requests, messenger_messages, messenger_conversations, messenger_customers CASCADE');
+  await db.exec('TRUNCATE messenger_analysis_history, messenger_outbound_requests, messenger_messages, messenger_conversations, messenger_customers CASCADE');
   const load = loader();
   const writer = load('lib/services/messengerPostgres.ts');
   return { load, writer };
@@ -134,6 +136,71 @@ test('settings channel status checks real Page access, requires inbox authorizat
     assert.equal(denied.pageName, '');
     assert.equal(denied.pageAvatarUrl, '');
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('automatic env session issues an HttpOnly cookie without exposing the key and rejects tampering, expiration and cross-origin access', async () => {
+  const load = loader();
+  const route = load('app/api/inbox/session/route.ts');
+  const access = load('lib/services/inboxAccess.ts');
+  const request = new Request('https://test.example/api/inbox/session');
+  const response = await route.GET(request);
+  assert.deepEqual(await response.json(), { ready: true });
+  const cookie = response.headers.get('set-cookie');
+  assert.match(cookie, /HttpOnly/); assert.match(cookie, /SameSite=Strict/); assert.match(cookie, /Secure/);
+  assert.equal(cookie.includes(process.env.INBOX_ACCESS_KEY), false);
+  const cookiePair = cookie.split(';')[0];
+  const authorized = (cookie, origin) => new Request('https://test.example/api/messenger/inbox', {
+    headers: { Cookie: cookie, ...(origin ? { Origin: origin } : {}) },
+  });
+  assert.equal(access.inboxAccessError(authorized(cookiePair)), undefined);
+  assert.equal(access.inboxAccessError(authorized(cookiePair, 'https://evil.example')).status, 403);
+  assert.equal(access.inboxAccessError(authorized(cookiePair.replace(/.$/, (c) => c === 'a' ? 'b' : 'a'))).status, 401);
+  const expired = access.createInboxSession(process.env.INBOX_ACCESS_KEY, Date.now() - 7200000);
+  assert.equal(access.inboxAccessError(authorized(`${access.INBOX_SESSION_COOKIE}=${expired}`)).status, 401);
+  const originalKey = process.env.INBOX_ACCESS_KEY;
+  try {
+    delete process.env.INBOX_ACCESS_KEY;
+    const unavailable = await route.GET(request);
+    assert.equal(unavailable.status, 503);
+    assert.match(unavailable.headers.get('set-cookie'), /Max-Age=0/);
+    assert.equal(access.inboxAccessError(authorized(cookiePair)).status, 503);
+  } finally { process.env.INBOX_ACCESS_KEY = originalKey; }
+  assert.equal((await route.GET(new Request('https://test.example/api/inbox/session', { headers: { Origin: 'https://evil.example' } }))).status, 403);
+});
+
+test('conversation memory survives reload, deduplicates per message, backfills all stored history and deletion hides only the shop view', async () => {
+  const { load, writer } = await fixture();
+  const memory = load('lib/services/conversationMemory.ts');
+  const read = load('lib/services/messengerInboxDb.ts');
+  const base = Date.now() - 100000;
+  await writer.savePostgresMessages(Array.from({ length: 55 }, (_, i) => m(`history-${String(i).padStart(2, '0')}`, { timestamp: base + i })), pool);
+  const jobs = await memory.pendingHistoricalAnalysis('111', '222', pool);
+  assert.equal(jobs.length, 10); assert.equal(jobs[0].messageId, 'history-00'); assert.equal(jobs[0].context.length, 0);
+  assert.equal(jobs[9].context.length, 9);
+  const data = { reply: 'Shop hỗ trợ bạn nhé', model: 'test', sourceSummary: 'Cấu hình AI', analysis: {
+    sentiment: 'negative', emotion: 'worried', priority: 'normal', priorityScore: 45, needsHuman: false,
+    reason: 'Khách cần được giải thích', communicationStyle: 'Thường hỏi thêm chi tiết để yên tâm',
+  } };
+  assert.equal(await memory.saveConversationMemory('111', '222', 'history-54', data, pool), true);
+  await memory.saveConversationMemory('111', '222', 'history-54', data, pool);
+  assert.equal(await memory.saveConversationMemory('111', '333', 'history-54', data, pool), false);
+  assert.equal(await memory.saveConversationMemory('999', '222', 'history-54', data, pool), false);
+  const snapshot = await read.readMessengerInbox('111', 100, pool);
+  assert.equal(snapshot.conversations[0].memory.length, 1);
+  const restored = load('lib/services/messengerView.ts').mergeMessengerThread(snapshot.conversations[0]);
+  assert.equal(restored.analysis.emotion, 'worried'); assert.equal(restored.aiSuggestion.text, data.reply);
+  assert.equal(restored.memory[0].analysis.communicationStyle, data.analysis.communicationStyle);
+  const hidden = await memory.hideConversation('111', '222', pool);
+  assert.equal(hidden.rowCount, 1);
+  assert.equal((await read.readMessengerInbox('111', 100, pool)).conversations.length, 0);
+  assert.equal((await load('lib/services/dashboardData.ts').readDashboardData('111', pool)).recentMessages.length, 0);
+  assert.equal((await query('SELECT COUNT(*) AS count FROM messenger_messages')).rows[0].count, 55);
+  assert.equal((await memory.pendingHistoricalAnalysis('111', '222', pool)).length, 0);
+  await writer.savePostgresMessages([m('history-54', { timestamp: base + 54 }), m('late-history', { timestamp: base - 1 })], pool);
+  assert.equal((await read.readMessengerInbox('111', 100, pool)).conversations.length, 0);
+  await writer.savePostgresMessages([m('fresh', { timestamp: Number(hidden.rows[0].hidden_at) + 100 })], pool);
+  const reopened = await read.readMessengerInbox('111', 100, pool);
+  assert.equal(reopened.conversations.length, 1); assert.equal(reopened.conversations[0].memory.length, 1);
 });
 
 test('two-way send -> stored outgoing -> webhook echo stays single; same request never sends twice', async () => {

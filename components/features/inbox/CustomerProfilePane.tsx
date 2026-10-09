@@ -5,15 +5,22 @@ import { CustomerProfile } from '@/lib/types/inbox';
 import type { AiMessageAnalysis } from '@/lib/types/ai';
 import { EMOTION_LABELS, PRIORITY_LABELS } from '@/lib/services/inboxAi';
 import { CustomerAvatar } from './CustomerAvatar';
+import type { ConversationMemoryEntry } from '@/lib/types/conversationMemory';
 
 interface CustomerProfilePaneProps {
   profile: CustomerProfile;
   analysis?: AiMessageAnalysis;
   aiStatus?: 'analyzing' | 'ready' | 'error';
   isUnreplied: boolean;
+  memory?: ConversationMemoryEntry[];
 }
 
-export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied }: CustomerProfilePaneProps) {
+export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, memory = [] }: CustomerProfilePaneProps) {
+  const emotions = Object.entries(memory.reduce<Record<string, number>>((counts, entry) => {
+    counts[entry.analysis.emotion] = (counts[entry.analysis.emotion] || 0) + 1;
+    return counts;
+  }, {}));
+  const styles = [...new Set([...memory].reverse().map((entry) => entry.analysis.communicationStyle).filter(Boolean))].slice(0, 5);
   return (
     <div className="profile-pane">
       {/* Profile Head */}
@@ -54,6 +61,24 @@ export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied }
           </>
         ) : <p className="emotion-analysis-note">Chưa có phân tích AI. Gửi tin mới hoặc bấm Phân tích AI.</p>}
         {aiStatus === 'error' && <p className="emotion-analysis-note">Phân tích tin mới chưa thành công; chưa cập nhật nhãn.</p>}
+        <div className="profile-section-title" style={{ marginTop: 20 }}>Diễn biến toàn cuộc trò chuyện</div>
+        <p className="emotion-analysis-note">Đã lưu {memory.length} lượt phân tích. Tin cũ được phân tích dần khi mở hội thoại.</p>
+        <div className="emotion-analysis-tags">{emotions.map(([emotion, count]) => <span className="tag tag-neutral" key={emotion}>
+          {EMOTION_LABELS[emotion as keyof typeof EMOTION_LABELS]} · {count}
+        </span>)}</div>
+        {styles.length > 0 && <>
+          <div className="profile-section-title" style={{ marginTop: 16 }}>Phong cách giao tiếp quan sát được</div>
+          {styles.map((style) => <p className="emotion-analysis-reason" key={style}>{style}</p>)}
+          <p className="emotion-analysis-note">Suy luận từ lời nhắn, không phải kết luận cố định về tính cách.</p>
+        </>}
+        {memory.length > 0 && <details style={{ marginTop: 16 }}><summary>Lịch sử cảm xúc &amp; ưu tiên ({memory.length})</summary>
+          {[...memory].reverse().map((entry) => <div className="timeline-text" key={entry.messageId} style={{ marginTop: 14 }}>
+            <div>{EMOTION_LABELS[entry.analysis.emotion]} · {PRIORITY_LABELS[entry.analysis.priority]}</div>
+            <p>{entry.analysis.reason}</p>
+            <div className="emotion-analysis-note">{entry.messageText.slice(0, 180)}</div>
+            <span className="t-time">{new Date(entry.timestamp).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</span>
+          </div>)}
+        </details>}
       </div>
 
       {/* Profile Info */}

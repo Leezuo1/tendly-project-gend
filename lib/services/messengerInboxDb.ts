@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import type { MessengerMessage } from '@/lib/types/messenger';
 import type { MessengerCustomerProfile, MessengerInboxSnapshot, MessengerThread } from '@/lib/types/messengerInbox';
+import { readConversationMemories } from '@/lib/services/conversationMemory';
 
 export function customerProfileFromRow(row: Record<string, unknown>): MessengerCustomerProfile {
   return {
@@ -27,18 +28,19 @@ export function messageFromRow(row: MessageRow): MessengerMessage {
 export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<Pool, 'query'> = getMessengerPool()): Promise<MessengerInboxSnapshot> {
   const rows = await db.query(`SELECT c.*, u.psid, u.display_name, u.first_name, u.last_name,
     u.avatar_url, u.profile_status, u.profile_refreshed_at, u.profile_retry_after FROM messenger_conversations c
-    JOIN messenger_customers u ON c.customer_id=u.id WHERE c.page_id=$1
+    JOIN messenger_customers u ON c.customer_id=u.id WHERE c.page_id=$1 AND c.hidden_at IS NULL
     ORDER BY c.last_message_at DESC NULLS LAST, c.id LIMIT $2`, [pageId, limit + 1]);
   const conversations: MessengerThread[] = [];
   // A bounded, single-query message fetch for every thread shown in the list.
   const ids = rows.rows.slice(0, limit).map((r) => r.id);
+  const memories = await readConversationMemories(pageId, ids, db);
   const recent = ids.length ? await db.query(`SELECT * FROM (
     SELECT m.*, ROW_NUMBER() OVER(PARTITION BY conversation_id ORDER BY sent_at DESC, message_id DESC) AS rn
     FROM messenger_messages m WHERE page_id=$1 AND conversation_id=ANY($2::text[])
   ) recent WHERE rn <= 51 ORDER BY sent_at, message_id`, [pageId, ids]) : { rows: [] };
   for (const row of rows.rows.slice(0, limit)) {
     const messages = recent.rows.filter((m) => m.conversation_id === row.id);
-    conversations.push({ id: row.id, pageId, psid: row.psid, createdAt: Number(row.created_at),
+    conversations.push({ id: row.id, pageId, psid: row.psid, createdAt: Number(row.created_at), memory: memories.get(row.id) || [],
       lastInAt: row.last_in_at === null ? null : Number(row.last_in_at),
       lastOutAt: row.last_out_at === null ? null : Number(row.last_out_at),
       messages: messages.slice(-50).map((m) => messageFromRow({ ...m, psid: row.psid })), hasOlder: messages.length > 50,

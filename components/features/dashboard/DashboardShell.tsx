@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { DashboardTab } from '@/lib/types/dashboard';
 import type { DashboardData } from '@/lib/types/dashboardData';
 import { useShopOwnerName } from '@/lib/services/shopIdentity';
+import { useInboxSession } from '@/lib/services/inboxCredentials';
 import { Sidebar } from './Sidebar';
 import { StatCards } from './StatCards';
 import { EmailAutomationLog } from './EmailAutomationLog';
@@ -13,15 +14,12 @@ import { Toast } from '@/components/shared/Toast';
 export function DashboardShell() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [data, setData] = useState<DashboardData | null>(null);
-  const [accessKey, setAccessKey] = useState('');
-  const [keyInput, setKeyInput] = useState('');
+  const { ready, error: sessionError } = useInboxSession();
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const ownerName = useShopOwnerName();
   useEffect(() => {
-    let key = accessKey;
-    try { key ||= sessionStorage.getItem('tendly.inbox-access') || ''; } catch { /* storage unavailable */ }
-    if (!key) return;
+    if (!ready) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let controller: AbortController;
@@ -31,7 +29,7 @@ export function DashboardShell() {
       const timeout = setTimeout(() => controller.abort(), 12000);
       try {
         const response = await fetch('/api/dashboard', {
-          headers: { Authorization: 'Bearer ' + key }, cache: 'no-store', signal: controller.signal,
+          cache: 'no-store', signal: controller.signal,
         });
         const result = await response.json();
         if (!cancelled) {
@@ -47,7 +45,11 @@ export function DashboardShell() {
     };
     void poll();
     return () => { cancelled = true; clearTimeout(timer); controller?.abort(); };
-  }, [accessKey, refresh]);
+  }, [ready, refresh]);
+  if (!ready) return <div className="dashboard-root"><div className="shell">
+    <Sidebar currentPath="tong-quan" onToast={setError} />
+    <main className="main"><p role="status">{sessionError || 'Đang kiểm tra cấu hình kết nối...'}</p></main>
+  </div></div>;
   return <div className="dashboard-root"><div className="shell">
     <Sidebar currentPath="tong-quan" activeTab={activeTab} setActiveTab={setActiveTab} onToast={setError} />
     <main className="main">
@@ -58,14 +60,6 @@ export function DashboardShell() {
           <Link href="/pricing" className="btn btn-outline btn-sm">Nâng cấp gói</Link>
         </div>
       </div>
-      {!data && <form className="head-actions" onSubmit={(event) => {
-        event.preventDefault(); const key = keyInput.trim();
-        try { sessionStorage.setItem('tendly.inbox-access', key); } catch { /* storage unavailable */ }
-        setAccessKey(key); setKeyInput(''); setRefresh((n) => n + 1);
-      }}>
-        <input type="password" value={keyInput} onChange={(event) => setKeyInput(event.target.value)} placeholder="Mã truy cập inbox" aria-label="Mã truy cập inbox" autoComplete="off" required />
-        <button type="submit" className="btn btn-outline btn-sm">Kết nối</button>
-      </form>}
       <div className="tabs">
         <button type="button" className={'tab-btn ' + (activeTab === 'overview' ? 'active' : '')} onClick={() => setActiveTab('overview')}>Tổng quan</button>
         <button type="button" className={'tab-btn ' + (activeTab === 'report' ? 'active' : '')} onClick={() => setActiveTab('report')}>Báo cáo chi tiết</button>

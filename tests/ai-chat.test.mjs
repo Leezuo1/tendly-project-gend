@@ -42,6 +42,7 @@ function fixture() {
   globalThis.localStorage = {
     getItem: (key) => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
+    removeItem: (key) => storage.delete(key),
   };
   globalThis.window = new EventTarget();
   process.env.GEMINI_API_KEY = 'test-key';
@@ -74,6 +75,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
   delete globalThis.window;
   delete globalThis.localStorage;
+  delete globalThis.sessionStorage;
   if (originalKey === undefined) delete process.env.GEMINI_API_KEY;
   else process.env.GEMINI_API_KEY = originalKey;
   if (originalModel === undefined) delete process.env.GEMINI_MODEL;
@@ -145,6 +147,40 @@ test('saved owner name updates dashboard identity and can be cleared', async () 
   await settings.settingsShopApi.update({ ownerName: '' });
   assert.equal(identity.readShopOwnerName(), '');
   assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).shop.ownerName, '');
+});
+
+test('automatic session removes legacy stored secrets, shares bootstrap request, and never sends a browser credential', async () => {
+  const f = fixture();
+  const session = new Map();
+  globalThis.sessionStorage = {
+    getItem: (key) => session.get(key) ?? null,
+    setItem: (key, value) => session.set(key, value), removeItem: (key) => session.delete(key),
+  };
+  const credentials = loadModules()('lib/services/inboxCredentials.ts');
+  session.set('tendly.inbox-access', 'legacy-test-key');
+  f.storage.set('tendly.inbox-access', 'legacy-test-key');
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls++;
+    assert.equal(url, '/api/inbox/session');
+    assert.equal(options.headers, undefined);
+    assert.equal(options.body, undefined);
+    return Response.json({ ready: true });
+  };
+  const results = await Promise.all([credentials.openInboxSession(), credentials.openInboxSession()]);
+  assert.equal(calls, 1);
+  assert.deepEqual(results, [{ ready: true, error: '' }, { ready: true, error: '' }]);
+  assert.equal(f.storage.has('tendly.inbox-access'), false);
+  assert.equal(session.has('tendly.inbox-access'), false);
+});
+
+test('automatic session works with blocked storage and denies viewing when server configuration is missing', async () => {
+  fixture();
+  const unavailable = { getItem() { throw new Error('Blocked'); }, setItem() { throw new Error('Blocked'); }, removeItem() { throw new Error('Blocked'); } };
+  globalThis.localStorage = unavailable; globalThis.sessionStorage = unavailable;
+  const credentials = loadModules()('lib/services/inboxCredentials.ts');
+  globalThis.fetch = async () => Response.json({ error: 'Missing server configuration' }, { status: 503 });
+  assert.deepEqual(await credentials.openInboxSession(), { ready: false, error: 'Missing server configuration' });
 });
 
 test('chat gửi nguồn sản phẩm, FAQ và email đã lưu; không gửi hồ sơ hay lịch sử khách', async () => {

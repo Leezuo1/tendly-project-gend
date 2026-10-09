@@ -4,6 +4,7 @@
 
 import type { AiMessageAnalysis } from './ai';
 import type { MessengerAttachment } from './messenger';
+import type { ConversationMemoryEntry } from './conversationMemory';
 
 export type InboxFilter = 'all' | 'urgent' | 'unreplied';
 
@@ -58,6 +59,7 @@ export interface CustomerProfile {
 }
 
 export interface Conversation {
+  memory?: ConversationMemoryEntry[];
   messenger?: { pageId: string; psid: string; hasOlder: boolean };
   id: string;
   name: string;
