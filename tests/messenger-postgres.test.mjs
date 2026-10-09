@@ -23,6 +23,7 @@ function fixture() {
   const migration = readFileSync('db/migrations/001-messenger.sql', 'utf8');
   db.public.none(migration);
   db.public.none(migration); // Applying the initial schema again must preserve data.
+  db.public.none(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
   const { Pool } = db.adapters.createPg();
   return { db, pool: new Pool() };
 }

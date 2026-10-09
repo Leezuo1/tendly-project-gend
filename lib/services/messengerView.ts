@@ -1,6 +1,7 @@
 import type { Conversation, ChatMessage } from '@/lib/types/inbox';
 import type { MessengerThread } from '@/lib/types/messengerInbox';
 import type { MessengerMessage } from '@/lib/types/messenger';
+import { applyConversationAnalysis } from '@/lib/services/inboxAi';
 
 const time = (timestamp: number) => new Date(timestamp).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 export function messengerChatMessage(m: MessengerMessage): ChatMessage {
@@ -10,7 +11,7 @@ export function messengerChatMessage(m: MessengerMessage): ChatMessage {
 
 export function mergeMessengerThread(thread: MessengerThread, previous?: Conversation): Conversation {
   // Retain pages of history already loaded and successful sends not echoed yet.
-  const byId = new Map((previous?.messages || []).map((m) => [m.id, m]));
+  const byId = new Map((previous?.messages || []).filter((m) => (m.timestamp || 0) > (thread.viewStartAt || 0)).map((m) => [m.id, m]));
   for (const m of thread.messages) byId.set(m.messageId, messengerChatMessage(m));
   const messages = [...byId.values()].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0) || a.id.localeCompare(b.id));
   const latest = messages.at(-1);
@@ -36,8 +37,10 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     : 'FB';
   const avatarUrl = thread.customer?.avatarUrl || undefined;
   const base: Conversation = {
-    id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid,
-      hasOlder: previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
+    memory: thread.memory || previous?.memory || [],
+    personalitySummary: thread.personalitySummary || '',
+    id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid, viewStartAt: thread.viewStartAt,
+      hasOlder: previous?.messenger?.viewStartAt === thread.viewStartAt && previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
         ? false : thread.hasOlder },
     name, avatar, avatarUrl, channel: 'facebook', time: latest?.time || '', preview: latest?.text || '', tags: [],
     isUnreplied: unanswered, isUrgent: false, pendingSince: unanswered ? latestIn?.timestamp : undefined,
@@ -62,6 +65,12 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   } else if (previous?.aiStatus && [...previous.messages].reverse().find((m) => m.sender === 'in')?.id === latestIn?.id && unanswered) {
     base.aiStatus = previous.aiStatus;
     base.aiError = previous.aiError;
+  }
+  const saved = base.memory?.find((m) => m.messageId === latestIn?.id);
+  if (saved && !sameQuestion) {
+    const restored = applyConversationAnalysis({ ...base, isUnreplied: true }, saved.messageId, saved);
+    return unanswered ? restored : { ...restored, isUnreplied: false, isUrgent: false, aiSuggestion: undefined,
+      tags: restored.tags.filter((t) => t.kind !== 'priority') };
   }
   return base;
 }

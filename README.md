@@ -37,11 +37,15 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Nguồn dữ liệu cho AI của Tendly
 
-Phần cuối sidebar hiển thị tên và ảnh đại diện Page Facebook thật qua API Meta sau khi tab đã có mã truy cập inbox. Chưa xác thực thì để trống; ảnh không tải được thì dùng chữ viết tắt tên Page. Tên chủ shop nhập trong Cài đặt vẫn dùng cho lời chào ở Tổng quan.
+Hội thoại có nút **Xóa hội thoại** kèm xác nhận: ẩn khỏi danh sách phía shop bằng `hidden_at`, giữ tin và lịch sử trong PostgreSQL, không xóa trên Facebook. Khách gửi tin mới sau thời điểm xóa thì hội thoại xuất hiện lại nhưng chỉ hiển thị đoạn chat sau lần xóa gần nhất (`view_start_at`); tải tin cũ cũng tôn trọng mốc này. AI vẫn dùng lịch sử lưu đầy đủ. Webhook lặp và tin cũ đến trễ không mở lại.
+
+Migration `004-conversation-memory.sql` lưu phân tích theo Page + message ID: cảm xúc, ưu tiên, lý do, phong cách giao tiếp quan sát được và gợi ý trả lời. Khi mở hội thoại, ứng dụng phân tích dần các tin khách cũ chưa có kết quả, mỗi lượt dùng tối đa 10 tin trước đó làm ngữ cảnh; toàn bộ kết quả tích lũy được lưu. Khi đã xử lý hết lịch sử, Gemini tổng hợp một câu suy luận tính cách từ tất cả các phân tích, kể cả trước mốc xóa; kết quả lưu và chỉ cập nhật khi dữ liệu thay đổi. **Cảm xúc & ưu tiên** chỉ hiển thị hai dòng: suy luận tính cách và cảm xúc/trạng thái hiện tại. Migration `005-conversation-view.sql` lưu mốc hiển thị và câu tổng hợp. Chạy `npm run db:migrate` trước khi deploy bản này. Phân tích lịch sử chạy khi trang hội thoại đang mở.
+
+Phần cuối sidebar hiển thị tên và ảnh đại diện Page Facebook thật qua API Meta sau khi server đã mở phiên tự động. Chưa cấu hình thì để trống; ảnh không tải được thì dùng chữ viết tắt tên Page. Tên chủ shop nhập trong Cài đặt vẫn dùng cho lời chào ở Tổng quan.
 
 Trang Cài đặt bỏ banner khôi phục và thông tin mẫu. Nút bút chì mở chỉnh sửa tên chủ shop, thông tin shop và danh sách nhân viên; hỗ trợ thêm/sửa/xóa nhân viên, kiểm tra email trùng và bảo vệ chủ shop duy nhất. Dữ liệu này lưu trong trình duyệt, chưa đồng bộ PostgreSQL và chưa tạo tài khoản đăng nhập hay gửi email mời. Gói hiện tại hiển thị Free theo cấu hình sản phẩm, chưa có thanh toán. Tab Tích hợp kênh dùng lại giao diện và dữ liệu mẫu ban đầu, với icon, nút gạt và thao tác kết nối giả lập. Các thao tác này chỉ thay đổi dữ liệu trong trình duyệt; luồng Messenger thật qua webhook và inbox hoạt động độc lập. Banner khôi phục dữ liệu mẫu vẫn được bỏ.
 
-Dashboard `/tong-quan` lấy số hội thoại đang chờ, tin đến/tin gửi hôm nay, 10 tin khách gần đây và thống kê hội thoại 7 ngày từ PostgreSQL qua `/api/dashboard`, cập nhật khoảng 2 giây khi tab đang mở. Dùng cùng mã truy cập inbox; mã được giữ trong `sessionStorage` của tab sau khi kết nối. Các số liệu email, đơn hàng và cảm xúc chưa có nguồn lưu thật được để trống. Tên chủ shop đọc từ thành viên chủ shop đã lưu trong cấu hình trình duyệt, bỏ qua tên mẫu; chưa có backend tài khoản nên chưa có tên thì để trống.
+Dashboard `/tong-quan` lấy số hội thoại đang chờ, tin đến/tin gửi hôm nay, 10 tin khách gần đây và thống kê hội thoại 7 ngày từ PostgreSQL qua `/api/dashboard`, cập nhật khoảng 2 giây khi tab đang mở. Server tự mở phiên từ biến môi trường, dùng chung cho Tổng quan và Hộp thoại; không nhập hay lưu mã truy cập trong trình duyệt. Các số liệu email, đơn hàng và cảm xúc chưa có nguồn lưu thật được để trống. Tên chủ shop đọc từ thành viên chủ shop đã lưu trong cấu hình trình duyệt, bỏ qua tên mẫu; chưa có backend tài khoản nên chưa có tên thì để trống.
 
 Trong `/cau-hinh-ai`, nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình email tự động. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email đang bật được cung cấp cho Gemini. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng này.
 
@@ -53,7 +57,7 @@ Cấu hình hiện dùng mock DB tại `localStorage` của trình duyệt, chư
 
 ## Cảm xúc và hàng chờ trả lời
 
-Khi khách nhắn tin ở Hộp thoại, Gemini phân tích cảm xúc (tích cực, trung lập, lo lắng, thất vọng, tức giận), mức ưu tiên (cao, bình thường, thấp), lý do và nhu cầu nhân viên hỗ trợ; sau đó tạo câu trả lời theo cảm xúc và nguồn Cấu hình AI trong cùng một lượt. API yêu cầu [kết quả có cấu trúc](https://ai.google.dev/gemini-api/docs/generate-content/structured-output) và kiểm tra nhãn trước khi cập nhật UI. Tối đa 10 tin nhắn đang có trong phiên được dùng làm ngữ cảnh; chưa lưu thêm lịch sử hay tính cách khách vào database.
+Khi khách nhắn tin ở Hộp thoại, Gemini phân tích cảm xúc (tích cực, trung lập, lo lắng, thất vọng, tức giận), mức ưu tiên (cao, bình thường, thấp), lý do và nhu cầu nhân viên hỗ trợ; sau đó tạo câu trả lời theo cảm xúc và nguồn Cấu hình AI trong cùng một lượt. API yêu cầu [kết quả có cấu trúc](https://ai.google.dev/gemini-api/docs/generate-content/structured-output) và kiểm tra nhãn trước khi cập nhật UI. Mỗi lượt dùng tối đa 10 tin trước đó làm ngữ cảnh. Kết quả cảm xúc, ưu tiên và phong cách giao tiếp quan sát được được lưu theo tin nhắn trong PostgreSQL để xem diễn biến cả cuộc trò chuyện.
 
 Tin khách chưa xem được tô nổi bật, có nhãn **Tin mới** và đứng đầu danh sách theo thời gian mới nhất; mở hội thoại sẽ bỏ đánh dấu. Tiếp theo là hội thoại chưa trả lời, sắp theo điểm ưu tiên AI; cùng điểm thì khách chờ lâu hơn đứng trước. Khi trang hội thoại đang mở và đã kết nối, AI tự phân tích tin đang chờ, cập nhật nhãn cảm xúc, mức ưu tiên và tạo gợi ý, tối đa hai hội thoại cùng lúc. Shop duyệt và gửi gợi ý qua Send API. Lỗi AI giữ tin ở trạng thái chờ và có nút thử lại; không gọi lại liên tục mỗi lần polling. Kết quả chậm không ghi đè câu hỏi mới hay mở lại hội thoại đã trả lời.
 
@@ -94,7 +98,7 @@ Nhận/lưu tin mới từ khi kết nối và lấy tên/avatar khách qua Mess
 
 ### Hội thoại Messenger và gửi hai chiều
 
-Trong `/hop-thoai`, nhập mã từ `INBOX_ACCESS_KEY` để kết nối Messenger. Trang chỉ hiển thị hội thoại đã lưu từ Page, không có nút chuyển dữ liệu mẫu. Mã cần ít nhất 24 ký tự ngẫu nhiên, lưu ở env server; không phải Page access token. API đọc/gửi kiểm tra mã qua Authorization header, không công khai dữ liệu inbox. Mã chỉ giữ trong bộ nhớ trang, tải lại trang cần nhập lại. Đây là truy cập cho một shop, chưa thay thế đăng nhập tài khoản/phân quyền người dùng.
+Tổng quan và Hộp thoại tự mở phiên qua `/api/inbox/session`, dựa trên `INBOX_ACCESS_KEY`, `PAGE_ID`, `DATABASE_URL` của server (local: `.env.local`, deploy: env Vercel). Không còn ô nhập mã; thiếu cấu hình thì không hiển thị trang dữ liệu. Server ký cookie HttpOnly, SameSite=Strict, Secure trên HTTPS; khóa không gửi về JavaScript hay lưu trong localStorage. Phiên được tự gia hạn; các mã đã lưu trên trình duyệt trước đây được xóa. API vẫn hỗ trợ Bearer cho công cụ kiểm thử. Đây là chế độ tự truy cập cho một shop: bất kỳ ai mở website có cấu hình đều được cấp phiên, chưa có đăng nhập hay phân quyền tài khoản.
 
 Thêm `INBOX_ACCESS_KEY` và `META_GRAPH_VERSION` vào env local/Vercel. Version phải có dạng `v23.0` và khớp version được hỗ trợ/config của Meta app. `PAGE_ACCESS_TOKEN` chỉ được dùng server-side. Chạy lại `npm run db:migrate` để tạo bảng `messenger_outbound_requests`, rồi deploy lại.
 
@@ -106,7 +110,7 @@ Mỗi lần polling chỉ lấy hồ sơ tối đa ba khách; lease trong databa
 
 Hội thoại thật chỉ gửi với tư cách Shop. Gửi text qua `/api/messenger/send` tới Send API; tiêu chuẩn RESPONSE trong 24 giờ từ tin khách gần nhất. Tin không được đánh dấu đã gửi nếu Meta từ chối. Chống gửi lặp cùng request ID bằng bảng outbound; timeout/HTTP 5xx/kết quả không rõ không tự gửi lại. Client giữ request ID khi lỗi không rõ, người dùng cần kiểm tra Messenger trước khi chủ động gửi một yêu cầu mới. Nếu Meta nhận tin nhưng lưu message bị lỗi, UI báo đã gửi và chờ webhook echo để đồng bộ. Webhook echo và bản gửi dashboard có cùng message ID nên không tạo bản thứ hai. [Meta Send API](https://www.postman.com/meta/messenger-platform-api/documentation/iyp204x/messenger-platform-api)
 
-AI tự phân tích tin thật và ngữ cảnh đã tải với Cấu hình AI hiện có trong trình duyệt; nút **Phân tích AI** dùng để chạy lại. Đóng trang thì AI không chạy; webhook vẫn lưu tin, khi mở lại AI xử lý các tin đang chờ. Nhãn AI và đánh dấu đã xem hiện chỉ lưu trong phiên trình duyệt, chưa lưu vào Postgres.
+AI tự phân tích tin thật với Cấu hình AI hiện có trong trình duyệt; nút **Phân tích AI** dùng để chạy lại. Đóng trang thì AI không chạy; webhook vẫn lưu tin. Khi mở lại, ứng dụng khôi phục phân tích từ PostgreSQL, xử lý tin mới và bổ sung phân tích lịch sử cho hội thoại đang mở. Đánh dấu đã xem hiện vẫn lưu trong phiên trình duyệt.
 
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 

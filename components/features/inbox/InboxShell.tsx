@@ -12,6 +12,9 @@ import { applyConversationAnalysis, automaticAnalysisCandidates, latestCustomerM
 import { mergeMessengerThread, messengerChatMessage } from '@/lib/services/messengerView';
 import type { MessengerInboxSnapshot } from '@/lib/types/messengerInbox';
 import type { MessengerMessage } from '@/lib/types/messenger';
+import { useInboxSession } from '@/lib/services/inboxCredentials';
+import type { AiChatReply, AiSessionMessage } from '@/lib/types/ai';
+import { ConfirmDialog } from '@/components/ui/Modal';
 
 export function InboxShell() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -24,17 +27,21 @@ export function InboxShell() {
   const pendingRequests = useRef(new Set<string>());
   const attemptedAnalysis = useRef(new Map<string, string>());
   const [analysisTick, setAnalysisTick] = useState(0);
-  const [accessKey, setAccessKey] = useState('');
-  const [keyInput, setKeyInput] = useState('');
-  const [syncStatus, setSyncStatus] = useState('Nhập mã truy cập để kết nối Messenger');
+  const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const conversationsRef = useRef(conversations);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+  const { ready, error: sessionError } = useInboxSession();
+  const [syncStatus, setSyncStatus] = useState('');
   const [limit, setLimit] = useState(100);
   const [hasMore, setHasMore] = useState(false);
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
   const sendLocks = useRef(new Set<string>());
   const outboundRequests = useRef(new Map<string, string>());
+  const hiddenConversations = useRef(new Map<string, number>());
 
   useEffect(() => {
-    if (!accessKey) return;
+    if (!ready) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let controller: AbortController;
@@ -44,12 +51,19 @@ export function InboxShell() {
       const timeout = setTimeout(() => controller.abort(), 12000);
       try {
         const response = await fetch(`/api/messenger/inbox?limit=${limit}`, {
-          headers: { Authorization: `Bearer ${accessKey}` }, cache: 'no-store', signal: controller.signal,
+          cache: 'no-store', signal: controller.signal,
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Không đồng bộ được Messenger.');
         if (cancelled) return;
         const snapshot = data as MessengerInboxSnapshot;
+        snapshot.conversations = snapshot.conversations.filter((thread) => {
+          const hiddenAt = hiddenConversations.current.get(thread.id);
+          if (hiddenAt === undefined) return true;
+          if ((thread.lastInAt || 0) <= hiddenAt) return false;
+          hiddenConversations.current.delete(thread.id);
+          return true;
+        });
         const nextSelected = snapshot.conversations.some((c) => c.id === selectedIdRef.current)
           ? selectedIdRef.current : snapshot.conversations[0]?.id || '';
         selectedIdRef.current = nextSelected;
@@ -71,7 +85,7 @@ export function InboxShell() {
     };
     void poll();
     return () => { cancelled = true; clearTimeout(timer); controller?.abort(); };
-  }, [accessKey, limit]);
+  }, [ready, limit]);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -129,7 +143,7 @@ export function InboxShell() {
     outboundRequests.current.set(requestKey, requestId);
     try {
       const response = await fetch('/api/messenger/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessKey}` },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ psid: target.messenger.psid, text, requestId }),
       });
       const result = await response.json();
@@ -160,6 +174,11 @@ export function InboxShell() {
   const analyzeMessage = useCallback(async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages, automatic = false) => {
     try {
       const data = await askShopAi(text, sessionContext(contextMessages, messageId));
+      if (conversation.messenger) {
+        const response = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ psid: conversation.messenger.psid, messageId, ...data }) });
+        if (!response.ok) throw new Error('Không lưu được phân tích vào database.');
+      }
       setConversations((prev) => prev.map((c) => c.id === conversation.id
         ? applyConversationAnalysis(c, messageId, data) : c));
       if (!automatic) showToast('Đã cập nhật cảm xúc, ưu tiên và gợi ý trả lời của AI.');
@@ -175,7 +194,7 @@ export function InboxShell() {
   }, [showToast]);
 
   useEffect(() => {
-    if (!accessKey) return;
+    if (!ready) return;
     const candidates = automaticAnalysisCandidates(conversations, pendingRequests.current, attemptedAnalysis.current);
     if (!candidates.length) return;
     for (const conversation of candidates) {
@@ -188,7 +207,43 @@ export function InboxShell() {
     const ids = new Set(candidates.map((c) => c.id));
     setConversations((previous) => previous.map((c) => ids.has(c.id)
       ? { ...c, aiStatus: 'analyzing', aiError: undefined, aiSuggestion: undefined } : c));
-  }, [accessKey, conversations, analysisTick, analyzeMessage]);
+  }, [ready, conversations, analysisTick, analyzeMessage]);
+
+  // Backfill persisted messages for the open conversation, without replacing its latest reply suggestion.
+  useEffect(() => {
+    if (!ready || !selectedId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const backfill = async () => {
+      const conversation = conversationsRef.current.find((c) => c.id === selectedId);
+      if (!conversation?.messenger || cancelled) return;
+      if (pendingRequests.current.size) { timer = setTimeout(backfill, 3000); return; }
+      try {
+        const response = await fetch(`/api/messenger/conversation?psid=${conversation.messenger.psid}`, { cache: 'no-store' });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
+        if (!result.jobs.length && !cancelled) {
+          await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ psid: conversation.messenger.psid, action: 'summarize' }) });
+        }
+        for (const job of result.jobs as { messageId: string; text: string; context: AiSessionMessage[] }[]) {
+          if (cancelled) return;
+          const current = conversationsRef.current.find((c) => c.id === selectedId);
+          if (!current) return;
+          if (pendingRequests.current.size || (current.isUnreplied && latestCustomerMessage(current)?.id === job.messageId)) break;
+          const data: AiChatReply = await askShopAi(job.text || '[Tệp đính kèm]', job.context);
+          const saved = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ psid: conversation.messenger.psid, messageId: job.messageId, ...data }) });
+          if (!saved.ok) throw new Error('Không lưu được phân tích lịch sử.');
+        }
+        if (!cancelled) timer = setTimeout(backfill, result.jobs.length ? 3000 : 15000);
+      } catch (error) {
+        if (!cancelled) showToast(error instanceof Error ? error.message : 'Không phân tích được lịch sử. Mở lại hội thoại để thử lại.');
+      }
+    };
+    timer = setTimeout(backfill, 3000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [ready, selectedId, showToast]);
 
   const handleGenerateAiSuggestion = async () => {
     if (!selectedConv || pendingRequests.current.has(selectedConv.id)) return;
@@ -204,6 +259,11 @@ export function InboxShell() {
     await analyzeMessage(selectedConv, question.id, question.text);
   };
 
+  if (!ready) return <div className="inbox-root"><div className="shell">
+    <Sidebar currentPath="hop-thoai" onToast={showToast} />
+    <main className="main"><p role="status">{sessionError || 'Đang kiểm tra cấu hình kết nối...'}</p></main>
+  </div></div>;
+
   return (
     <div className="inbox-root">
       <div className="shell">
@@ -214,12 +274,6 @@ export function InboxShell() {
           <div className="inbox-shell">
             <ConversationList
               toolbar={<div className="messenger-toolbar">
-                  <form onSubmit={(e) => { e.preventDefault(); const key = keyInput.trim();
-                    try { sessionStorage.setItem('tendly.inbox-access', key); } catch { /* storage unavailable */ }
-                    setAccessKey(key); setKeyInput(''); }}>
-                    <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} placeholder="Mã truy cập inbox" aria-label="Mã truy cập inbox" autoComplete="off" required />
-                    <button className="btn btn-outline btn-sm" type="submit">Kết nối</button>
-                  </form>
                   {syncStatus && <p role="status">{syncStatus}</p>}
                   {hasMore && limit < 1000 && <button className="btn btn-outline btn-sm" onClick={() => setLimit((n) => n + 100)}>Tải thêm hội thoại</button>}
               </div>}
@@ -245,13 +299,14 @@ export function InboxShell() {
                   onToast={showToast}
                   onGenerateAiSuggestion={handleGenerateAiSuggestion}
                   isSending={sendingIds.has(selectedConv.id)}
+                  onDeleteConversation={async () => { setDeleteTarget(selectedConv); }}
                   onLoadOlder={async () => {
                     const target = selectedConv;
                     const oldest = target.messages[0];
                     if (!target.messenger || !oldest) return;
                     try {
                       const params = new URLSearchParams({ psid: target.messenger.psid, before: String(oldest.timestamp), messageId: oldest.id });
-                      const response = await fetch(`/api/messenger/inbox?${params}`, { headers: { Authorization: `Bearer ${accessKey}` }, cache: 'no-store' });
+                      const response = await fetch(`/api/messenger/inbox?${params}`, { cache: 'no-store' });
                       const result = await response.json();
                       if (!response.ok) throw new Error(result.error);
                       setConversations((prev) => prev.map((c) => c.id === target.id ? { ...c,
@@ -267,18 +322,36 @@ export function InboxShell() {
                   analysis={selectedConv.analysis}
                   aiStatus={selectedConv.aiStatus}
                   isUnreplied={Boolean(selectedConv.isUnreplied)}
+                  personalitySummary={selectedConv.personalitySummary}
                 />
               </>
             )}
             {!selectedConv && <div className="messenger-empty">
               <h2>Hội thoại Messenger</h2>
-              <p>{accessKey ? 'Tin mới sẽ hiện ở đây khi khách nhắn vào Page và webhook đã được kết nối.' : 'Nhập mã truy cập ở bên trái để mở inbox.'}</p>
+              <p>Tin mới sẽ hiện ở đây khi khách nhắn vào Page và webhook đã được kết nối.</p>
             </div>}
           </div>
         </main>
       </div>
 
       <Toast message={toastMessage} />
+      <ConfirmDialog open={Boolean(deleteTarget)} title="Xóa hội thoại khỏi inbox?"
+        message="Hội thoại sẽ được ẩn phía shop, không xóa tin trên Facebook. Lịch sử vẫn lưu trong database và hội thoại hiện lại khi khách nhắn tin mới."
+        confirmLabel="Xóa hội thoại" busy={deleting} onClose={() => { if (!deleting) setDeleteTarget(null); }}
+        onConfirm={() => { void (async () => {
+          if (!deleteTarget?.messenger) return;
+          setDeleting(true);
+          try {
+            const response = await fetch('/api/messenger/conversation', { method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ psid: deleteTarget.messenger.psid }) });
+            if (!response.ok) throw new Error('Không xóa được hội thoại.');
+            const result = await response.json();
+            hiddenConversations.current.set(deleteTarget.id, result.hiddenAt || Date.now());
+            setConversations((previous) => previous.filter((c) => c.id !== deleteTarget.id));
+            setDeleteTarget(null); setDraftText(''); showToast('Đã xóa hội thoại khỏi inbox.');
+          } catch (error) { showToast(error instanceof Error ? error.message : 'Không xóa được hội thoại.'); }
+          finally { setDeleting(false); }
+        })(); }} />
     </div>
   );
 }

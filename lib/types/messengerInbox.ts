@@ -1,4 +1,5 @@
 import type { MessengerMessage } from './messenger';
+import type { ConversationMemoryEntry } from './conversationMemory';
 
 export interface MessengerCustomerProfile {
   name: string | null;
@@ -11,6 +12,9 @@ export interface MessengerCustomerProfile {
 }
 
 export interface MessengerThread {
+  viewStartAt?: number;
+  personalitySummary?: string;
+  memory?: ConversationMemoryEntry[];
   id: string;
   psid: string;
   pageId: string;

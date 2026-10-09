@@ -27,6 +27,7 @@ export interface AiMessageAnalysis {
   priorityScore: number;
   reason: string;
   needsHuman: boolean;
+  communicationStyle?: string;
 }
 
 /** Ngữ cảnh đang có trong phiên hiện tại; không lưu thêm lịch sử vào database. */

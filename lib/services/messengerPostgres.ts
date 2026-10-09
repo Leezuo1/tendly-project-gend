@@ -50,6 +50,7 @@ export async function savePostgresMessages(messages: MessengerMessage[], databas
       if (!result.rowCount) continue;
       inserted++;
       await client.query(`UPDATE messenger_conversations SET
+        hidden_at=CASE WHEN $2::text='in' AND (hidden_at IS NULL OR $1::bigint > hidden_at) THEN NULL ELSE hidden_at END,
         last_message_at=GREATEST(COALESCE(last_message_at,0),$1::bigint),
         last_in_at=CASE WHEN $2::text='in' THEN GREATEST(COALESCE(last_in_at,0),$1::bigint) ELSE last_in_at END,
         last_out_at=CASE WHEN $2::text='out' THEN GREATEST(COALESCE(last_out_at,0),$1::bigint) ELSE last_out_at END
