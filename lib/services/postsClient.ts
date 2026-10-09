@@ -31,7 +31,8 @@ export function setDashboardKey(key: string) {
   }
 }
 
-async function request(url: string, init: RequestInit = {}): Promise<Response> {
+/** fetch kèm mã quản trị; lỗi HTTP thành PostsApiError (dùng chung cho các API Marketing). */
+export async function dashboardRequest(url: string, init: RequestInit = {}): Promise<Response> {
   const key = getDashboardKey();
   let res: Response;
   try {
@@ -54,7 +55,7 @@ async function request(url: string, init: RequestInit = {}): Promise<Response> {
 }
 
 async function call<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const res = await request(url, init);
+  const res = await dashboardRequest(url, init);
   if (res.status === 204) return undefined as T;
   return await res.json() as T;
 }
@@ -103,8 +104,8 @@ export const postsClient = {
 
   /** AI vẽ ảnh từ mô tả, trả ảnh để xem trước (chưa lưu). */
   generateImage: (prompt: string) =>
-    request('/api/posts/generate-image', { method: 'POST', body: JSON.stringify({ prompt }) }).then((r) => r.blob()),
-  getImage: (id: string) => request(`/api/posts/${encodeURIComponent(id)}/image`).then((r) => r.blob()),
+    dashboardRequest('/api/posts/generate-image', { method: 'POST', body: JSON.stringify({ prompt }) }).then((r) => r.blob()),
+  getImage: (id: string) => dashboardRequest(`/api/posts/${encodeURIComponent(id)}/image`).then((r) => r.blob()),
   setImage: (id: string, image: Blob, source: PostImageSource) =>
     call<{ post: MarketingPost }>(`/api/posts/${encodeURIComponent(id)}/image`, {
       method: 'PUT', body: image, headers: { 'Content-Type': image.type || 'application/octet-stream', 'X-Image-Source': source },

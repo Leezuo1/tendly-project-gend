@@ -28,7 +28,7 @@ export function MarketingShell() {
         <main className="main">
           <div className="page-head">
             <h1>Marketing</h1>
-            <p>Duyệt nội dung remarketing do AI đề xuất và theo dõi hiệu suất so với cách làm cũ.</p>
+            <p>Nhắn lại khách bằng tin AI soạn theo đúng hội thoại, xem nhóm khách và hiệu quả bài đăng — từ dữ liệu Messenger &amp; Fanpage thật.</p>
           </div>
 
           <div className="tabs">

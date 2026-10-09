@@ -53,3 +53,46 @@ export async function publishToFacebookPage(
   }
   return { id: postId, url: `https://www.facebook.com/${postId}` };
 }
+
+export interface PostEngagement { reactions: number; comments: number; shares: number }
+
+/**
+ * Lượt cảm xúc / bình luận / chia sẻ của các bài trên Fanpage (cần pages_read_engagement).
+ * Gọi từng bài để một bài bị xoá trên Page không làm hỏng số liệu các bài còn lại.
+ */
+export async function fetchPostEngagement(
+  postIds: string[],
+): Promise<{ stats: Map<string, PostEngagement>; failed: number; missingPermission: string | null }> {
+  const token = process.env.PAGE_ACCESS_TOKEN?.trim();
+  if (!token) throw new FacebookNotConfigured('Chưa cấu hình PAGE_ACCESS_TOKEN để đọc số liệu Fanpage.');
+  const fields = 'reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares';
+  const stats = new Map<string, PostEngagement>();
+  let failed = 0;
+  let missingPermission: string | null = null;
+  await Promise.all(postIds.filter((id) => /^\d+(_\d+)?$/.test(id)).map(async (id) => {
+    try {
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${id}?fields=${encodeURIComponent(fields)}`, {
+        headers: { Authorization: `Bearer ${token}` }, // token không đặt trên URL
+        signal: AbortSignal.timeout(10_000),
+      });
+      const data = await res.json() as {
+        reactions?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } };
+        shares?: { count?: number }; error?: { message?: unknown };
+      };
+      if (!res.ok) {
+        // Lỗi quyền (#10) nêu rõ quyền còn thiếu, ví dụ pages_read_user_content.
+        const reason = typeof data.error?.message === 'string' ? data.error.message : '';
+        missingPermission ??= /'(pages_[a-z_]+)'/.exec(reason)?.[1] ?? null;
+        throw new Error('graph error');
+      }
+      stats.set(id, {
+        reactions: data.reactions?.summary?.total_count ?? 0,
+        comments: data.comments?.summary?.total_count ?? 0,
+        shares: data.shares?.count ?? 0,
+      });
+    } catch {
+      failed += 1;
+    }
+  }));
+  return { stats, failed, missingPermission };
+}
