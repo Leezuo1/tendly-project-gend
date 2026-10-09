@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ApprovalQueueTab } from './ApprovalQueueTab';
 import { CustomerSegmentsTab } from './CustomerSegmentsTab';
 import { CampaignPerformanceTab } from './CampaignPerformanceTab';
+import { PostComposerTab } from './PostComposerTab';
 import { Toast } from '@/components/shared/Toast';
 
 export function MarketingShell() {
@@ -52,11 +53,19 @@ export function MarketingShell() {
             >
               Hiệu suất chiến dịch
             </button>
+            <button
+              type="button"
+              className={`tab-btn ${activeTab === 'composer' ? 'active' : ''}`}
+              onClick={() => setActiveTab('composer')}
+            >
+              ✨ Soạn bài AI
+            </button>
           </div>
 
           {activeTab === 'queue' && <ApprovalQueueTab onToast={showToast} />}
           {activeTab === 'segments' && <CustomerSegmentsTab />}
           {activeTab === 'performance' && <CampaignPerformanceTab />}
+          {activeTab === 'composer' && <PostComposerTab onToast={showToast} />}
         </main>
       </div>
 

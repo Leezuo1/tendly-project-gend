@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { MarketingShell } from '@/components/features/marketing/MarketingShell';
 import './marketing.css';
+import './post-composer.css';
 
 export const metadata: Metadata = {
   title: 'Marketing — Tendly',
