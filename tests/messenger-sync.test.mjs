@@ -106,6 +106,46 @@ test('dashboard aggregates real messages across all conversations, isolates Page
   assert.equal(response.headers.get('cache-control'), 'no-store');
 });
 
+test('sidebar count tracks unanswered conversations without opening inbox, excludes hidden and other Pages', async () => {
+  const { load, writer } = await fixture();
+  const { readUnrepliedCount } = load('lib/services/messengerCount.ts');
+  const count = () => readUnrepliedCount('111', pool);
+  assert.equal(await count(), 0);
+  const base = Date.now() - 10000;
+  await writer.savePostgresMessages([
+    m('count-in', { timestamp: base }), m('count-in-again', { timestamp: base + 1 }),
+    m('count-other-customer', { psid: '333', timestamp: base + 2 }),
+    m('count-other-page', { pageId: '999', timestamp: base + 3 }),
+    m('count-out-only', { psid: '444', direction: 'out', timestamp: base + 4 }),
+  ], pool);
+  assert.equal(await count(), 2, 'multiple messages from one customer count as one waiting conversation');
+  await load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool);
+  assert.equal(await count(), 2, 'reading inbox does not answer conversations');
+  await writer.savePostgresMessages([m('count-reply', { direction: 'out', timestamp: base + 5 })], pool);
+  assert.equal(await count(), 1);
+  await writer.savePostgresMessages([m('count-next-in', { timestamp: base + 6 })], pool);
+  assert.equal(await count(), 2, 'new inbound message reopens waiting state');
+  await load('lib/services/conversationMemory.ts').hideConversation('111', '333', pool);
+  assert.equal(await count(), 1);
+
+  const route = loader({ 'lib/services/messengerCount.ts': {
+    readUnrepliedCount: (id) => readUnrepliedCount(id, pool),
+  } })('app/api/messenger/unreplied/route.ts');
+  const request = () => new Request('http://localhost/api/messenger/unreplied', {
+    headers: { Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` },
+  });
+  assert.equal((await route.GET(new Request('http://localhost/api/messenger/unreplied'))).status, 401);
+  const response = await route.GET(request());
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { count: 1 });
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const databaseUrl = process.env.DATABASE_URL;
+  try {
+    delete process.env.DATABASE_URL;
+    assert.equal((await route.GET(request())).status, 503);
+  } finally { process.env.DATABASE_URL = databaseUrl; }
+});
+
 test('settings channel status checks real Page access, requires inbox authorization and exposes no token', async () => {
   const route = loader()('app/api/settings/channels/route.ts');
   assert.equal((await route.GET(new Request('http://localhost/api/settings/channels'))).status, 401);

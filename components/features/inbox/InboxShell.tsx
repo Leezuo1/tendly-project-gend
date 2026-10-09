@@ -267,8 +267,7 @@ export function InboxShell() {
   return (
     <div className="inbox-root">
       <div className="shell">
-        <Sidebar currentPath="hop-thoai" onToast={showToast}
-          unreadMessageCount={conversations.reduce((sum, c) => sum + (c.unreadMessageIds?.length || 0), 0)} />
+        <Sidebar currentPath="hop-thoai" onToast={showToast} />
 
         <main className="main" aria-label="Hộp thoại">
           <div className="inbox-shell">
