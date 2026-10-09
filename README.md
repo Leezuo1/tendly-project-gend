@@ -104,10 +104,8 @@ Nút **Phân tích AI** dùng tin thật và ngữ cảnh đã tải với Cấu
 
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 
-<<<<<<< HEAD
-=======
 Test đồng bộ dùng PostgreSQL WASM (PGlite) để chạy SQL đọc inbox/phân trang và luồng gửi–lưu–echo; Meta được giả lập. Các ca gồm access code, gửi trùng request, timeout, token bị từ chối, hết thời hạn, khách nhắn thêm và giữ ngữ cảnh UI. Chưa kiểm tra mạng/TLS/quyền thật của Meta hoặc database cloud chỉ bằng các test này.
->>>>>>> 04d1708b2f1a5e70c3cb6d1cd457789dd691c7d7
+
 ## AI soạn & đăng bài (Marketing → Soạn bài AI)
 
 Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, tối đa 5 sản phẩm và ghi chú (khuyến mãi, sự kiện). Gemini viết 1–3 phương án gồm tiêu đề, nội dung, hashtag và gợi ý ảnh/kịch bản video. Bài AI viết chỉ là bản nháp: chủ shop sửa trực tiếp rồi **Lưu nháp**, **Sao chép** hoặc **Lưu & đăng Fanpage**.
@@ -118,8 +116,3 @@ Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, t�
 - Dashboard chưa có đăng nhập nên mọi API `/api/posts/*` (kể cả tạo bài) yêu cầu header `Authorization: Bearer <DASHBOARD_KEY>`. Production thiếu `DASHBOARD_KEY` thì trả 503; local (`next dev`) bỏ trống vẫn chạy. Giao diện hỏi mã một lần và lưu trên trình duyệt của chủ shop.
 
 Biến môi trường trên Vercel: `GEMINI_API_KEY`, `DATABASE_URL`, `DASHBOARD_KEY`; thêm `PAGE_ID`, `PAGE_ACCESS_TOKEN` để đăng Fanpage. `npm test` có kiểm thử validate yêu cầu, prompt chỉ chứa sản phẩm đã chọn, làm sạch output, khoá bằng mã quản trị, lưu/khoá bài bằng `pg-mem` và gọi Graph API giả lập.
-<<<<<<< HEAD
-
-Test đồng bộ dùng PostgreSQL WASM (PGlite) để chạy SQL đọc inbox/phân trang và luồng gửi–lưu–echo; Meta được giả lập. Các ca gồm access code, gửi trùng request, timeout, token bị từ chối, hết thời hạn, khách nhắn thêm và giữ ngữ cảnh UI. Chưa kiểm tra mạng/TLS/quyền thật của Meta hoặc database cloud chỉ bằng các test này.
-=======
->>>>>>> 04d1708b2f1a5e70c3cb6d1cd457789dd691c7d7
