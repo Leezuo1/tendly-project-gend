@@ -26,11 +26,21 @@ export interface PostDraft {
   imageIdea: string;
 }
 
+/** Bản nháp AI vừa tạo: thêm mô tả ảnh tiếng Anh để AI vẽ ảnh (không lưu vào database). */
+export interface GeneratedPostDraft extends PostDraft {
+  imagePrompt: string;
+}
+
+export type PostImageMime = 'image/jpeg' | 'image/png' | 'image/webp';
+export type PostImageSource = 'ai' | 'upload';
+
 export interface MarketingPost extends PostDraft {
   id: string;
   channel: PostChannel;
   goal: PostGoal;
   productSkus: string[];
+  /** Ảnh kèm bài (bytes đọc qua /api/posts/[id]/image); updatedAt để trình duyệt tải lại khi đổi ảnh. */
+  image: { source: PostImageSource; updatedAt: number } | null;
   status: PostStatus;
   externalId: string | null;
   externalUrl: string | null;

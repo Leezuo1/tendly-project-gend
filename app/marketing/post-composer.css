@@ -94,3 +94,39 @@
   .marketing-root .pc-grid { grid-template-columns: 1fr; }
   .marketing-root .pc-time { margin-left: 0; width: 100%; }
 }
+
+/* ---- ảnh kèm bài ---- */
+.marketing-root .pc-image { display: flex; flex-direction: column; gap: 8px; }
+.marketing-root .pc-image-empty {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 120px; padding: 12px;
+  border: 1px dashed var(--line); border-radius: 12px; background: var(--paper); color: var(--ink-soft); font-size: 12.5px; text-align: center;
+}
+.marketing-root .pc-image-preview { position: relative; border-radius: 12px; overflow: hidden; background: var(--sand); }
+.marketing-root .pc-image-preview img { display: block; width: 100%; max-height: 360px; object-fit: contain; }
+.marketing-root .pc-image-thumb { max-width: 280px; }
+.marketing-root .pc-image-thumb .pc-hint { display: block; padding: 12px; }
+.marketing-root .pc-image-badge {
+  position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  background: rgba(0, 0, 0, 0.6); color: #fff;
+}
+.marketing-root .pc-image-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.marketing-root .pc-prompt summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.marketing-root .pc-prompt textarea { margin-top: 6px; }
+
+/* ---- tab Hàng chờ duyệt / Khách hàng / Hiệu suất (dữ liệu thật) ---- */
+.marketing-root .approval-tail { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.marketing-root .approval-editor { margin-top: 10px; width: 100%; }
+.marketing-root .approval-body { min-width: 0; flex: 1; }
+.marketing-root .seg-hint { margin: 10px 0 4px; }
+.marketing-root .seg-customer { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--sand); }
+.marketing-root .seg-customer:last-child { border-bottom: none; }
+.marketing-root .seg-customer-body { flex: 1; min-width: 0; }
+.marketing-root .kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.marketing-root .perf-post { display: flex; gap: 16px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--sand); }
+.marketing-root .perf-post:last-child { border-bottom: none; }
+.marketing-root .perf-post-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.marketing-root .perf-stats { display: flex; align-items: center; gap: 12px; flex-shrink: 0; font-size: 13px; font-weight: 600; }
+@media (max-width: 880px) {
+  .marketing-root .kpi-grid-4 { grid-template-columns: 1fr 1fr; }
+  .marketing-root .perf-post { flex-direction: column; }
+}
