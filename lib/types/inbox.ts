@@ -60,7 +60,8 @@ export interface CustomerProfile {
 
 export interface Conversation {
   memory?: ConversationMemoryEntry[];
-  messenger?: { pageId: string; psid: string; hasOlder: boolean };
+  personalitySummary?: string;
+  messenger?: { pageId: string; psid: string; hasOlder: boolean; viewStartAt?: number };
   id: string;
   name: string;
   avatar: string;

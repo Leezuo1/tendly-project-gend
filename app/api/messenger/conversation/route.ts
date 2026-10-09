@@ -1,6 +1,7 @@
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { hideConversation, pendingHistoricalAnalysis, saveConversationMemory } from '@/lib/services/conversationMemory';
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
+import { refreshCustomerPersonality } from '@/lib/services/customerPersonality';
 
 export const runtime = 'nodejs';
 async function handle(request: Request) {
@@ -16,6 +17,7 @@ async function handle(request: Request) {
       return Response.json({ deleted: (result.rowCount ?? 0) > 0, hiddenAt: result.rows[0] ? Number(result.rows[0].hidden_at) : null });
     }
     if (request.method === 'GET') return Response.json({ jobs: await pendingHistoricalAnalysis(pageId, body.psid) }, { headers: { 'Cache-Control': 'no-store' } });
+    if (body.action === 'summarize') return Response.json(await refreshCustomerPersonality(pageId, body.psid));
     if (typeof body.messageId !== 'string' || !body.messageId || body.messageId.length > 1024
       || typeof body.reply !== 'string' || !body.reply.trim() || body.reply.length > 8000
       || typeof body.model !== 'string' || body.model.length > 200

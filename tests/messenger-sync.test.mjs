@@ -12,6 +12,8 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/002-messenger-outbound.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
 })();
@@ -201,6 +203,46 @@ test('conversation memory survives reload, deduplicates per message, backfills a
   await writer.savePostgresMessages([m('fresh', { timestamp: Number(hidden.rows[0].hidden_at) + 100 })], pool);
   const reopened = await read.readMessengerInbox('111', 100, pool);
   assert.equal(reopened.conversations.length, 1); assert.equal(reopened.conversations[0].memory.length, 1);
+  assert.deepEqual(reopened.conversations[0].messages.map((m) => m.messageId), ['fresh']);
+  assert.equal(reopened.conversations[0].hasOlder, false);
+  const afterDeletion = load('lib/services/messengerView.ts').mergeMessengerThread(reopened.conversations[0], restored);
+  assert.deepEqual(afterDeletion.messages.map((m) => m.id), ['fresh']);
+  const older = await read.readOlderMessengerMessages('111', '222', reopened.conversations[0].messages[0].timestamp, 'fresh', pool);
+  assert.deepEqual(older.messages, []);
+  assert.equal((await query('SELECT COUNT(*) AS count FROM messenger_messages')).rows[0].count, 57);
+});
+
+test('one-line personality summarizes the entire persisted analysis history and caches until evidence changes', async () => {
+  const { load, writer } = await fixture();
+  const memory = load('lib/services/conversationMemory.ts');
+  const personality = load('lib/services/customerPersonality.ts');
+  const messages = [m('old1', { timestamp: 100 }), m('old2', { timestamp: 200 }), m('latest', { timestamp: 300 })];
+  await writer.savePostgresMessages(messages, pool);
+  const result = { reply: 'Shop hỗ trợ bạn', model: 'test', sourceSummary: 'Cấu hình AI', analysis: {
+    sentiment: 'positive', emotion: 'happy', priority: 'normal', priorityScore: 40, reason: 'Khách hỏi lịch sự',
+    needsHuman: false, communicationStyle: 'Lịch sự, ngắn gọn',
+  } };
+  let calls = 0;
+  const generate = async (options) => {
+    calls++;
+    const input = JSON.parse(options.user);
+    assert.equal(input.messageCount, 3);
+    assert.equal(input.styles.reduce((n, s) => n + s.count, 0), 3);
+    return { result: options.parse(JSON.stringify({ summary: 'Lịch sự, thường trao đổi ngắn gọn.' })), model: 'test' };
+  };
+  await memory.saveConversationMemory('111', '222', 'latest', result, pool);
+  assert.equal((await personality.refreshCustomerPersonality('111', '222', pool, generate)).summary, '');
+  assert.equal(calls, 0);
+  for (const id of ['old1', 'old2']) await memory.saveConversationMemory('111', '222', id, result, pool);
+  const summary = await personality.refreshCustomerPersonality('111', '222', pool, generate);
+  assert.equal(summary.summary, 'Lịch sự, thường trao đổi ngắn gọn.');
+  await personality.refreshCustomerPersonality('111', '222', pool, generate);
+  assert.equal(calls, 1);
+  await memory.saveConversationMemory('111', '222', 'old1', { ...result, analysis: { ...result.analysis, communicationStyle: 'Hỏi nhiều chi tiết' } }, pool);
+  await personality.refreshCustomerPersonality('111', '222', pool, generate);
+  assert.equal(calls, 2);
+  const snapshot = await load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool);
+  assert.equal(snapshot.conversations[0].personalitySummary, summary.summary);
 });
 
 test('two-way send -> stored outgoing -> webhook echo stays single; same request never sends twice', async () => {

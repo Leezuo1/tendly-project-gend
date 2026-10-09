@@ -11,7 +11,7 @@ export function messengerChatMessage(m: MessengerMessage): ChatMessage {
 
 export function mergeMessengerThread(thread: MessengerThread, previous?: Conversation): Conversation {
   // Retain pages of history already loaded and successful sends not echoed yet.
-  const byId = new Map((previous?.messages || []).map((m) => [m.id, m]));
+  const byId = new Map((previous?.messages || []).filter((m) => (m.timestamp || 0) > (thread.viewStartAt || 0)).map((m) => [m.id, m]));
   for (const m of thread.messages) byId.set(m.messageId, messengerChatMessage(m));
   const messages = [...byId.values()].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0) || a.id.localeCompare(b.id));
   const latest = messages.at(-1);
@@ -38,8 +38,9 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   const avatarUrl = thread.customer?.avatarUrl || undefined;
   const base: Conversation = {
     memory: thread.memory || previous?.memory || [],
-    id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid,
-      hasOlder: previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
+    personalitySummary: thread.personalitySummary || '',
+    id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid, viewStartAt: thread.viewStartAt,
+      hasOlder: previous?.messenger?.viewStartAt === thread.viewStartAt && previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
         ? false : thread.hasOlder },
     name, avatar, avatarUrl, channel: 'facebook', time: latest?.time || '', preview: latest?.text || '', tags: [],
     isUnreplied: unanswered, isUrgent: false, pendingSince: unanswered ? latestIn?.timestamp : undefined,

@@ -222,6 +222,10 @@ export function InboxShell() {
         const response = await fetch(`/api/messenger/conversation?psid=${conversation.messenger.psid}`, { cache: 'no-store' });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error);
+        if (!result.jobs.length && !cancelled) {
+          await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ psid: conversation.messenger.psid, action: 'summarize' }) });
+        }
         for (const job of result.jobs as { messageId: string; text: string; context: AiSessionMessage[] }[]) {
           if (cancelled) return;
           const current = conversationsRef.current.find((c) => c.id === selectedId);
@@ -318,7 +322,7 @@ export function InboxShell() {
                   analysis={selectedConv.analysis}
                   aiStatus={selectedConv.aiStatus}
                   isUnreplied={Boolean(selectedConv.isUnreplied)}
-                  memory={selectedConv.memory || []}
+                  personalitySummary={selectedConv.personalitySummary}
                 />
               </>
             )}

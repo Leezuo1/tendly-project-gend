@@ -12,6 +12,8 @@ export interface MessengerCustomerProfile {
 }
 
 export interface MessengerThread {
+  viewStartAt?: number;
+  personalitySummary?: string;
   memory?: ConversationMemoryEntry[];
   id: string;
   psid: string;
