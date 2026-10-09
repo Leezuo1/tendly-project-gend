@@ -80,6 +80,73 @@ afterEach(() => {
   else process.env.GEMINI_MODEL = originalModel;
 });
 
+test('dashboard identity is blank without saved owner, rejects seeded demo names, and reads a configured owner', () => {
+  const f = fixture();
+  const { readShopOwnerName } = loadModules()('lib/services/shopIdentity.ts');
+  assert.equal(readShopOwnerName(), '');
+  f.storage.set('tendly.mockdb', JSON.stringify(f.db.readDb()));
+  assert.equal(readShopOwnerName(), '');
+  const saved = structuredClone(f.db.readDb());
+  saved.members[0].name = 'Chủ shop kiểm thử';
+  saved.members[0].email = 'owner@example.test';
+  f.storage.set('tendly.mockdb', JSON.stringify(saved));
+  assert.equal(readShopOwnerName(), 'Chủ shop kiểm thử');
+  f.storage.set('tendly.mockdb', '{broken');
+  assert.equal(readShopOwnerName(), '');
+});
+
+test('settings hides seeded identity, keeps entered information including formerly seeded values, and allows missing contacts', async () => {
+  const f = fixture();
+  const settings = loadModules()('lib/services/settingsData.ts');
+  const initial = await settings.settingsShopApi.get();
+  assert.equal(initial.name, ''); assert.equal(initial.email, ''); assert.equal(initial.phone, '');
+  assert.deepEqual(settings.savedMembers(), []);
+  const products = structuredClone(f.db.readDb().products);
+  const saved = await settings.settingsShopApi.update({ name: 'Tendly', email: '', phone: '' });
+  assert.equal(saved.name, 'Tendly');
+  assert.equal((await settings.settingsShopApi.get()).name, 'Tendly');
+  assert.deepEqual(f.db.readDb().products, products);
+  assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).settingsShopSaved, true);
+  await assert.rejects(settings.settingsShopApi.update({ email: 'invalid' }), /Email/);
+  assert.equal((await settings.settingsShopApi.get()).email, '');
+});
+
+test('settings employee CRUD persists entered records, validates duplicate emails and protects the last owner', () => {
+  const f = fixture();
+  const settings = loadModules()('lib/services/settingsData.ts');
+  const owner = settings.saveMember({ name: 'Shop Owner', email: 'owner@example.test', role: 'owner' });
+  const staff = settings.saveMember({ name: 'Staff', email: 'staff@example.test', role: 'staff' });
+  assert.equal(settings.savedMembers().length, 2);
+  assert.throws(() => settings.saveMember({ name: 'Duplicate', email: 'STAFF@example.test', role: 'staff' }), /Email/);
+  assert.throws(() => settings.deleteMember(owner.id), /chủ shop duy nhất/);
+  assert.throws(() => settings.saveMember({ ...owner, role: 'staff' }), /chủ shop duy nhất/);
+  settings.saveMember({ ...staff, name: 'Edited Staff' });
+  assert.equal(settings.savedMembers().find((m) => m.id === staff.id).name, 'Edited Staff');
+  settings.deleteMember(staff.id);
+  assert.deepEqual(settings.savedMembers().map((m) => m.id), [owner.id]);
+  const saved = JSON.parse(f.storage.get('tendly.mockdb'));
+  assert.equal(saved.settingsMembersSaved, true);
+  assert.equal(saved.members[0].name, 'Shop Owner');
+  assert.equal(settings.messengerSyncEnabled(), true);
+  settings.setMessengerSyncEnabled(false);
+  assert.equal(settings.messengerSyncEnabled(), false);
+  assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).settingsMessengerEnabled, false);
+  settings.setMessengerSyncEnabled(true);
+  assert.equal(settings.messengerSyncEnabled(), true);
+});
+
+test('saved owner name updates dashboard identity and can be cleared', async () => {
+  const f = fixture();
+  const load = loadModules();
+  const settings = load('lib/services/settingsData.ts');
+  const identity = load('lib/services/shopIdentity.ts');
+  await settings.settingsShopApi.update({ ownerName: ' Nguyễn An ' });
+  assert.equal(identity.readShopOwnerName(), 'Nguyễn An');
+  await settings.settingsShopApi.update({ ownerName: '' });
+  assert.equal(identity.readShopOwnerName(), '');
+  assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).shop.ownerName, '');
+});
+
 test('chat gửi nguồn sản phẩm, FAQ và email đã lưu; không gửi hồ sơ hay lịch sử khách', async () => {
   const f = fixture();
   const result = await f.chat.askShopAi('AT-01 giá bao nhiêu?');

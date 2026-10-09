@@ -1,4 +1,5 @@
 export interface Shop {
+  ownerName?: string;
   name: string;
   email: string;
   phone: string;
@@ -94,6 +95,9 @@ export interface EmailLog {
 }
 
 export interface MockDb {
+  settingsShopSaved?: boolean;
+  settingsMembersSaved?: boolean;
+  settingsMessengerEnabled?: boolean;
   version: number;
   shop: Shop;
   subscription: Subscription;

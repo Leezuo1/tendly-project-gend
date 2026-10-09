@@ -58,10 +58,10 @@ export function InboxShell() {
           const merged = mergeMessengerThread(thread, previous.find((c) => c.id === thread.id));
           // The visible open thread is already being read; other rows keep their unread marker.
           return thread.id === selectedIdRef.current && document.visibilityState === 'visible'
-            ? { ...merged, hasNewMessage: false } : merged;
+            ? { ...merged, hasNewMessage: false, unreadMessageIds: [] } : merged;
         }));
         setHasMore(snapshot.hasMore);
-        setSyncStatus('Đã kết nối · Tự cập nhật mỗi 2 giây');
+        setSyncStatus('');
       } catch (error) {
         if (!cancelled) setSyncStatus(error instanceof Error ? error.message : 'Mất kết nối. Đang thử lại...');
       } finally {
@@ -115,7 +115,7 @@ export function InboxShell() {
   const handleSelectConv = (id: string) => {
     selectedIdRef.current = id;
     setSelectedId(id);
-    setConversations((previous) => previous.map((c) => c.id === id ? { ...c, hasNewMessage: false } : c));
+    setConversations((previous) => previous.map((c) => c.id === id ? { ...c, hasNewMessage: false, unreadMessageIds: [] } : c));
     setDraftText('');
   };
 
@@ -207,18 +207,20 @@ export function InboxShell() {
   return (
     <div className="inbox-root">
       <div className="shell">
-        <Sidebar currentPath="hop-thoai" onToast={showToast} />
+        <Sidebar currentPath="hop-thoai" onToast={showToast}
+          unreadMessageCount={conversations.reduce((sum, c) => sum + (c.unreadMessageIds?.length || 0), 0)} />
 
         <main className="main" aria-label="Hộp thoại">
           <div className="inbox-shell">
             <ConversationList
               toolbar={<div className="messenger-toolbar">
-                  <form onSubmit={(e) => { e.preventDefault(); setAccessKey(keyInput.trim()); setKeyInput(''); }}>
+                  <form onSubmit={(e) => { e.preventDefault(); const key = keyInput.trim();
+                    try { sessionStorage.setItem('tendly.inbox-access', key); } catch { /* storage unavailable */ }
+                    setAccessKey(key); setKeyInput(''); }}>
                     <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} placeholder="Mã truy cập inbox" aria-label="Mã truy cập inbox" autoComplete="off" required />
                     <button className="btn btn-outline btn-sm" type="submit">Kết nối</button>
                   </form>
-                  <p role="status">{syncStatus}</p>
-                  {accessKey && <p>AI tự phân tích và tạo gợi ý khi trang này đang mở.</p>}
+                  {syncStatus && <p role="status">{syncStatus}</p>}
                   {hasMore && limit < 1000 && <button className="btn btn-outline btn-sm" onClick={() => setLimit((n) => n + 100)}>Tải thêm hội thoại</button>}
               </div>}
               conversations={filteredConversations}
