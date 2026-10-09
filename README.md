@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+﻿This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
@@ -36,6 +36,12 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 ## Nguồn dữ liệu cho AI của Tendly
+
+Phần cuối sidebar hiển thị tên và ảnh đại diện Page Facebook thật qua API Meta sau khi tab đã có mã truy cập inbox. Chưa xác thực thì để trống; ảnh không tải được thì dùng chữ viết tắt tên Page. Tên chủ shop nhập trong Cài đặt vẫn dùng cho lời chào ở Tổng quan.
+
+Trang Cài đặt bỏ banner khôi phục và thông tin mẫu. Nút bút chì mở chỉnh sửa tên chủ shop, thông tin shop và danh sách nhân viên; hỗ trợ thêm/sửa/xóa nhân viên, kiểm tra email trùng và bảo vệ chủ shop duy nhất. Dữ liệu này lưu trong trình duyệt, chưa đồng bộ PostgreSQL và chưa tạo tài khoản đăng nhập hay gửi email mời. Gói hiện tại hiển thị Free theo cấu hình sản phẩm, chưa có thanh toán. Tab Tích hợp kênh dùng lại giao diện và dữ liệu mẫu ban đầu, với icon, nút gạt và thao tác kết nối giả lập. Các thao tác này chỉ thay đổi dữ liệu trong trình duyệt; luồng Messenger thật qua webhook và inbox hoạt động độc lập. Banner khôi phục dữ liệu mẫu vẫn được bỏ.
+
+Dashboard `/tong-quan` lấy số hội thoại đang chờ, tin đến/tin gửi hôm nay, 10 tin khách gần đây và thống kê hội thoại 7 ngày từ PostgreSQL qua `/api/dashboard`, cập nhật khoảng 2 giây khi tab đang mở. Dùng cùng mã truy cập inbox; mã được giữ trong `sessionStorage` của tab sau khi kết nối. Các số liệu email, đơn hàng và cảm xúc chưa có nguồn lưu thật được để trống. Tên chủ shop đọc từ thành viên chủ shop đã lưu trong cấu hình trình duyệt, bỏ qua tên mẫu; chưa có backend tài khoản nên chưa có tên thì để trống.
 
 Trong `/cau-hinh-ai`, nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình email tự động. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email đang bật được cung cấp cho Gemini. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng này.
 

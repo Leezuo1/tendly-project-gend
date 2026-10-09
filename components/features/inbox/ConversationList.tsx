@@ -42,7 +42,6 @@ export function ConversationList({
           placeholder="Tìm khách hàng, mã đơn..."
           aria-label="Tìm kiếm hội thoại"
         />
-        <p className="conv-queue-note">Tin mới trước · Tiếp theo là mức ưu tiên AI</p>
         {toolbar}
       </div>
 

@@ -70,6 +70,72 @@ test('Postgres inbox snapshot, page isolation and cursor history use real Postgr
   assert.equal(older.hasOlder, false);
 });
 
+test('dashboard aggregates real messages across all conversations, isolates Page, returns empty data and counts Vietnamese local dates', async () => {
+  const { load, writer } = await fixture();
+  const { readDashboardData } = load('lib/services/dashboardData.ts');
+  assert.deepEqual(await readDashboardData('111', pool), {
+    waiting: 0, incomingToday: 0, outgoingToday: 0, recentMessages: [], weeklyChats: [],
+  });
+  const now = Date.now();
+  const localDate = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
+  const start = Date.parse(localDate + 'T00:00:00+07:00');
+  await writer.savePostgresMessages([
+    m('yesterday', { timestamp: start - 1 }), m('today1', { timestamp: start }),
+    m('today2', { timestamp: start + 1, psid: '333' }),
+    m('answer', { timestamp: start + 2, direction: 'out' }),
+    m('unrelated', { pageId: '999', timestamp: start + 3 }),
+  ], pool);
+  const result = await readDashboardData('111', pool);
+  assert.equal(result.waiting, 1);
+  assert.equal(result.incomingToday, 2);
+  assert.equal(result.outgoingToday, 1);
+  assert.deepEqual(result.recentMessages.map((x) => x.id), ['today2', 'today1', 'yesterday']);
+  assert.equal(result.recentMessages[0].name, '');
+  assert.equal(result.weeklyChats.find((x) => x.day === localDate).count, 2);
+  const route = loader({ 'lib/services/dashboardData.ts': { readDashboardData: (id) => readDashboardData(id, pool) } })('app/api/dashboard/route.ts');
+  assert.equal((await route.GET(new Request('http://localhost/api/dashboard'))).status, 401);
+  const response = await route.GET(new Request('http://localhost/api/dashboard', {
+    headers: { Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` },
+  }));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).incomingToday, 2);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('settings channel status checks real Page access, requires inbox authorization and exposes no token', async () => {
+  const route = loader()('app/api/settings/channels/route.ts');
+  assert.equal((await route.GET(new Request('http://localhost/api/settings/channels'))).status, 401);
+  const originalFetch = globalThis.fetch;
+  const request = () => new Request('http://localhost/api/settings/channels', {
+    headers: { Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` },
+  });
+  try {
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url.includes(process.env.PAGE_ACCESS_TOKEN), false);
+      assert.equal(options.headers.Authorization, `Bearer ${process.env.PAGE_ACCESS_TOKEN}`);
+      assert.equal(url.includes('picture.type(large)'), true);
+      return Response.json({ id: '111', name: 'Real test Page', picture: { data: {
+        url: 'https://scontent.example.test/page-avatar.jpg', is_silhouette: false,
+      } } });
+    };
+    const response = await route.GET(request());
+    const result = await response.json();
+    assert.equal(result.pageAccessible, true);
+    assert.equal(result.pageName, 'Real test Page');
+    assert.equal(result.pageAvatarUrl, 'https://scontent.example.test/page-avatar.jpg');
+    assert.equal(JSON.stringify(result).includes(process.env.PAGE_ACCESS_TOKEN), false);
+    globalThis.fetch = async () => Response.json({ id: '111', name: 'Real test Page', picture: { data: {
+      url: `https://example.test/picture?access_token=${process.env.PAGE_ACCESS_TOKEN}`, is_silhouette: false,
+    } } });
+    assert.equal((await (await route.GET(request())).json()).pageAvatarUrl, '');
+    globalThis.fetch = async () => Response.json({ error: { message: 'Token denied' } }, { status: 403 });
+    const denied = await (await route.GET(request())).json();
+    assert.equal(denied.pageAccessible, false);
+    assert.equal(denied.pageName, '');
+    assert.equal(denied.pageAvatarUrl, '');
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('two-way send -> stored outgoing -> webhook echo stays single; same request never sends twice', async () => {
   const { load, writer } = await fixture();
   await writer.savePostgresMessages([m('customer')], pool);
@@ -172,14 +238,24 @@ test('new inbound highlights until viewed; repeated snapshots, loaded history an
     messages: [m('in', { timestamp: 100 })], hasOlder: false };
   const initial = mergeMessengerThread(thread);
   assert.equal(initial.hasNewMessage, true);
-  const seen = { ...initial, hasNewMessage: false };
+  assert.deepEqual(initial.unreadMessageIds, ['in']);
+  const seen = { ...initial, hasNewMessage: false, unreadMessageIds: [] };
   assert.equal(mergeMessengerThread(thread, seen).hasNewMessage, false);
+  assert.deepEqual(mergeMessengerThread(thread, seen).unreadMessageIds, []);
   const echo = mergeMessengerThread({ ...thread, messages: [m('out', { timestamp: 200, direction: 'out' })] }, seen);
   assert.equal(echo.hasNewMessage, false);
   assert.equal(mergeMessengerThread({ ...thread, messages: [m('old', { timestamp: 50 })] }, echo).hasNewMessage, false);
   const fresh = mergeMessengerThread({ ...thread, messages: [m('new', { timestamp: 300 })] }, echo);
   assert.equal(fresh.hasNewMessage, true);
+  assert.deepEqual(fresh.unreadMessageIds, ['new']);
   assert.equal(mergeMessengerThread(thread, fresh).hasNewMessage, true);
+  assert.deepEqual(mergeMessengerThread(thread, fresh).unreadMessageIds, ['new']);
+  const burst = mergeMessengerThread({ ...thread, messages: [
+    m('next1', { timestamp: 400 }), m('next2', { timestamp: 500 }),
+  ] }, fresh);
+  assert.equal(burst.unreadMessageIds.length, 3);
+  const outgoing = mergeMessengerThread({ ...thread, messages: [m('reply', { timestamp: 600, direction: 'out' })] }, burst);
+  assert.equal(outgoing.unreadMessageIds.length, 3);
 });
 
 test('customer profile loads from Meta, persists by Page/PSID, and supplies real name/avatar/history to UI', async () => {

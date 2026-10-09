@@ -70,6 +70,7 @@ export interface Conversation {
   isUrgent?: boolean;
   isUnreplied?: boolean;
   hasNewMessage?: boolean;
+  unreadMessageIds?: string[];
   threadWho: {
     name: string;
     sub: string;
