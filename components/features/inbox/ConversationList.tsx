@@ -42,7 +42,7 @@ export function ConversationList({
           placeholder="Tìm khách hàng, mã đơn..."
           aria-label="Tìm kiếm hội thoại"
         />
-        <p className="conv-queue-note">Sắp theo mức độ cần hỗ trợ · Ưu tiên cao trước</p>
+        <p className="conv-queue-note">Tin mới trước · Tiếp theo là mức ưu tiên AI</p>
         {toolbar}
       </div>
 
@@ -85,10 +85,11 @@ export function ConversationList({
             return (
               <div
                 key={conv.id}
-                className={`conv-item ${isActive ? 'active' : ''}`}
+                className={`conv-item ${isActive ? 'active' : ''} ${conv.hasNewMessage ? 'has-new-message' : ''}`}
                 onClick={() => onSelectConv(conv.id)}
                 data-conv={conv.id}
                 role="button"
+                aria-label={`${conv.name}${conv.hasNewMessage ? ' · Có tin nhắn mới' : ''}`}
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -109,8 +110,9 @@ export function ConversationList({
                     <span className="conv-time">{conv.time}</span>
                   </div>
                   <div className="conv-preview">{conv.preview}</div>
-                  {conv.tags && conv.tags.length > 0 && (
+                  {(conv.tags.length > 0 || conv.hasNewMessage || conv.aiStatus === 'analyzing' || conv.aiStatus === 'error') && (
                     <div className="conv-tags">
+                    {conv.hasNewMessage && <span className="tag tag-high">Tin mới</span>}
                     {conv.aiStatus === 'analyzing' && <span className="tag tag-neutral">Đang phân tích...</span>}
                     {conv.aiStatus === 'error' && <span className="tag tag-risk">Cần phân tích lại</span>}
                       {conv.tags.map((tag, idx) => (

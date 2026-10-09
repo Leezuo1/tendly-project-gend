@@ -166,6 +166,22 @@ test('UI merge preserves loaded history, deduplicates echoes, invalidates stale 
   assert.equal(repeated.messages.length, 3);
 });
 
+test('new inbound highlights until viewed; repeated snapshots, loaded history and outgoing echoes never mark it new again', () => {
+  const { mergeMessengerThread } = loader()('lib/services/messengerView.ts');
+  const thread = { id: 'thread', psid: '222', pageId: '111', createdAt: 1,
+    messages: [m('in', { timestamp: 100 })], hasOlder: false };
+  const initial = mergeMessengerThread(thread);
+  assert.equal(initial.hasNewMessage, true);
+  const seen = { ...initial, hasNewMessage: false };
+  assert.equal(mergeMessengerThread(thread, seen).hasNewMessage, false);
+  const echo = mergeMessengerThread({ ...thread, messages: [m('out', { timestamp: 200, direction: 'out' })] }, seen);
+  assert.equal(echo.hasNewMessage, false);
+  assert.equal(mergeMessengerThread({ ...thread, messages: [m('old', { timestamp: 50 })] }, echo).hasNewMessage, false);
+  const fresh = mergeMessengerThread({ ...thread, messages: [m('new', { timestamp: 300 })] }, echo);
+  assert.equal(fresh.hasNewMessage, true);
+  assert.equal(mergeMessengerThread(thread, fresh).hasNewMessage, true);
+});
+
 test('customer profile loads from Meta, persists by Page/PSID, and supplies real name/avatar/history to UI', async () => {
   const { load, writer } = await fixture();
   await writer.savePostgresMessages([m('profile-customer'), m('other-page', { pageId: '999' })], pool);

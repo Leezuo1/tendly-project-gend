@@ -18,6 +18,10 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   const latestOut = [...messages].reverse().find((m) => m.sender === 'out');
   const unanswered = latestIn !== undefined && (!latestOut || (latestIn.timestamp || 0) > (latestOut.timestamp || 0));
   const sameQuestion = previous?.analysis?.messageId === latestIn?.id;
+  const previousIn = previous && [...previous.messages].reverse().find((m) => m.sender === 'in');
+  // Only a newer customer message creates an unread marker; echoes and loaded history do not.
+  const newIncoming = Boolean(latestIn && (!previous || (latestIn.id !== previousIn?.id
+    && (latestIn.timestamp || 0) >= (previousIn?.timestamp || 0))));
   const name = thread.customer?.name || `Khách ${thread.psid.slice(-6)}`;
   const avatar = thread.customer?.name
     ? thread.customer.name.split(/\s+/).filter(Boolean).slice(-2).map((part) => Array.from(part)[0]).join('').toUpperCase()
@@ -29,6 +33,7 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
         ? false : thread.hasOlder },
     name, avatar, avatarUrl, channel: 'facebook', time: latest?.time || '', preview: latest?.text || '', tags: [],
     isUnreplied: unanswered, isUrgent: false, pendingSince: unanswered ? latestIn?.timestamp : undefined,
+    hasNewMessage: newIncoming ? unanswered : previous?.hasNewMessage,
     threadWho: { name, sub: 'Messenger · Page đã kết nối' }, messages,
     profile: { name, avatar, avatarUrl, messengerId: thread.psid, identityStatus: thread.customer?.status || 'pending',
       since: `Nhận tin từ ${time(thread.createdAt)}`, tags: [], channel: 'Messenger',

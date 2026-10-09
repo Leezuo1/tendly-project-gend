@@ -250,6 +250,36 @@ test('cùng mức ưu tiên thì khách chờ lâu hơn đứng trước, danh s
   assert.deepEqual(input.map((c)=>c.id),['recent','older']);
 });
 
+test('tin mới chưa xem đứng đầu theo thời gian, sau khi xem quay về ưu tiên AI', () => {
+  const f = fixture();
+  const base = f.samples.find((c) => c.isUnreplied);
+  const make = (id, timestamp, fresh, score) => ({ ...base, id, hasNewMessage: fresh,
+    analysis: { priorityScore: score }, messages: [{ id, sender: 'in', timestamp, text: id }] });
+  const urgent = make('urgent', 50, false, 100);
+  const older = make('older', 100, true, 40);
+  const newest = make('newest', 200, true, 10);
+  assert.deepEqual(f.inbox.sortReplyQueue([urgent, older, newest]).map((c) => c.id), ['newest', 'older', 'urgent']);
+  assert.deepEqual(f.inbox.sortReplyQueue([urgent, { ...older, hasNewMessage: false }, { ...newest, hasNewMessage: false }]).map((c) => c.id), ['urgent', 'older', 'newest']);
+});
+
+test('AI tự xử lý mọi hội thoại đang chờ, giới hạn song song, bỏ qua tin đã xử lý/lỗi và lấy tin mới sau khi hết khóa', () => {
+  const f = fixture();
+  const base = f.samples.find((c) => c.isUnreplied);
+  const make = (id) => ({ ...base, id, messenger: { pageId: '1', psid: id }, analysis: undefined,
+    messages: [{ id: `${id}-message`, sender: 'in', text: id }] });
+  const a = make('a'), b = make('b'), c = make('c');
+  const pending = new Set(['a']);
+  const attempted = new Map([['a', 'a-message'], ['b', 'b-message']]);
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([a, b, c], pending, attempted).map((x) => x.id), ['c']);
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([a, b, c], new Set(['a', 'other']), attempted), []);
+  const newer = { ...a, messages: [...a.messages, { id: 'a-new', sender: 'in', text: 'Hỏi thêm' }] };
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([newer], pending, attempted), []);
+  assert.equal(f.inbox.automaticAnalysisCandidates([newer], new Set(), attempted)[0].id, 'a');
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([
+    { ...c, analysis: { messageId: 'c-message' } }, { ...a, isUnreplied: false }, { ...b, messenger: undefined },
+  ], new Set(), new Map()), []);
+});
+
 test('AI thiếu phân tích hoặc trả nhãn ngoài danh sách thì trả lỗi, không tự gán trung lập', async () => {
   const f = fixture();
   for (const text of ['Một câu trả lời không có JSON',JSON.stringify({reply:'Xin chào'}),structuredReply('Xin chào',{...defaultAnalysis,emotion:'made-up'})]) {

@@ -69,6 +69,7 @@ export interface Conversation {
   tags: ConversationTag[];
   isUrgent?: boolean;
   isUnreplied?: boolean;
+  hasNewMessage?: boolean;
   threadWho: {
     name: string;
     sub: string;
