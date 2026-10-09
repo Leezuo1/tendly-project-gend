@@ -8,7 +8,8 @@ import ts from 'typescript';
 const require = createRequire(import.meta.url);
 const db = new PGlite();
 const ready = (async () => {
-  for (const file of ['001-messenger.sql', '002-messenger-outbound.sql', '003-messenger-profiles.sql']) {
+  for (const file of ['001-messenger.sql', '002-messenger-outbound.sql', '003-messenger-profiles.sql',
+    '004-conversation-memory.sql', '005-conversation-view.sql']) {
     await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
   }
 })();
@@ -204,4 +205,24 @@ test('Facebook engagement reports which permission the token is missing', async 
   const { failed, missingPermission } = await fb.fetchPostEngagement(['111_1']);
   assert.equal(failed, 1);
   assert.equal(missingPermission, 'pages_read_user_content');
+});
+
+test('conversations deleted in Hộp thoại are hidden, and history before the delete is not shown or sent to AI', async () => {
+  const load = await seed();
+  const insights = load('lib/services/marketingInsights.ts');
+  // Shop xoá hội thoại 1003; xoá hội thoại 1002 lúc 2 ngày trước rồi khách nhắn lại (giống luồng của Hộp thoại).
+  await query("UPDATE messenger_conversations SET hidden_at=$1, view_start_at=$1 WHERE id=$2", [NOW - DAY, '["111","1003"]']);
+  await query("UPDATE messenger_conversations SET view_start_at=$1 WHERE id=$2", [NOW - 2 * DAY - 1, '["111","1002"]']);
+  await load('lib/services/messengerPostgres.ts').savePostgresMessages([msg('1002', 'b4', 'in', HOUR, 'Mình quay lại nè')], pool);
+
+  const customers = await insights.readMarketingCustomers('111', [], NOW, pool);
+  const by = Object.fromEntries(customers.map((c) => [c.psid, c]));
+  assert.equal(by['1003'], undefined);
+  assert.equal(by['1002'].inboundCount, 1);
+  assert.equal(by['1002'].lastInboundText, 'Mình quay lại nè');
+  assert.equal(by['1002'].segment, 'new');
+
+  assert.equal(await insights.readConversationForDraft('111', '1003', pool), null);
+  const draft = await insights.readConversationForDraft('111', '1002', pool);
+  assert.deepEqual(draft.messages.map((m) => m.text), ['Mình quay lại nè']);
 });

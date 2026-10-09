@@ -56,18 +56,21 @@ interface CustomerRow {
 export async function readMarketingCustomers(
   pageId: string, products: { label: string; terms: string[] }[], now = Date.now(), db: Queryable = getMessengerPool(),
 ): Promise<MarketingCustomer[]> {
-  // created_at là lúc Tendly nhận/đồng bộ hội thoại; lần đầu khách nhắn lấy theo tin sớm nhất.
+  // Giống Hộp thoại: bỏ hội thoại đã xoá (hidden_at) và tin trước mốc xoá (view_start_at).
+  // created_at là lúc Tendly nhận/đồng bộ hội thoại; lần đầu khách nhắn lấy theo tin sớm nhất còn hiển thị.
   const { rows } = await db.query(`SELECT c.id, u.psid, u.display_name, u.avatar_url, c.last_in_at, c.last_out_at,
       LEAST(c.created_at, COALESCE((SELECT MIN(m.sent_at) FROM messenger_messages m
-        WHERE m.page_id = c.page_id AND m.conversation_id = c.id), c.created_at)) AS created_at
+        WHERE m.page_id = c.page_id AND m.conversation_id = c.id AND m.sent_at > COALESCE(c.view_start_at, 0)), c.created_at)) AS created_at
     FROM messenger_conversations c JOIN messenger_customers u ON u.id = c.customer_id
-    WHERE c.page_id=$1 ORDER BY c.last_message_at DESC NULLS LAST, c.id LIMIT 500`, [pageId]);
+    WHERE c.page_id=$1 AND c.hidden_at IS NULL ORDER BY c.last_message_at DESC NULLS LAST, c.id LIMIT 500`, [pageId]);
   const ids = (rows as CustomerRow[]).map((r) => r.id);
   // 30 tin khách gửi gần nhất của mỗi hội thoại là đủ để dò từ khoá, không đọc cả lịch sử.
   const inbound = ids.length ? (await db.query(`SELECT conversation_id, text, sent_at, total FROM (
-      SELECT conversation_id, text, sent_at, COUNT(*) OVER (PARTITION BY conversation_id) AS total,
-        ROW_NUMBER() OVER (PARTITION BY conversation_id ORDER BY sent_at DESC, message_id DESC) AS rn
-      FROM messenger_messages WHERE page_id=$1 AND direction='in' AND conversation_id = ANY($2::text[])
+      SELECT m.conversation_id, m.text, m.sent_at, COUNT(*) OVER (PARTITION BY m.conversation_id) AS total,
+        ROW_NUMBER() OVER (PARTITION BY m.conversation_id ORDER BY m.sent_at DESC, m.message_id DESC) AS rn
+      FROM messenger_messages m JOIN messenger_conversations c ON c.page_id = m.page_id AND c.id = m.conversation_id
+      WHERE m.page_id=$1 AND m.direction='in' AND m.conversation_id = ANY($2::text[])
+        AND m.sent_at > COALESCE(c.view_start_at, 0)
     ) recent WHERE rn <= 30 ORDER BY sent_at DESC`, [pageId, ids])).rows : [];
 
   return (rows as CustomerRow[]).map((row) => {
@@ -99,11 +102,13 @@ export async function readMarketingCustomers(
 /** Hội thoại gần đây (cả hai chiều) để AI soạn tin nhắn cá nhân hoá. */
 export async function readConversationForDraft(pageId: string, psid: string, db: Queryable = getMessengerPool()) {
   const conversationId = JSON.stringify([pageId, psid]);
-  const customer = await db.query(`SELECT u.display_name, u.first_name, c.last_in_at FROM messenger_conversations c
-    JOIN messenger_customers u ON u.id = c.customer_id WHERE c.page_id=$1 AND c.id=$2`, [pageId, conversationId]);
+  // Hội thoại đã xoá thì không soạn; tin trước mốc xoá không đưa cho AI đọc.
+  const customer = await db.query(`SELECT u.display_name, u.first_name, c.last_in_at, c.view_start_at FROM messenger_conversations c
+    JOIN messenger_customers u ON u.id = c.customer_id WHERE c.page_id=$1 AND c.id=$2 AND c.hidden_at IS NULL`, [pageId, conversationId]);
   if (!customer.rows.length) return null;
   const messages = await db.query(`SELECT direction, text, sent_at FROM messenger_messages
-    WHERE page_id=$1 AND conversation_id=$2 ORDER BY sent_at DESC, message_id DESC LIMIT 20`, [pageId, conversationId]);
+    WHERE page_id=$1 AND conversation_id=$2 AND sent_at > $3
+    ORDER BY sent_at DESC, message_id DESC LIMIT 20`, [pageId, conversationId, Number(customer.rows[0].view_start_at ?? 0)]);
   return {
     name: (customer.rows[0].first_name || customer.rows[0].display_name || '') as string,
     lastInAt: customer.rows[0].last_in_at === null ? null : Number(customer.rows[0].last_in_at),

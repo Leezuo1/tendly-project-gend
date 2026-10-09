@@ -150,7 +150,7 @@ test('dashboard key protects post APIs; production without a key refuses', async
 
 test('Postgres posts: migration is re-runnable, drafts editable, published posts locked', async () => {
   const db = newDb({ noAstCoverageCheck: true });
-  const migration = ['002-marketing-posts.sql', '004-marketing-post-images.sql']
+  const migration = ['002-marketing-posts.sql', '006-marketing-post-images.sql']
     .map((file) => readFileSync(path.join(root, 'db/migrations', file), 'utf8')).join('\n');
   db.public.none(migration);
   db.public.none(migration);
@@ -249,7 +249,7 @@ test('generate-image route proxies the free image service and rejects non-image 
 
 test('Postgres post images: attach, replace, list metadata only, locked after publish, removed with the post', async () => {
   const db = newDb({ noAstCoverageCheck: true });
-  for (const file of ['002-marketing-posts.sql', '004-marketing-post-images.sql']) {
+  for (const file of ['002-marketing-posts.sql', '006-marketing-post-images.sql']) {
     db.public.none(readFileSync(path.join(root, 'db/migrations', file), 'utf8'));
   }
   const { Pool } = db.adapters.createPg();
