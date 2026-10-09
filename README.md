@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+﻿This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
@@ -37,6 +37,12 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Nguồn dữ liệu cho AI của Tendly
 
+Phần cuối sidebar hiển thị tên và ảnh đại diện Page Facebook thật qua API Meta sau khi tab đã có mã truy cập inbox. Chưa xác thực thì để trống; ảnh không tải được thì dùng chữ viết tắt tên Page. Tên chủ shop nhập trong Cài đặt vẫn dùng cho lời chào ở Tổng quan.
+
+Trang Cài đặt bỏ banner khôi phục và thông tin mẫu. Nút bút chì mở chỉnh sửa tên chủ shop, thông tin shop và danh sách nhân viên; hỗ trợ thêm/sửa/xóa nhân viên, kiểm tra email trùng và bảo vệ chủ shop duy nhất. Dữ liệu này lưu trong trình duyệt, chưa đồng bộ PostgreSQL và chưa tạo tài khoản đăng nhập hay gửi email mời. Gói hiện tại hiển thị Free theo cấu hình sản phẩm, chưa có thanh toán. Tab Tích hợp kênh dùng lại giao diện và dữ liệu mẫu ban đầu, với icon, nút gạt và thao tác kết nối giả lập. Các thao tác này chỉ thay đổi dữ liệu trong trình duyệt; luồng Messenger thật qua webhook và inbox hoạt động độc lập. Banner khôi phục dữ liệu mẫu vẫn được bỏ.
+
+Dashboard `/tong-quan` lấy số hội thoại đang chờ, tin đến/tin gửi hôm nay, 10 tin khách gần đây và thống kê hội thoại 7 ngày từ PostgreSQL qua `/api/dashboard`, cập nhật khoảng 2 giây khi tab đang mở. Dùng cùng mã truy cập inbox; mã được giữ trong `sessionStorage` của tab sau khi kết nối. Các số liệu email, đơn hàng và cảm xúc chưa có nguồn lưu thật được để trống. Tên chủ shop đọc từ thành viên chủ shop đã lưu trong cấu hình trình duyệt, bỏ qua tên mẫu; chưa có backend tài khoản nên chưa có tên thì để trống.
+
 Trong `/cau-hinh-ai`, nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình email tự động. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email đang bật được cung cấp cho Gemini. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng này.
 
 Sản phẩm là nguồn cho giá, chất liệu, size, màu và tổng tồn kho. FAQ là nguồn cho chính sách shop. Mẫu email chỉ cung cấp thông tin về kịch bản, không chứng minh khách đủ điều kiện nhận ưu đãi hay email đã được gửi. Chỉ dẫn yêu cầu AI báo thiếu dữ liệu thay vì đoán thông tin hoặc tự xác nhận đã tạo đơn/gửi email. Việc gửi email thực tế không nằm trong tính năng này.
@@ -49,7 +55,7 @@ Cấu hình hiện dùng mock DB tại `localStorage` của trình duyệt, chư
 
 Khi khách nhắn tin ở Hộp thoại, Gemini phân tích cảm xúc (tích cực, trung lập, lo lắng, thất vọng, tức giận), mức ưu tiên (cao, bình thường, thấp), lý do và nhu cầu nhân viên hỗ trợ; sau đó tạo câu trả lời theo cảm xúc và nguồn Cấu hình AI trong cùng một lượt. API yêu cầu [kết quả có cấu trúc](https://ai.google.dev/gemini-api/docs/generate-content/structured-output) và kiểm tra nhãn trước khi cập nhật UI. Tối đa 10 tin nhắn đang có trong phiên được dùng làm ngữ cảnh; chưa lưu thêm lịch sử hay tính cách khách vào database.
 
-Hội thoại chưa trả lời đứng trước hội thoại đã xử lý, sắp theo điểm ưu tiên ứng dụng tính từ mức khẩn cấp và cảm xúc. Cùng điểm thì khách chờ lâu hơn đứng trước. Nhãn trong danh sách, đầu chat và hồ sơ cập nhật đồng thời; phần **Cảm xúc & ưu tiên** hiển thị lý do. Nhãn mẫu ban đầu là dữ liệu demo; bấm **Phân tích AI** để đánh giá tin đang chờ hoặc gửi tin mới để tự động phân tích. Shop gửi câu trả lời/gợi ý AI sẽ bỏ trạng thái Khẩn cấp, tin khách tiếp theo mở lại hàng chờ. Lỗi AI giữ tin ở trạng thái chờ và có nút thử lại; kết quả chậm không ghi đè câu hỏi mới.
+Tin khách chưa xem được tô nổi bật, có nhãn **Tin mới** và đứng đầu danh sách theo thời gian mới nhất; mở hội thoại sẽ bỏ đánh dấu. Tiếp theo là hội thoại chưa trả lời, sắp theo điểm ưu tiên AI; cùng điểm thì khách chờ lâu hơn đứng trước. Khi trang hội thoại đang mở và đã kết nối, AI tự phân tích tin đang chờ, cập nhật nhãn cảm xúc, mức ưu tiên và tạo gợi ý, tối đa hai hội thoại cùng lúc. Shop duyệt và gửi gợi ý qua Send API. Lỗi AI giữ tin ở trạng thái chờ và có nút thử lại; không gọi lại liên tục mỗi lần polling. Kết quả chậm không ghi đè câu hỏi mới hay mở lại hội thoại đã trả lời.
 
 Chạy `npm test` để kiểm tra luồng dữ liệu cấu hình → API → Gemini bằng phản hồi giả lập. Các bài kiểm tra bao gồm sửa giá/tồn kho/FAQ/email, xóa/tắt nguồn dữ liệu, lỗi cấu hình, lỗi model và bỏ qua chỉ dẫn tùy ý từ client. Chạy `npm run build` để kiểm tra bản production.
 
@@ -84,7 +90,7 @@ Database gồm khách (định danh Page + PSID, chưa lấy tên/avatar), hội
 
 Để nối Page: cung cấp URL HTTPS công khai cho `/api/meta/webhook` qua tunnel hoặc server; nhập Callback URL và Verify Token vào Meta, đăng ký `messages` và `message_echoes`, rồi subscribe Page vào app. Echo cần để nhận tin shop gửi trực tiếp trên Facebook. Xác minh callback thành công chưa đồng nghĩa Page đã subscribe. Tham khảo [Messenger sample của Facebook](https://github.com/fbsamples/messenger-platform-samples/blob/main/node/README.md) và [tài liệu webhook Meta](https://developers.facebook.com/docs/graph-api/webhooks/getting-started).
 
-Nhận/lưu tin mới từ khi kết nối; chưa nhập lịch sử từ Facebook trước ngày kết nối, lấy tên/avatar khách, xử lý read/delivery, sửa/xóa tin hoặc gửi file. Attachment nhận từ khách có liên kết mở file nếu là HTTPS.
+Nhận/lưu tin mới từ khi kết nối và lấy tên/avatar khách qua Messenger User Profile API; chưa nhập lịch sử từ Facebook trước ngày kết nối, xử lý read/delivery, sửa/xóa tin hoặc gửi file. Attachment nhận từ khách có liên kết mở file nếu là HTTPS.
 
 ### Hội thoại Messenger và gửi hai chiều
 
@@ -100,7 +106,7 @@ Mỗi lần polling chỉ lấy hồ sơ tối đa ba khách; lease trong databa
 
 Hội thoại thật chỉ gửi với tư cách Shop. Gửi text qua `/api/messenger/send` tới Send API; tiêu chuẩn RESPONSE trong 24 giờ từ tin khách gần nhất. Tin không được đánh dấu đã gửi nếu Meta từ chối. Chống gửi lặp cùng request ID bằng bảng outbound; timeout/HTTP 5xx/kết quả không rõ không tự gửi lại. Client giữ request ID khi lỗi không rõ, người dùng cần kiểm tra Messenger trước khi chủ động gửi một yêu cầu mới. Nếu Meta nhận tin nhưng lưu message bị lỗi, UI báo đã gửi và chờ webhook echo để đồng bộ. Webhook echo và bản gửi dashboard có cùng message ID nên không tạo bản thứ hai. [Meta Send API](https://www.postman.com/meta/messenger-platform-api/documentation/iyp204x/messenger-platform-api)
 
-Nút **Phân tích AI** dùng tin thật và ngữ cảnh đã tải với Cấu hình AI hiện có trong trình duyệt; nút gửi gợi ý dùng cùng Send API. Phân tích chưa tự chạy trên webhook/server và chưa lưu nhãn AI vào Postgres.
+AI tự phân tích tin thật và ngữ cảnh đã tải với Cấu hình AI hiện có trong trình duyệt; nút **Phân tích AI** dùng để chạy lại. Đóng trang thì AI không chạy; webhook vẫn lưu tin, khi mở lại AI xử lý các tin đang chờ. Nhãn AI và đánh dấu đã xem hiện chỉ lưu trong phiên trình duyệt, chưa lưu vào Postgres.
 
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 

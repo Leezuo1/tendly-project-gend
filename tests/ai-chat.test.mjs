@@ -80,6 +80,73 @@ afterEach(() => {
   else process.env.GEMINI_MODEL = originalModel;
 });
 
+test('dashboard identity is blank without saved owner, rejects seeded demo names, and reads a configured owner', () => {
+  const f = fixture();
+  const { readShopOwnerName } = loadModules()('lib/services/shopIdentity.ts');
+  assert.equal(readShopOwnerName(), '');
+  f.storage.set('tendly.mockdb', JSON.stringify(f.db.readDb()));
+  assert.equal(readShopOwnerName(), '');
+  const saved = structuredClone(f.db.readDb());
+  saved.members[0].name = 'Chủ shop kiểm thử';
+  saved.members[0].email = 'owner@example.test';
+  f.storage.set('tendly.mockdb', JSON.stringify(saved));
+  assert.equal(readShopOwnerName(), 'Chủ shop kiểm thử');
+  f.storage.set('tendly.mockdb', '{broken');
+  assert.equal(readShopOwnerName(), '');
+});
+
+test('settings hides seeded identity, keeps entered information including formerly seeded values, and allows missing contacts', async () => {
+  const f = fixture();
+  const settings = loadModules()('lib/services/settingsData.ts');
+  const initial = await settings.settingsShopApi.get();
+  assert.equal(initial.name, ''); assert.equal(initial.email, ''); assert.equal(initial.phone, '');
+  assert.deepEqual(settings.savedMembers(), []);
+  const products = structuredClone(f.db.readDb().products);
+  const saved = await settings.settingsShopApi.update({ name: 'Tendly', email: '', phone: '' });
+  assert.equal(saved.name, 'Tendly');
+  assert.equal((await settings.settingsShopApi.get()).name, 'Tendly');
+  assert.deepEqual(f.db.readDb().products, products);
+  assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).settingsShopSaved, true);
+  await assert.rejects(settings.settingsShopApi.update({ email: 'invalid' }), /Email/);
+  assert.equal((await settings.settingsShopApi.get()).email, '');
+});
+
+test('settings employee CRUD persists entered records, validates duplicate emails and protects the last owner', () => {
+  const f = fixture();
+  const settings = loadModules()('lib/services/settingsData.ts');
+  const owner = settings.saveMember({ name: 'Shop Owner', email: 'owner@example.test', role: 'owner' });
+  const staff = settings.saveMember({ name: 'Staff', email: 'staff@example.test', role: 'staff' });
+  assert.equal(settings.savedMembers().length, 2);
+  assert.throws(() => settings.saveMember({ name: 'Duplicate', email: 'STAFF@example.test', role: 'staff' }), /Email/);
+  assert.throws(() => settings.deleteMember(owner.id), /chủ shop duy nhất/);
+  assert.throws(() => settings.saveMember({ ...owner, role: 'staff' }), /chủ shop duy nhất/);
+  settings.saveMember({ ...staff, name: 'Edited Staff' });
+  assert.equal(settings.savedMembers().find((m) => m.id === staff.id).name, 'Edited Staff');
+  settings.deleteMember(staff.id);
+  assert.deepEqual(settings.savedMembers().map((m) => m.id), [owner.id]);
+  const saved = JSON.parse(f.storage.get('tendly.mockdb'));
+  assert.equal(saved.settingsMembersSaved, true);
+  assert.equal(saved.members[0].name, 'Shop Owner');
+  assert.equal(settings.messengerSyncEnabled(), true);
+  settings.setMessengerSyncEnabled(false);
+  assert.equal(settings.messengerSyncEnabled(), false);
+  assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).settingsMessengerEnabled, false);
+  settings.setMessengerSyncEnabled(true);
+  assert.equal(settings.messengerSyncEnabled(), true);
+});
+
+test('saved owner name updates dashboard identity and can be cleared', async () => {
+  const f = fixture();
+  const load = loadModules();
+  const settings = load('lib/services/settingsData.ts');
+  const identity = load('lib/services/shopIdentity.ts');
+  await settings.settingsShopApi.update({ ownerName: ' Nguyễn An ' });
+  assert.equal(identity.readShopOwnerName(), 'Nguyễn An');
+  await settings.settingsShopApi.update({ ownerName: '' });
+  assert.equal(identity.readShopOwnerName(), '');
+  assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).shop.ownerName, '');
+});
+
 test('chat gửi nguồn sản phẩm, FAQ và email đã lưu; không gửi hồ sơ hay lịch sử khách', async () => {
   const f = fixture();
   const result = await f.chat.askShopAi('AT-01 giá bao nhiêu?');
@@ -248,6 +315,36 @@ test('cùng mức ưu tiên thì khách chờ lâu hơn đứng trước, danh s
   const input = [recent,older];
   assert.deepEqual(f.inbox.sortReplyQueue(input).map((c)=>c.id),['older','recent']);
   assert.deepEqual(input.map((c)=>c.id),['recent','older']);
+});
+
+test('tin mới chưa xem đứng đầu theo thời gian, sau khi xem quay về ưu tiên AI', () => {
+  const f = fixture();
+  const base = f.samples.find((c) => c.isUnreplied);
+  const make = (id, timestamp, fresh, score) => ({ ...base, id, hasNewMessage: fresh,
+    analysis: { priorityScore: score }, messages: [{ id, sender: 'in', timestamp, text: id }] });
+  const urgent = make('urgent', 50, false, 100);
+  const older = make('older', 100, true, 40);
+  const newest = make('newest', 200, true, 10);
+  assert.deepEqual(f.inbox.sortReplyQueue([urgent, older, newest]).map((c) => c.id), ['newest', 'older', 'urgent']);
+  assert.deepEqual(f.inbox.sortReplyQueue([urgent, { ...older, hasNewMessage: false }, { ...newest, hasNewMessage: false }]).map((c) => c.id), ['urgent', 'older', 'newest']);
+});
+
+test('AI tự xử lý mọi hội thoại đang chờ, giới hạn song song, bỏ qua tin đã xử lý/lỗi và lấy tin mới sau khi hết khóa', () => {
+  const f = fixture();
+  const base = f.samples.find((c) => c.isUnreplied);
+  const make = (id) => ({ ...base, id, messenger: { pageId: '1', psid: id }, analysis: undefined,
+    messages: [{ id: `${id}-message`, sender: 'in', text: id }] });
+  const a = make('a'), b = make('b'), c = make('c');
+  const pending = new Set(['a']);
+  const attempted = new Map([['a', 'a-message'], ['b', 'b-message']]);
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([a, b, c], pending, attempted).map((x) => x.id), ['c']);
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([a, b, c], new Set(['a', 'other']), attempted), []);
+  const newer = { ...a, messages: [...a.messages, { id: 'a-new', sender: 'in', text: 'Hỏi thêm' }] };
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([newer], pending, attempted), []);
+  assert.equal(f.inbox.automaticAnalysisCandidates([newer], new Set(), attempted)[0].id, 'a');
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([
+    { ...c, analysis: { messageId: 'c-message' } }, { ...a, isUnreplied: false }, { ...b, messenger: undefined },
+  ], new Set(), new Map()), []);
 });
 
 test('AI thiếu phân tích hoặc trả nhãn ngoài danh sách thì trả lỗi, không tự gán trung lập', async () => {

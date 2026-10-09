@@ -24,12 +24,29 @@ export function sessionContext(messages: ChatMessage[], latestMessageId?: string
 export function sortReplyQueue(conversations: Conversation[]): Conversation[] {
   const score = (c: Conversation) => c.analysis?.priorityScore ?? (c.isUrgent ? 80 : 40);
   return [...conversations].sort((a, b) => {
+    const unread = Number(Boolean(b.hasNewMessage)) - Number(Boolean(a.hasNewMessage));
+    if (unread) return unread;
+    if (a.hasNewMessage && b.hasNewMessage) {
+      const recent = (latestCustomerMessage(b)?.timestamp ?? 0) - (latestCustomerMessage(a)?.timestamp ?? 0);
+      if (recent) return recent;
+    }
     const awaiting = Number(Boolean(b.isUnreplied)) - Number(Boolean(a.isUnreplied));
     if (awaiting) return awaiting;
     // Hội thoại đã trả lời không chen vào hàng chờ, không giữ điểm khẩn cấp cũ.
     if (!a.isUnreplied) return 0;
     return score(b) - score(a) || (a.pendingSince ?? 0) - (b.pendingSince ?? 0);
   });
+}
+
+export function automaticAnalysisCandidates(
+  conversations: Conversation[], pending: Set<string>, attempted: Map<string, string>, capacity = 2,
+): Conversation[] {
+  return sortReplyQueue(conversations).filter((c) => {
+    const message = latestCustomerMessage(c);
+    return Boolean(c.messenger && c.isUnreplied && message
+      && c.analysis?.messageId !== message.id
+      && attempted.get(c.id) !== message.id && !pending.has(c.id));
+  }).slice(0, Math.max(0, capacity - pending.size));
 }
 
 export function applyConversationAnalysis(conversation: Conversation, messageId: string, result: AiChatReply): Conversation {

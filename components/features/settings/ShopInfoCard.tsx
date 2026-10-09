@@ -4,17 +4,17 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { DEFAULT_LOGO } from '@/components/shared/ShopProvider';
 import { errorMessage, useToast } from '@/components/shared/ToastProvider';
 import { TIMEZONES } from '@/lib/data/admin';
-import { shopApi } from '@/lib/services/api';
+import { settingsShopApi as shopApi } from '@/lib/services/settingsData';
 import type { Shop } from '@/lib/types/admin';
 import { isEmail, isPhone } from '@/lib/utils/format';
+import { IconEdit } from '@/components/ui/Icons';
 
 type Errors = Partial<Record<'name' | 'email' | 'phone', string>>;
 
 function validate(form: Shop): Errors {
   const errors: Errors = {};
-  if (!form.name.trim()) errors.name = 'Vui lòng nhập tên shop';
-  if (!isEmail(form.email)) errors.email = 'Email không hợp lệ';
-  if (!isPhone(form.phone)) errors.phone = 'Số điện thoại không hợp lệ (VD: 090 123 4567)';
+  if (form.email.trim() && !isEmail(form.email)) errors.email = 'Email không hợp lệ';
+  if (form.phone.trim() && !isPhone(form.phone)) errors.phone = 'Số điện thoại không hợp lệ (VD: 090 123 4567)';
   return errors;
 }
 
@@ -27,6 +27,7 @@ export function ShopInfoCard() {
   const [form, setForm] = useState<Shop | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     shopApi.get().then((s) => { setSaved(s); setForm(s); });
@@ -60,6 +61,7 @@ export function ShopInfoCard() {
       const updated = await shopApi.update({ ...form, name: form.name.trim(), email: form.email.trim() });
       setSaved(updated);
       setForm(updated);
+      setEditing(false);
       toast('Đã lưu thông tin shop');
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -70,7 +72,10 @@ export function ShopInfoCard() {
 
   return (
     <div className="card">
-      <div className="card-head"><h2>Thông tin shop</h2></div>
+      <div className="card-head"><h2>Thông tin tài khoản & shop</h2>
+        <button type="button" className="btn-icon" aria-label="Chỉnh sửa thông tin tài khoản và shop" title="Chỉnh sửa" onClick={() => setEditing(true)}><IconEdit /></button>
+      </div>
+      <fieldset disabled={!editing || saving} className="settings-fields">
       <div className="logo-row">
         <div className="logo-circle">
           <img src={form.logo ?? DEFAULT_LOGO} alt={form.name} className={form.logo ? 'custom' : ''} />
@@ -84,6 +89,12 @@ export function ShopInfoCard() {
       </div>
 
       <div className="field-row">
+        <div className="field">
+          <label htmlFor="shop-owner">Tên chủ shop</label>
+          <input id="shop-owner" value={form.ownerName || ''} onChange={set('ownerName')} />
+        </div>
+      </div>
+      <div className="field-row" style={{ marginTop: 16 }}>
         <div className={`field${errors.name ? ' has-error' : ''}`}>
           <label htmlFor="shop-name">Tên shop</label>
           <input id="shop-name" value={form.name} onChange={set('name')} />
@@ -109,16 +120,15 @@ export function ShopInfoCard() {
         </div>
       </div>
 
-      <div className="card-actions">
+      </fieldset>
+      {editing && <div className="card-actions">
         {dirty && <span className="dirty-note">Có thay đổi chưa lưu</span>}
-        {dirty && (
-          <button className="btn btn-outline" onClick={() => { setForm(saved); setErrors({}); }} disabled={saving}>Huỷ</button>
-        )}
+        <button className="btn btn-outline" onClick={() => { setForm(saved); setErrors({}); setEditing(false); }} disabled={saving}>Huỷ</button>
         <button className="btn btn-primary" onClick={onSave} disabled={!dirty || saving}>
           {saving && <span className="spinner" />}
           {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
