@@ -4,7 +4,7 @@ import type { ConversationMemoryEntry } from '@/lib/types/conversationMemory';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 
 export async function hideConversation(pageId: string, psid: string, db: Pick<Pool, 'query'> = getMessengerPool()) {
-  return db.query('UPDATE messenger_conversations SET hidden_at=$3 WHERE page_id=$1 AND id=$2 RETURNING id,hidden_at',
+  return db.query('UPDATE messenger_conversations SET hidden_at=$3,view_start_at=$3 WHERE page_id=$1 AND id=$2 RETURNING id,hidden_at',
     [pageId, JSON.stringify([pageId, psid]), Date.now()]);
 }
 
