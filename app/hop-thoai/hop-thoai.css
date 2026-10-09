@@ -417,24 +417,27 @@
 }
 
 .inbox-root .conv-filter-row {
-  display: flex;
-  gap: 6px;
-  padding: 10px 14px 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 4px;
+  padding: 10px 8px 6px;
   flex-shrink: 0;
-  overflow-x: auto;
 }
 
 .inbox-root .conv-filter {
-  font-size: 11.5px;
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.3;
   font-weight: 700;
   color: var(--ink-soft);
   background: var(--sand);
   border: none;
-  padding: 5px 11px;
+  padding: 6px 4px;
   border-radius: 20px;
   transition: all 0.2s ease;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .inbox-root .conv-filter:hover {
@@ -1286,7 +1289,8 @@
 }
 
 .inbox-root .messenger-toolbar { margin-top: 10px; font-size: 12px; }
-.inbox-root .messenger-source { display: flex; gap: 6px; flex-wrap: wrap; }
+.inbox-root .customer-avatar-image { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.inbox-root .messenger-customer-id { overflow-wrap: anywhere; min-width: 0; }
 .inbox-root .messenger-toolbar form { display: flex; gap: 6px; margin-top: 8px; }
 .inbox-root .messenger-toolbar form input { min-width: 0; flex: 1; }
 .inbox-root .messenger-toolbar p { margin: 8px 0 0; overflow-wrap: anywhere; }

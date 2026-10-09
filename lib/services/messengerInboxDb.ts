@@ -1,7 +1,19 @@
 import type { Pool } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import type { MessengerMessage } from '@/lib/types/messenger';
-import type { MessengerInboxSnapshot, MessengerThread } from '@/lib/types/messengerInbox';
+import type { MessengerCustomerProfile, MessengerInboxSnapshot, MessengerThread } from '@/lib/types/messengerInbox';
+
+export function customerProfileFromRow(row: Record<string, unknown>): MessengerCustomerProfile {
+  return {
+    name: typeof row.display_name === 'string' ? row.display_name : null,
+    firstName: typeof row.first_name === 'string' ? row.first_name : null,
+    lastName: typeof row.last_name === 'string' ? row.last_name : null,
+    avatarUrl: typeof row.avatar_url === 'string' ? row.avatar_url : null,
+    status: row.profile_status as MessengerCustomerProfile['status'],
+    refreshedAt: row.profile_refreshed_at == null ? null : Number(row.profile_refreshed_at),
+    retryAfter: row.profile_retry_after == null ? null : Number(row.profile_retry_after),
+  };
+}
 
 export interface MessageRow {
   page_id: string; message_id: string; psid: string; direction: 'in' | 'out';
@@ -13,7 +25,8 @@ export function messageFromRow(row: MessageRow): MessengerMessage {
 }
 
 export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<Pool, 'query'> = getMessengerPool()): Promise<MessengerInboxSnapshot> {
-  const rows = await db.query(`SELECT c.*, u.psid FROM messenger_conversations c
+  const rows = await db.query(`SELECT c.*, u.psid, u.display_name, u.first_name, u.last_name,
+    u.avatar_url, u.profile_status, u.profile_refreshed_at, u.profile_retry_after FROM messenger_conversations c
     JOIN messenger_customers u ON c.customer_id=u.id WHERE c.page_id=$1
     ORDER BY c.last_message_at DESC NULLS LAST, c.id LIMIT $2`, [pageId, limit + 1]);
   const conversations: MessengerThread[] = [];
@@ -28,7 +41,8 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
     conversations.push({ id: row.id, pageId, psid: row.psid, createdAt: Number(row.created_at),
       lastInAt: row.last_in_at === null ? null : Number(row.last_in_at),
       lastOutAt: row.last_out_at === null ? null : Number(row.last_out_at),
-      messages: messages.slice(-50).map((m) => messageFromRow({ ...m, psid: row.psid })), hasOlder: messages.length > 50 });
+      messages: messages.slice(-50).map((m) => messageFromRow({ ...m, psid: row.psid })), hasOlder: messages.length > 50,
+      customer: customerProfileFromRow(row) });
   }
   return { conversations, hasMore: rows.rows.length > limit };
 }

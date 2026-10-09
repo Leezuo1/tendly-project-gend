@@ -88,19 +88,24 @@ Nhận/lưu tin mới từ khi kết nối; chưa nhập lịch sử từ Facebo
 
 ### Hội thoại Messenger và gửi hai chiều
 
-Trong `/hop-thoai`, chọn **Messenger thật**, nhập mã từ `INBOX_ACCESS_KEY` để kết nối. Mã cần ít nhất 24 ký tự ngẫu nhiên, lưu ở env server; không phải Page access token. API đọc/gửi kiểm tra mã qua Authorization header, không công khai dữ liệu inbox. Mã chỉ giữ trong bộ nhớ trang, tải lại trang cần nhập lại. Đây là truy cập cho một shop demo, chưa thay thế đăng nhập tài khoản/phân quyền người dùng.
+Trong `/hop-thoai`, nhập mã từ `INBOX_ACCESS_KEY` để kết nối Messenger. Trang chỉ hiển thị hội thoại đã lưu từ Page, không có nút chuyển dữ liệu mẫu. Mã cần ít nhất 24 ký tự ngẫu nhiên, lưu ở env server; không phải Page access token. API đọc/gửi kiểm tra mã qua Authorization header, không công khai dữ liệu inbox. Mã chỉ giữ trong bộ nhớ trang, tải lại trang cần nhập lại. Đây là truy cập cho một shop, chưa thay thế đăng nhập tài khoản/phân quyền người dùng.
 
 Thêm `INBOX_ACCESS_KEY` và `META_GRAPH_VERSION` vào env local/Vercel. Version phải có dạng `v23.0` và khớp version được hỗ trợ/config của Meta app. `PAGE_ACCESS_TOKEN` chỉ được dùng server-side. Chạy lại `npm run db:migrate` để tạo bảng `messenger_outbound_requests`, rồi deploy lại.
 
-Dashboard polling API `/api/messenger/inbox` mỗi khoảng 2 giây sau khi request trước hoàn tất; khi tab ẩn thì dừng lấy dữ liệu và khi quay lại sẽ tiếp tục. Đây là cập nhật tự động bằng polling, không phải WebSocket/SSE. Mất kết nối hiển thị lỗi và giữ tin đã tải. Danh sách tải 100 hội thoại mới nhất, có nút tải thêm tới 1.000; mỗi thread tải 50 tin gần nhất và có nút tải tin cũ hơn trong database. Khách hiện hiển thị theo PSID, không dựng thông tin đơn hàng/hồ sơ giả.
+Dashboard polling API `/api/messenger/inbox` mỗi khoảng 2 giây sau khi request trước hoàn tất; khi tab ẩn thì dừng lấy dữ liệu và khi quay lại sẽ tiếp tục. Đây là cập nhật tự động bằng polling, không phải WebSocket/SSE. Mất kết nối hiển thị lỗi và giữ tin đã tải. Danh sách tải 100 hội thoại mới nhất, có nút tải thêm tới 1.000; mỗi thread tải 50 tin gần nhất và có nút tải tin cũ hơn trong database.
+
+Tên và ảnh khách được lấy server-side qua Messenger User Profile API `GET /{PSID}?fields=first_name,last_name,profile_pic`, sử dụng `PAGE_ACCESS_TOKEN` và `META_GRAPH_VERSION` của Page. Migration `003-messenger-profiles.sql` bổ sung hồ sơ vào `messenger_customers`; chạy `npm run db:migrate` trước khi deploy. Hồ sơ hiển thị ở danh sách, tiêu đề chat và khung khách bên phải, gồm Messenger ID, thời gian bắt đầu nhận tin và tối đa ba tin gần đây. Đơn hàng, địa chỉ và tổng chi tiêu vẫn chưa có nguồn dữ liệu, không dựng từ hồ sơ Facebook.
+
+Mỗi lần polling chỉ lấy hồ sơ tối đa ba khách; lease trong database tránh nhiều dashboard cùng gọi Meta cho một khách. Hồ sơ thành công được cache 24 giờ; trường hợp Meta không cung cấp hồ sơ hoặc lỗi mạng được thử lại sau một giờ. Lỗi hồ sơ không ngăn nhận/đọc/gửi tin; tên/ảnh đã lưu vẫn được giữ. Khi chưa lấy được tên, dùng nhãn theo PSID và báo trạng thái trên khung hồ sơ. Avatar hỏng quay về chữ viết tắt. Việc Meta trả thông tin còn phụ thuộc quyền truy cập hồ sơ của app/token và khách đó.
 
 Hội thoại thật chỉ gửi với tư cách Shop. Gửi text qua `/api/messenger/send` tới Send API; tiêu chuẩn RESPONSE trong 24 giờ từ tin khách gần nhất. Tin không được đánh dấu đã gửi nếu Meta từ chối. Chống gửi lặp cùng request ID bằng bảng outbound; timeout/HTTP 5xx/kết quả không rõ không tự gửi lại. Client giữ request ID khi lỗi không rõ, người dùng cần kiểm tra Messenger trước khi chủ động gửi một yêu cầu mới. Nếu Meta nhận tin nhưng lưu message bị lỗi, UI báo đã gửi và chờ webhook echo để đồng bộ. Webhook echo và bản gửi dashboard có cùng message ID nên không tạo bản thứ hai. [Meta Send API](https://www.postman.com/meta/messenger-platform-api/documentation/iyp204x/messenger-platform-api)
 
-Nút **Phân tích AI** dùng tin thật và ngữ cảnh đã tải với Cấu hình AI hiện có trong trình duyệt; nút gửi gợi ý dùng cùng Send API. Phân tích chưa tự chạy trên webhook/server và chưa lưu nhãn AI vào Postgres. **Dữ liệu mẫu** vẫn dùng luồng giả lập riêng, không gọi Send API.
+Nút **Phân tích AI** dùng tin thật và ngữ cảnh đã tải với Cấu hình AI hiện có trong trình duyệt; nút gửi gợi ý dùng cùng Send API. Phân tích chưa tự chạy trên webhook/server và chưa lưu nhãn AI vào Postgres.
 
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 
 Test đồng bộ dùng PostgreSQL WASM (PGlite) để chạy SQL đọc inbox/phân trang và luồng gửi–lưu–echo; Meta được giả lập. Các ca gồm access code, gửi trùng request, timeout, token bị từ chối, hết thời hạn, khách nhắn thêm và giữ ngữ cảnh UI. Chưa kiểm tra mạng/TLS/quyền thật của Meta hoặc database cloud chỉ bằng các test này.
+
 ## AI soạn & đăng bài (Marketing → Soạn bài AI)
 
 Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, tối đa 5 sản phẩm và ghi chú (khuyến mãi, sự kiện). Gemini viết 1–3 phương án gồm tiêu đề, nội dung, hashtag và gợi ý ảnh/kịch bản video. Bài AI viết chỉ là bản nháp: chủ shop sửa trực tiếp rồi **Lưu nháp**, **Sao chép** hoặc **Lưu & đăng Fanpage**.

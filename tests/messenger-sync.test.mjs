@@ -10,6 +10,8 @@ const db = new PGlite();
 const ready = (async () => {
   await db.exec(readFileSync('db/migrations/001-messenger.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/002-messenger-outbound.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
 })();
 const query = async (sql, values) => {
   const result = await db.query(sql, values);
@@ -125,7 +127,7 @@ test('dashboard APIs deny missing code, validate send input, and return stored m
   const routes = loader({ 'lib/services/messengerInboxDb.ts': {
     readMessengerInbox: (pageId, limit) => read.readMessengerInbox(pageId, limit, pool),
     readOlderMessengerMessages: (...args) => read.readOlderMessengerMessages(...args, pool),
-  } });
+  }, 'lib/services/messengerProfiles.ts': { refreshMessengerProfiles: async (snapshot) => snapshot } });
   const inbox = routes('app/api/messenger/inbox/route.ts');
   assert.equal((await inbox.GET(new Request('http://localhost/api/messenger/inbox'))).status, 401);
   const response = await inbox.GET(new Request('http://localhost/api/messenger/inbox', {
@@ -162,4 +164,95 @@ test('UI merge preserves loaded history, deduplicates echoes, invalidates stale 
   assert.equal(newQuestion.isUnreplied, true);
   const repeated = mergeMessengerThread({ ...thread, messages: [m('new', { timestamp: 300 })] }, newQuestion);
   assert.equal(repeated.messages.length, 3);
+});
+
+test('customer profile loads from Meta, persists by Page/PSID, and supplies real name/avatar/history to UI', async () => {
+  const { load, writer } = await fixture();
+  await writer.savePostgresMessages([m('profile-customer'), m('other-page', { pageId: '999' })], pool);
+  const read = load('lib/services/messengerInboxDb.ts');
+  const profiles = load('lib/services/messengerProfiles.ts');
+  let calls = 0;
+  const transport = async (url, options) => {
+    calls++;
+    assert.equal(url, 'https://graph.facebook.com/v23.0/222?fields=first_name,last_name,profile_pic');
+    assert.equal(options.headers.Authorization, 'Bearer test-page-token');
+    assert.equal(url.includes('test-page-token'), false);
+    return Response.json({ id: '222', first_name: 'Ngọc', last_name: 'Anh', profile_pic: 'https://example.com/avatar.jpg' });
+  };
+  const routes = loader({
+    'lib/services/messengerInboxDb.ts': { readMessengerInbox: (pageId, limit) => read.readMessengerInbox(pageId, limit, pool) },
+    'lib/services/messengerProfiles.ts': { refreshMessengerProfiles: (snapshot) => profiles.refreshMessengerProfiles(snapshot, pool, transport) },
+  });
+  const route = routes('app/api/messenger/inbox/route.ts');
+  const req = () => new Request('http://localhost/api/messenger/inbox', { headers: { Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` } });
+  const response = await route.GET(req());
+  assert.equal(response.status, 200);
+  const snapshot = await response.json();
+  assert.equal(snapshot.conversations[0].customer.name, 'Ngọc Anh');
+  const view = load('lib/services/messengerView.ts').mergeMessengerThread(snapshot.conversations[0]);
+  assert.equal(view.name, 'Ngọc Anh');
+  assert.equal(view.threadWho.name, 'Ngọc Anh');
+  assert.equal(view.profile.name, 'Ngọc Anh');
+  assert.equal(view.avatar, 'NA');
+  assert.equal(view.avatarUrl, 'https://example.com/avatar.jpg');
+  assert.equal(view.profile.messengerId, '222');
+  assert.equal(view.profile.timeline[0].text, 'Khách nhắn: Shop có áo không?');
+  assert.equal(view.profile.orderCount, 'Chưa có dữ liệu');
+  await route.GET(req());
+  assert.equal(calls, 1); // Polling reads persisted profile instead of hitting Meta again.
+  const stored = (await pool.query('SELECT display_name, profile_status FROM messenger_customers WHERE page_id=$1', ['111'])).rows[0];
+  assert.equal(stored.display_name, 'Ngọc Anh');
+  assert.equal(stored.profile_status, 'ready');
+  assert.equal((await read.readMessengerInbox('999', 100, pool)).conversations[0].customer.name, null);
+});
+
+test('profile denial/timeout never breaks messages, never invents identity, backs off, and retains cached names', async () => {
+  const { load, writer } = await fixture();
+  await writer.savePostgresMessages([m('profile-denied')], pool);
+  const read = load('lib/services/messengerInboxDb.ts');
+  const { refreshMessengerProfiles } = load('lib/services/messengerProfiles.ts');
+  let calls = 0;
+  const denied = async () => { calls++; return Response.json({ error: { message: 'Permission denied' } }, { status: 403 }); };
+  let snapshot = await read.readMessengerInbox('111', 100, pool);
+  await refreshMessengerProfiles(snapshot, pool, denied);
+  assert.equal(snapshot.conversations[0].customer.status, 'unavailable');
+  assert.equal(snapshot.conversations[0].customer.name, null);
+  assert.equal(snapshot.conversations[0].messages[0].messageId, 'profile-denied');
+  snapshot = await read.readMessengerInbox('111', 100, pool);
+  await refreshMessengerProfiles(snapshot, pool, denied);
+  assert.equal(calls, 1);
+  await pool.query(`UPDATE messenger_customers SET display_name='Tên đã lưu', profile_status='ready', profile_retry_after=0 WHERE page_id=$1`, ['111']);
+  snapshot = await read.readMessengerInbox('111', 100, pool);
+  await refreshMessengerProfiles(snapshot, pool, async () => { throw new Error('timeout'); });
+  assert.equal(snapshot.conversations[0].customer.name, 'Tên đã lưu');
+  assert.equal(snapshot.conversations[0].customer.status, 'ready');
+});
+
+test('profile requests are bounded, leased across simultaneous polls, and unsafe image URLs are rejected', async () => {
+  const { load, writer } = await fixture();
+  await writer.savePostgresMessages(Array.from({ length: 5 }, (_, i) => m(`profile-${i}`, { psid: String(300 + i) })), pool);
+  const read = load('lib/services/messengerInboxDb.ts');
+  const { refreshMessengerProfiles } = load('lib/services/messengerProfiles.ts');
+  let calls = 0;
+  let finish;
+  let started;
+  const pending = new Promise((resolve) => { finish = resolve; });
+  const entered = new Promise((resolve) => { started = resolve; });
+  const transport = async () => {
+    calls++;
+    if (calls === 3) started();
+    await pending;
+    return Response.json({ first_name: 'Khách có tên', profile_pic: 'javascript:alert(1)' });
+  };
+  const first = await read.readMessengerInbox('111', 100, pool);
+  const stale = await read.readMessengerInbox('111', 100, pool);
+  const updating = refreshMessengerProfiles(first, pool, transport);
+  await entered;
+  await refreshMessengerProfiles(stale, pool, transport);
+  assert.equal(calls, 3);
+  finish();
+  await updating;
+  assert.equal(first.conversations.filter((thread) => thread.customer.name).length, 3);
+  assert.equal(first.conversations[0].customer.avatarUrl, null);
+  assert.equal((await read.readMessengerInbox('111', 100, pool)).conversations.filter((thread) => thread.customer.status === 'pending').length, 2);
 });

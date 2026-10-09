@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Conversation } from '@/lib/types/inbox';
 import { EMOTION_LABELS } from '@/lib/services/inboxAi';
+import { CustomerAvatar } from './CustomerAvatar';
 
 interface ThreadPaneProps {
   conversation: Conversation;
@@ -128,7 +129,7 @@ export function ThreadPane({
       <div className="thread-header">
         <div className="thread-who">
           <div className="conv-avatar-wrap">
-            <div className="conv-avatar">{conversation.avatar}</div>
+            <CustomerAvatar className="conv-avatar" name={conversation.name} initials={conversation.avatar} url={conversation.avatarUrl} />
             <div className={`channel-dot ${isFb ? 'cd-fb' : 'cd-zalo'}`}>
               {isFb ? 'f' : 'Z'}
             </div>

@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import pg from 'pg';
@@ -20,18 +20,18 @@ if (!process.env.DATABASE_URL?.trim()) {
     max: 1, connectionTimeoutMillis: 20000, statement_timeout: 30000 });
   let client;
   let stage = 'reading migration files';
-  let files = [];
   try {
-    const directory = fileURLToPath(new URL('../db/migrations/', import.meta.url));
-    files = (await readdir(directory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
+    // Áp dụng cả Messenger và Marketing theo thứ tự tên file.
+    const directory = new URL('../db/migrations/', import.meta.url);
+    const files = (await readdir(fileURLToPath(directory))).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
     stage = 'connecting to Postgres';
     client = await pool.connect();
     stage = 'starting migration transaction';
     await client.query('BEGIN');
     await client.query("SELECT pg_advisory_xact_lock(727364101)");
-    for (const filename of files) {
-      stage = `applying ${filename}`;
-      await client.query(await readFile(new URL(filename, new URL('../db/migrations/', import.meta.url)), 'utf8'));
+    for (const file of files) {
+      stage = `applying ${file}`;
+      await client.query(await readFile(new URL(file, directory), 'utf8'));
     }
     stage = 'committing migration';
     await client.query('COMMIT');
