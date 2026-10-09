@@ -6,8 +6,10 @@ import { EMOTION_LABELS } from '@/lib/services/inboxAi';
 
 interface ThreadPaneProps {
   conversation: Conversation;
-  onSendMessage: (text: string) => void;
-  onUseAiSuggestion: (text: string) => void;
+  onSendMessage: (text: string) => Promise<boolean> | void;
+  onUseAiSuggestion: (text: string) => Promise<boolean> | void;
+  isSending?: boolean;
+  onLoadOlder?: () => Promise<void>;
   draftText: string;
   onDraftChange: (text: string) => void;
   onToast: (msg: string) => void;
@@ -33,43 +35,64 @@ export function ThreadPane({
   onToast,
   onCustomerSendMessage,
   onGenerateAiSuggestion,
+  isSending = false,
+  onLoadOlder,
 }: ThreadPaneProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const previousConversationRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Mặc định cho phép người dùng đóng vai khách hàng hỏi ngay
-  const [role, setRole] = useState<'customer' | 'shop'>('customer');
+  const [demoRole, setRole] = useState<'customer' | 'shop'>('customer');
+  const role = conversation.messenger ? 'shop' : demoRole;
+  const currentConversationRef = useRef(conversation.id);
+  const mountedRef = useRef(false);
+  const previousFirstMessageRef = useRef<string | undefined>(undefined);
+  const previousHeightRef = useRef(0);
   const isThinkingAi = conversation.aiStatus === 'analyzing';
+  const firstMessageId = conversation.messages[0]?.id;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    currentConversationRef.current = conversation.id;
+    return () => { mountedRef.current = false; };
+  }, [conversation.id]);
 
   useEffect(() => {
     const messages = messagesRef.current;
     if (!messages) return;
     const switchedConversation = previousConversationRef.current !== conversation.id;
     previousConversationRef.current = conversation.id;
-    messages.scrollTo({
-      top: messages.scrollHeight,
-      behavior: switchedConversation ? 'instant' : 'smooth',
+    const firstId = firstMessageId;
+    const prepended = !switchedConversation && previousFirstMessageRef.current !== firstId;
+    const nearBottom = previousHeightRef.current - messages.scrollTop - messages.clientHeight < 100;
+    if (prepended) messages.scrollTop += messages.scrollHeight - previousHeightRef.current;
+    else if (switchedConversation || nearBottom) messages.scrollTo({
+      top: messages.scrollHeight, behavior: switchedConversation ? 'instant' : 'smooth',
     });
-  }, [conversation.id, conversation.messages.length, conversation.aiSuggestion, isThinkingAi, role]);
+    previousFirstMessageRef.current = firstId;
+    previousHeightRef.current = messages.scrollHeight;
+  }, [conversation.id, conversation.messages.length, firstMessageId, conversation.aiSuggestion, isThinkingAi, role]);
 
   const handleAskGemini = async () => {
     if (!isThinkingAi) await onGenerateAiSuggestion();
   };
 
   const handleSend = async () => {
-    if (!draftText.trim() || isThinkingAi) return;
+    if (!draftText.trim() || isThinkingAi || isSending) return;
     const text = draftText.trim();
-    onDraftChange('');
+    const conversationId = conversation.id;
 
     if (role === 'customer') {
       if (onCustomerSendMessage) {
+        onDraftChange('');
         await onCustomerSendMessage(text);
       } else {
         onToast('Tính năng gửi tin nhắn khách hàng chưa sẵn sàng.');
       }
     } else {
-      onSendMessage(text);
+      const sent = await onSendMessage(text);
+      if (sent !== false && mountedRef.current && currentConversationRef.current === conversationId) onDraftChange('');
     }
   };
 
@@ -132,6 +155,9 @@ export function ThreadPane({
 
       {/* Messages */}
       <div className="thread-messages" ref={messagesRef}>
+        {conversation.messenger?.hasOlder && onLoadOlder && (
+          <button className="btn btn-outline btn-sm" onClick={onLoadOlder}>Tải tin cũ hơn</button>
+        )}
         {conversation.messages.map((msg) => {
           if (msg.isDivider) {
             return (
@@ -143,7 +169,11 @@ export function ThreadPane({
 
           return (
             <div key={msg.id} className={`msg-row ${msg.sender}`}>
-              <div className="msg-bubble">{msg.text}</div>
+              <div className="msg-bubble">{msg.text}
+                {msg.attachments?.map((attachment, index) => attachment.url && /^https:\/\//i.test(attachment.url) ? (
+                  <div key={index}><a href={attachment.url} target="_blank" rel="noopener noreferrer">Mở {attachment.type}</a></div>
+                ) : <div key={index}>[{attachment.type}]</div>)}
+              </div>
               <div className="msg-meta">
                 {msg.isAiReply && <span className="msg-ai-tag">AI Gemini trả lời</span>}
                 <span>{msg.time}</span>
@@ -189,6 +219,7 @@ export function ThreadPane({
                 type="button"
                 className="btn btn-primary btn-sm"
                 onClick={() => onUseAiSuggestion(conversation.aiSuggestion!.text)}
+                disabled={isSending}
               >
                 Gửi ngay câu này (Tư cách Shop)
               </button>
@@ -205,7 +236,7 @@ export function ThreadPane({
 
         {/* Thanh chọn chế độ đóng vai */}
         <div className="role-switch-bar">
-          <div className="role-toggle-group">
+          {!conversation.messenger && <div className="role-toggle-group">
             <button
               type="button"
               className={`role-btn ${role === 'customer' ? 'active-customer' : ''}`}
@@ -222,7 +253,7 @@ export function ThreadPane({
             >
               🏢 Shop trả lời
             </button>
-          </div>
+          </div>}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {role === 'customer' ? (
@@ -278,13 +309,14 @@ export function ThreadPane({
                 : 'Nhập tin nhắn phản hồi của Shop...'
             }
             aria-label="Nhập tin nhắn"
-            disabled={isThinkingAi}
+            disabled={isThinkingAi || isSending}
+            maxLength={conversation.messenger ? 2000 : undefined}
           />
           <button
             type="button"
             className={`compose-send ${role === 'customer' ? 'send-as-customer' : ''}`}
             onClick={handleSend}
-            disabled={!draftText.trim() || isThinkingAi}
+            disabled={!draftText.trim() || isThinkingAi || isSending}
             title={role === 'customer' ? 'Gửi với vai Khách hàng' : 'Gửi với vai Shop'}
             aria-label="Gửi tin nhắn"
           >

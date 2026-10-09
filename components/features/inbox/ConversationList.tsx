@@ -4,6 +4,7 @@ import React from 'react';
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
 
 interface ConversationListProps {
+  toolbar?: React.ReactNode;
   conversations: Conversation[];
   selectedId: string;
   onSelectConv: (id: string) => void;
@@ -27,6 +28,7 @@ export function ConversationList({
   searchQuery,
   onSearchChange,
   counts,
+  toolbar,
 }: ConversationListProps) {
   return (
     <div className="conv-pane">
@@ -40,6 +42,7 @@ export function ConversationList({
           aria-label="Tìm kiếm hội thoại"
         />
         <p className="conv-queue-note">Sắp theo mức độ cần hỗ trợ · Ưu tiên cao trước</p>
+        {toolbar}
       </div>
 
       <div className="conv-filter-row">

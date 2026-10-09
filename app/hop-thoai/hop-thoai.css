@@ -1285,4 +1285,17 @@
   50% { opacity: 0.6; }
 }
 
+.inbox-root .messenger-toolbar { margin-top: 10px; font-size: 12px; }
+.inbox-root .messenger-source { display: flex; gap: 6px; flex-wrap: wrap; }
+.inbox-root .messenger-toolbar form { display: flex; gap: 6px; margin-top: 8px; }
+.inbox-root .messenger-toolbar form input { min-width: 0; flex: 1; }
+.inbox-root .messenger-toolbar p { margin: 8px 0 0; overflow-wrap: anywhere; }
+.inbox-root .messenger-empty { grid-column: 2 / -1; padding: 32px; align-self: center; text-align: center; color: var(--ink-soft); }
+.inbox-root .msg-bubble a { color: inherit; text-decoration: underline; }
+@media (max-width: 720px) {
+  .inbox-root .inbox-shell { grid-template-rows: auto minmax(0, 1fr); }
+  .inbox-root .conv-pane { max-height: 310px; }
+  .inbox-root .messenger-empty { grid-column: 1; }
+}
+
 

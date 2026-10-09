@@ -3,6 +3,7 @@
 // ============================================================
 
 import type { AiMessageAnalysis } from './ai';
+import type { MessengerAttachment } from './messenger';
 
 export type InboxFilter = 'all' | 'urgent' | 'unreplied';
 
@@ -25,6 +26,8 @@ export interface ChatMessage {
   isAiReply?: boolean;
   aiSource?: string;
   isDivider?: boolean;
+  timestamp?: number;
+  attachments?: MessengerAttachment[];
 }
 
 export interface AISuggestion {
@@ -52,6 +55,7 @@ export interface CustomerProfile {
 }
 
 export interface Conversation {
+  messenger?: { pageId: string; psid: string; hasOlder: boolean };
   id: string;
   name: string;
   avatar: string;
