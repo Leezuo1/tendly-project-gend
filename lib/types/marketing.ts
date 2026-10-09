@@ -2,7 +2,7 @@
 // DOMAIN TYPES — Marketing
 // ============================================================
 
-export type MarketingTab = 'queue' | 'segments' | 'performance';
+export type MarketingTab = 'queue' | 'segments' | 'performance' | 'composer';
 
 export interface ApprovalItem {
   id: string;

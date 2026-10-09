@@ -101,3 +101,13 @@ Nút **Phân tích AI** dùng tin thật và ngữ cảnh đã tải với Cấu
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 
 Test đồng bộ dùng PostgreSQL WASM (PGlite) để chạy SQL đọc inbox/phân trang và luồng gửi–lưu–echo; Meta được giả lập. Các ca gồm access code, gửi trùng request, timeout, token bị từ chối, hết thời hạn, khách nhắn thêm và giữ ngữ cảnh UI. Chưa kiểm tra mạng/TLS/quyền thật của Meta hoặc database cloud chỉ bằng các test này.
+## AI soạn & đăng bài (Marketing → Soạn bài AI)
+
+Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, tối đa 5 sản phẩm và ghi chú (khuyến mãi, sự kiện). Gemini viết 1–3 phương án gồm tiêu đề, nội dung, hashtag và gợi ý ảnh/kịch bản video. Bài AI viết chỉ là bản nháp: chủ shop sửa trực tiếp rồi **Lưu nháp**, **Sao chép** hoặc **Lưu & đăng Fanpage**.
+
+- Nguồn dữ liệu là Cấu hình AI (giống `/api/chat`): chỉ gửi sản phẩm được chọn và FAQ đang bật. Chỉ dẫn yêu cầu không bịa giá, khuyến mãi, phí ship; sản phẩm hết hàng không được quảng bá như còn hàng. Ghi chú của chủ shop là dữ liệu, không thay được quy tắc.
+- Bài viết lưu trong bảng `marketing_posts` (`db/migrations/002-marketing-posts.sql`). `npm run db:migrate` giờ áp dụng mọi file trong `db/migrations` theo thứ tự tên. Chưa có `DATABASE_URL` thì AI vẫn soạn được, chỉ không lưu/đăng.
+- Đăng Fanpage dùng Graph API `POST /{PAGE_ID}/feed` (v26.0) với `PAGE_ID` + `PAGE_ACCESS_TOKEN`; token cần quyền `pages_manage_posts`. Token gửi trong body, không đặt trên URL. TikTok/Email chưa có API đăng: sao chép nội dung rồi bấm **Đánh dấu đã đăng**. Bài đã đăng thì không sửa được; xoá trong Tendly không xoá bài trên Fanpage.
+- Dashboard chưa có đăng nhập nên mọi API `/api/posts/*` (kể cả tạo bài) yêu cầu header `Authorization: Bearer <DASHBOARD_KEY>`. Production thiếu `DASHBOARD_KEY` thì trả 503; local (`next dev`) bỏ trống vẫn chạy. Giao diện hỏi mã một lần và lưu trên trình duyệt của chủ shop.
+
+Biến môi trường trên Vercel: `GEMINI_API_KEY`, `DATABASE_URL`, `DASHBOARD_KEY`; thêm `PAGE_ID`, `PAGE_ACCESS_TOKEN` để đăng Fanpage. `npm test` có kiểm thử validate yêu cầu, prompt chỉ chứa sản phẩm đã chọn, làm sạch output, khoá bằng mã quản trị, lưu/khoá bài bằng `pg-mem` và gọi Graph API giả lập.
