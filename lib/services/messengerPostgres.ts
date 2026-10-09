@@ -1,15 +1,19 @@
 import { Pool } from 'pg';
+import { getDefaultAutoSelectFamilyAttemptTimeout, setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
 import { attachDatabasePool } from '@vercel/functions';
 import type { MessengerMessage } from '@/lib/types/messenger';
 
 let pool: Pool | undefined;
 
-function getPool(): Pool {
+export function getMessengerPool(): Pool {
   if (!process.env.DATABASE_URL?.trim()) throw new Error('Missing DATABASE_URL');
   if (!pool) {
+    if (!process.env.VERCEL) {
+      setDefaultAutoSelectFamilyAttemptTimeout(Math.max(getDefaultAutoSelectFamilyAttemptTimeout(), 2000));
+    }
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: 3, connectionTimeoutMillis: 5000, idleTimeoutMillis: 5000,
+      max: 3, connectionTimeoutMillis: process.env.VERCEL ? 5000 : 15000, idleTimeoutMillis: 5000,
       statement_timeout: 8000,
     });
     // Prevent an unhandled idle-client error without logging connection strings.
@@ -19,7 +23,7 @@ function getPool(): Pool {
   return pool;
 }
 
-export async function savePostgresMessages(messages: MessengerMessage[], database: Pick<Pool, 'connect'> = getPool()) {
+export async function savePostgresMessages(messages: MessengerMessage[], database: Pick<Pool, 'connect'> = getMessengerPool()) {
   const client = await database.connect();
   let inserted = 0;
   try {

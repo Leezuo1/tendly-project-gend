@@ -73,7 +73,7 @@ DATABASE_URL=<pooled Postgres connection string của provider>
 
 1. Mở [Vercel Marketplace Storage](https://vercel.com/docs/marketplace-storage), thêm Postgres (ví dụ Neon), tạo database và connect với project Tendly. Chọn environment Production cho site thật; Preview nên dùng database test riêng.
 2. Kiểm tra project có biến **`DATABASE_URL`** chứa pooled connection string của provider. Nếu integration dùng tên khác, thêm `DATABASE_URL` tương ứng. Giữ nguyên tham số SSL do provider cung cấp; không tắt xác minh certificate trong code.
-3. Đặt cùng connection string vào `.env.local` để khởi tạo bảng. Chạy `npm run db:migrate`. Lệnh đọc `.env.local`, áp dụng `db/migrations/001-messenger.sql` trong transaction và dùng advisory lock để tránh hai tiến trình khởi tạo cùng lúc. Lệnh có thể chạy lại, không xóa dữ liệu sẵn có và không in credentials. Migration không tự chạy lúc build hoặc webhook nhận tin.
+3. Đặt cùng connection string vào `.env.local` để khởi tạo bảng. Chạy `npm run db:migrate`. Lệnh đọc `.env.local`, áp dụng các file SQL trong `db/migrations/` theo thứ tự tên trong transaction và dùng advisory lock để tránh hai tiến trình khởi tạo cùng lúc. Lệnh có thể chạy lại, không xóa dữ liệu sẵn có và không in credentials. Migration không tự chạy lúc build hoặc webhook nhận tin.
 4. Deploy lại sau khi thêm biến. Các deployment cũ không tự nhận env mới. Chỉ đăng ký/test Meta sau khi migration thành công.
 
 Driver `pg` dùng pool nhỏ và tích hợp `attachDatabasePool` của Vercel để quản lý kết nối. Webhook chỉ xác nhận sau khi transaction commit. Migration tạo bảng `messenger_customers`, `messenger_conversations`, `messenger_messages` và index; bảng có prefix để không đụng các bảng của ứng dụng khác.
@@ -82,12 +82,25 @@ Endpoint `GET /api/meta/webhook` kiểm tra `hub.mode=subscribe`, `hub.verify_to
 
 Database gồm khách (định danh Page + PSID, chưa lấy tên/avatar), hội thoại (thời điểm tin vào/ra gần nhất) và tin nhắn (nội dung, chiều gửi, timestamp, attachment). Postgres dùng ba bảng prefix `messenger_` ở trên. Khóa Page + message ID chống trùng trong cùng batch và khi Meta gửi lại. Một batch được lưu trong transaction: lỗi thì rollback và trả 503 để Meta có thể thử lại; chỉ trả `EVENT_RECEIVED` sau khi commit. Tin đến sai thứ tự không làm lùi timestamp hội thoại. Hội thoại cần trả lời khi `last_in_at` có giá trị và lớn hơn `last_out_at` (hoặc chưa có tin shop).
 
-Để nối Page: cung cấp URL HTTPS công khai cho `/api/meta/webhook` qua tunnel hoặc server; nhập Callback URL và Verify Token vào Meta, đăng ký `messages` và subscribe Page vào app. Xác minh callback thành công chưa đồng nghĩa Page đã subscribe. Tham khảo [Messenger sample của Facebook](https://github.com/fbsamples/messenger-platform-samples/blob/main/node/README.md) và [tài liệu webhook Meta](https://developers.facebook.com/docs/graph-api/webhooks/getting-started).
+Để nối Page: cung cấp URL HTTPS công khai cho `/api/meta/webhook` qua tunnel hoặc server; nhập Callback URL và Verify Token vào Meta, đăng ký `messages` và `message_echoes`, rồi subscribe Page vào app. Echo cần để nhận tin shop gửi trực tiếp trên Facebook. Xác minh callback thành công chưa đồng nghĩa Page đã subscribe. Tham khảo [Messenger sample của Facebook](https://github.com/fbsamples/messenger-platform-samples/blob/main/node/README.md) và [tài liệu webhook Meta](https://developers.facebook.com/docs/graph-api/webhooks/getting-started).
 
-Bước này chỉ làm nhận/lưu tin mới từ khi kết nối. Chưa đồng bộ lịch sử cũ, nối dữ liệu thật vào UI, cập nhật real-time, phân tích AI cho tin Messenger hay gửi phản hồi. Chưa mở API đọc hội thoại công khai khi chưa có xác thực dashboard.
+Nhận/lưu tin mới từ khi kết nối; chưa nhập lịch sử từ Facebook trước ngày kết nối, lấy tên/avatar khách, xử lý read/delivery, sửa/xóa tin hoặc gửi file. Attachment nhận từ khách có liên kết mở file nếu là HTTPS.
+
+### Hội thoại Messenger và gửi hai chiều
+
+Trong `/hop-thoai`, chọn **Messenger thật**, nhập mã từ `INBOX_ACCESS_KEY` để kết nối. Mã cần ít nhất 24 ký tự ngẫu nhiên, lưu ở env server; không phải Page access token. API đọc/gửi kiểm tra mã qua Authorization header, không công khai dữ liệu inbox. Mã chỉ giữ trong bộ nhớ trang, tải lại trang cần nhập lại. Đây là truy cập cho một shop demo, chưa thay thế đăng nhập tài khoản/phân quyền người dùng.
+
+Thêm `INBOX_ACCESS_KEY` và `META_GRAPH_VERSION` vào env local/Vercel. Version phải có dạng `v23.0` và khớp version được hỗ trợ/config của Meta app. `PAGE_ACCESS_TOKEN` chỉ được dùng server-side. Chạy lại `npm run db:migrate` để tạo bảng `messenger_outbound_requests`, rồi deploy lại.
+
+Dashboard polling API `/api/messenger/inbox` mỗi khoảng 2 giây sau khi request trước hoàn tất; khi tab ẩn thì dừng lấy dữ liệu và khi quay lại sẽ tiếp tục. Đây là cập nhật tự động bằng polling, không phải WebSocket/SSE. Mất kết nối hiển thị lỗi và giữ tin đã tải. Danh sách tải 100 hội thoại mới nhất, có nút tải thêm tới 1.000; mỗi thread tải 50 tin gần nhất và có nút tải tin cũ hơn trong database. Khách hiện hiển thị theo PSID, không dựng thông tin đơn hàng/hồ sơ giả.
+
+Hội thoại thật chỉ gửi với tư cách Shop. Gửi text qua `/api/messenger/send` tới Send API; tiêu chuẩn RESPONSE trong 24 giờ từ tin khách gần nhất. Tin không được đánh dấu đã gửi nếu Meta từ chối. Chống gửi lặp cùng request ID bằng bảng outbound; timeout/HTTP 5xx/kết quả không rõ không tự gửi lại. Client giữ request ID khi lỗi không rõ, người dùng cần kiểm tra Messenger trước khi chủ động gửi một yêu cầu mới. Nếu Meta nhận tin nhưng lưu message bị lỗi, UI báo đã gửi và chờ webhook echo để đồng bộ. Webhook echo và bản gửi dashboard có cùng message ID nên không tạo bản thứ hai. [Meta Send API](https://www.postman.com/meta/messenger-platform-api/documentation/iyp204x/messenger-platform-api)
+
+Nút **Phân tích AI** dùng tin thật và ngữ cảnh đã tải với Cấu hình AI hiện có trong trình duyệt; nút gửi gợi ý dùng cùng Send API. Phân tích chưa tự chạy trên webhook/server và chưa lưu nhãn AI vào Postgres. **Dữ liệu mẫu** vẫn dùng luồng giả lập riêng, không gọi Send API.
 
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 
+Test đồng bộ dùng PostgreSQL WASM (PGlite) để chạy SQL đọc inbox/phân trang và luồng gửi–lưu–echo; Meta được giả lập. Các ca gồm access code, gửi trùng request, timeout, token bị từ chối, hết thời hạn, khách nhắn thêm và giữ ngữ cảnh UI. Chưa kiểm tra mạng/TLS/quyền thật của Meta hoặc database cloud chỉ bằng các test này.
 ## AI soạn & đăng bài (Marketing → Soạn bài AI)
 
 Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, tối đa 5 sản phẩm và ghi chú (khuyến mãi, sự kiện). Gemini viết 1–3 phương án gồm tiêu đề, nội dung, hashtag và gợi ý ảnh/kịch bản video. Bài AI viết chỉ là bản nháp: chủ shop sửa trực tiếp rồi **Lưu nháp**, **Sao chép** hoặc **Lưu & đăng Fanpage**.
