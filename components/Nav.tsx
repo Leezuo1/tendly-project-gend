@@ -20,9 +20,9 @@ export default function Nav() {
           <img src="/tendly-logo.png" alt="Tendly" style={{ height: 32, width: 'auto', display: 'block' }} />
         </Link>
         <div className="nav-links">
-          <Link href="/#steps">Cách hoạt động</Link>
+          <Link href="/#how">Cách hoạt động</Link>
           <Link href="/#features">Tính năng</Link>
-          <Link href="/#details">Chi tiết</Link>
+          <Link href="/#care">AI hỗ trợ khách</Link>
           <Link href="/pricing" className={pathname === '/pricing' ? 'active' : ''}>
             Bảng giá
           </Link>

@@ -8,9 +8,9 @@ export default function Footer() {
           <img src="/tendly-logo.png" alt="Tendly" style={{ height: 26, width: 'auto', display: 'block' }} />
         </Link>
         <div className="footer-links">
-          <Link href="#">Điều khoản</Link>
-          <Link href="#">Chính sách</Link>
-          <Link href="#">Liên hệ</Link>
+          <Link href="/#features">Tính năng</Link>
+          <Link href="/pricing">Bảng giá</Link>
+          <Link href="/tong-quan">Mở Tendly</Link>
         </div>
         <p>© 2026 Tendly — Nền tảng chăm sóc khách hàng AI</p>
       </div>
