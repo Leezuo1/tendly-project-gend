@@ -27,7 +27,7 @@ export default function Nav() {
             Bảng giá
           </Link>
         </div>
-        <Link href="/tong-quan" className="nav-cta">Đăng ký / Đăng nhập</Link>
+        <Link href="/dang-nhap" className="nav-cta">Đăng ký / Đăng nhập</Link>
       </div>
     </nav>
   );

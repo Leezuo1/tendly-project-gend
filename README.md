@@ -2,6 +2,14 @@
 
 ## Getting Started
 
+### Flow onboarding mẫu
+
+Mở `/dang-nhap`, dùng tài khoản `admin` và mật khẩu `admin123` để đi qua `/tao-shop` → `/ket-noi` → `/tong-quan`. Có thể chọn tài khoản mẫu cho Messenger, Zalo, TikTok và Shopee, ngắt kết nối hoặc bỏ qua bước kết nối. Trang tổng quan giữ nguyên giao diện và luồng dữ liệu hiện có.
+
+Phiên đăng nhập mẫu lưu trong `sessionStorage`; thông tin shop và lựa chọn kết nối lưu riêng tại khóa `tendly.onboarding.mock.v1` trong `localStorage`. Mỗi lần đăng nhập thành công đều bắt đầu lại tại `/tao-shop`, sau đó qua `/ket-noi`, kể cả đã hoàn tất trước đó. Thông tin cũ được điền sẵn để có thể chỉnh sửa. Đây là flow giao diện mô phỏng, chưa có xác thực backend hay cấp quyền nền tảng thật. Đăng ký mới và đăng nhập Google/Facebook vẫn là giao diện xem trước.
+
+Chạy `node --test tests/mock-onboarding.test.mjs` để kiểm tra tài khoản mẫu, lưu/khôi phục tiến độ, kết nối/ngắt kết nối và bỏ qua thiết lập.
+
 First, run the development server:
 
 ```bash
