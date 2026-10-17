@@ -32,7 +32,7 @@ export function LandingNavigation() {
           <a href="#how" onClick={close}>Cách hoạt động</a>
           <Link href="/pricing" onClick={close}>Bảng giá</Link>
         </div>
-        <Link href="/tong-quan" className="tl-nav-action">Đăng ký / Đăng nhập <span aria-hidden="true">↗</span></Link>
+        <Link href="/dang-nhap" className="tl-nav-action">Đăng ký / Đăng nhập <span aria-hidden="true">↗</span></Link>
         <button type="button" className="tl-menu-toggle" aria-label={open ? 'Đóng menu' : 'Mở menu'} aria-controls="landing-nav-links" aria-expanded={open} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'Escape') close(); }}>
           {open ? 'Đóng' : 'Menu'}
         </button>
