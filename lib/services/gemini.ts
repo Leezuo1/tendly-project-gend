@@ -15,6 +15,7 @@ interface GeminiResponse {
 }
 
 interface GenerateJsonOptions<T> {
+  signal?: AbortSignal;
   system: string;
   user: string;
   schema: object;
@@ -30,13 +31,14 @@ export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Pr
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : GEMINI_CANDIDATE_MODELS;
 
   for (const model of models) {
+    if (options.signal?.aborted) break;
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-          signal: AbortSignal.timeout(40_000),
+          signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(40_000)]) : AbortSignal.timeout(40_000),
           body: JSON.stringify({
             system_instruction: { parts: [{ text: options.system }] },
             contents: [{ role: 'user', parts: [{ text: options.user }] }],

@@ -34,14 +34,28 @@ export function ProductsTab() {
   const [sort, setSort] = useState<SortKey>('default');
   const [page, setPage] = useState(1);
   const [syncing, setSyncing] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [loadingSource, setLoadingSource] = useState(true);
+  const [sourceError, setSourceError] = useState('');
   const [importing, setImporting] = useState(false);
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
   const [, forceTick] = useState(0);
 
   useEffect(() => {
-    Promise.all([productApi.list(), productApi.getSource()]).then(([p, s]) => { setProducts(p); setSource(s); });
+    let cancelled = false;
+    const load = async () => {
+      const [p, s] = await Promise.all([productApi.list(), productApi.getSource()]);
+      if (cancelled) return;
+      setProducts(p); setSource(s);
+      try {
+        const data = await productApi.loadShopee();
+        if (!cancelled) { setProducts(data.products); setSource(data.source); }
+      } catch (error) { if (!cancelled) setSourceError(errorMessage(error)); }
+      finally { if (!cancelled) setLoadingSource(false); }
+    };
+    void load();
     const t = setInterval(() => forceTick((x) => x + 1), 30000); // cập nhật "x phút trước"
-    return () => clearInterval(t);
+    return () => { cancelled = true; clearInterval(t); };
   }, []);
 
   const categories = useMemo(
@@ -79,19 +93,29 @@ export function ProductsTab() {
   const onSync = async () => {
     if (!products) return;
     setSyncing(true);
+    setSourceError('');
     try {
       const res = await productApi.syncShopee();
       flash(products, res.products);
       setProducts(res.products);
       setSource(res.source);
-      const parts = [`${res.changed} sản phẩm cập nhật tồn kho`];
-      if (res.added) parts.unshift(`${res.added} sản phẩm mới`);
+      const parts = [`${res.changed} dòng cập nhật`];
+      if (res.added) parts.unshift(`${res.added} dòng mới`);
+      if (res.removed) parts.push(`${res.removed} dòng ngừng bán`);
       toast(`Đồng bộ Shopee xong: ${parts.join(', ')}`);
     } catch (e) {
+      setSourceError(errorMessage(e));
       toast(errorMessage(e), 'error');
     } finally {
       setSyncing(false);
     }
+  };
+
+  const onConnect = async () => {
+    setConnecting(true);
+    setSourceError('');
+    try { window.location.assign(await productApi.connectShopee()); }
+    catch (error) { setSourceError(errorMessage(error)); setConnecting(false); }
   };
 
   const onPickCsv = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -121,11 +145,11 @@ export function ProductsTab() {
           <p className="card-desc">AI học danh mục này để kiểm tra tồn kho, tư vấn kích thước và phân loại màu sắc khi khách hỏi.</p>
         </div>
         <div className="head-actions">
-          <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()} disabled={importing}>
+          <button className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()} disabled={importing || syncing || loadingSource || connecting}>
             {importing && <span className="spinner" />}
             Nhập file CSV
           </button>
-          <button className="btn btn-primary btn-sm" onClick={onSync} disabled={syncing}>
+          <button className="btn btn-primary btn-sm" onClick={onSync} disabled={syncing || connecting || loadingSource || !source?.connected || importing}>
             {syncing && <span className="spinner" />}
             {syncing ? 'Đang đồng bộ...' : 'Đồng bộ Shopee'}
           </button>
@@ -133,23 +157,29 @@ export function ProductsTab() {
         <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onPickCsv} />
       </div>
 
-      <div className="source-row">
+      <div className="source-row" aria-busy={syncing || connecting || loadingSource}>
         <div className="source-left">
           <div className="source-icon">S</div>
           <div>
             <div className="source-name">{source?.name ?? '...'}</div>
             <div className="source-meta">
-              {products?.length ?? 0} sản phẩm đã đồng bộ • {source ? `Cập nhật ${relativeTime(source.lastSyncedAt).toLowerCase()}` : ''}
+              {products?.length ?? 0} dòng sản phẩm / phân loại • {source?.lastSyncedAt ? `Đồng bộ ${relativeTime(source.lastSyncedAt).toLowerCase()}` : 'Chưa đồng bộ Shopee thật'}
             </div>
           </div>
         </div>
         <div className="source-right">
-          {syncing
+          {loadingSource
+            ? <span className="tag-status syncing" role="status">Đang kiểm tra kết nối</span>
+            : syncing
             ? <span className="tag-status syncing"><span className="dot" />Đang đồng bộ</span>
-            : <span className="tag-status live"><span className="dot" />Đang kết nối</span>}
-          <button className="btn btn-outline btn-sm" onClick={onSync} disabled={syncing}>Đồng bộ lại</button>
+            : <span className={`tag-status${source?.connected ? ' live' : ''}`}><span className="dot" />{source?.connected ? 'Đã cấp quyền' : 'Chưa kết nối'}</span>}
+          <button className="btn btn-outline btn-sm" onClick={onConnect} disabled={syncing || connecting || loadingSource || importing}>
+            {connecting ? 'Đang mở Shopee...' : source?.connected ? 'Kết nối lại Shopee' : 'Kết nối Shopee'}
+          </button>
         </div>
       </div>
+      {sourceError && <p role="alert" className="source-meta">{sourceError}</p>}
+      <p className="source-meta">Mỗi phân loại Shopee là một dòng có giá và tồn kho riêng. Sản phẩm nhập thủ công được giữ lại khi đồng bộ.</p>
 
       <div className="table-toolbar">
         <div className="toolbar-left">
@@ -201,13 +231,13 @@ export function ProductsTab() {
                     <div className="prod-avatar">{p.emoji}</div>
                     <div>
                       <div className="prod-title">{p.name}</div>
-                      <div className="prod-sku">SKU: {p.sku} • {p.material}</div>
+                      <div className="prod-sku">SKU: {p.sku}{p.material ? ` • ${p.material}` : ''}</div>
                     </div>
                   </div>
                 </td>
                 <td>
                   <span className="cat-pill">{p.category}</span>
-                  <div className="variant-desc">{p.colors.join(', ')} • {sizeLabel(p.sizes)}</div>
+                  <div className="variant-desc">{[p.colors.join(', '), p.sizes.length ? sizeLabel(p.sizes) : ''].filter(Boolean).join(' • ') || '—'}</div>
                 </td>
                 <td style={{ textAlign: 'right' }}><span className="price-val">{formatMoney(p.price)}</span></td>
                 <td style={{ textAlign: 'right' }}><span className="qty-val">{p.qty}</span></td>
@@ -233,7 +263,7 @@ export function ProductsTab() {
 
       <div className="import-alt">
         Chưa đồng bộ sàn TMĐT?{' '}
-        <button className="link-btn" onClick={() => fileRef.current?.click()}>Nhập kho sản phẩm qua file Excel / CSV</button>{' '}
+        <button className="link-btn" onClick={() => fileRef.current?.click()} disabled={importing || syncing || connecting || loadingSource}>Nhập kho sản phẩm qua file Excel / CSV</button>{' '}
         (<button className="link-btn" onClick={() => downloadText('tendly-mau-san-pham.csv', CSV_TEMPLATE)}>tải file mẫu</button>) hoặc liên kết kho{' '}
         <button className="link-btn" onClick={() => toast('Kết nối Haravan sắp ra mắt', 'info')}>Haravan</button>,{' '}
         <button className="link-btn" onClick={() => toast('Kết nối Sapo sắp ra mắt', 'info')}>Sapo</button>.

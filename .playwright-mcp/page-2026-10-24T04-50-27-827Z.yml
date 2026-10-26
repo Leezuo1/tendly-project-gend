@@ -1,0 +1,198 @@
+- generic [active] [ref=f17e1]:
+  - generic [ref=f17e2]:
+    - generic [ref=f17e3]:
+      - complementary [ref=f17e4]:
+        - link [ref=f17e6] [cursor=pointer]:
+          - /url: /
+          - img "Tendly" [ref=f17e7]
+        - generic [ref=f17e8]:
+          - link "Tổng quan" [ref=f17e9] [cursor=pointer]:
+            - /url: /tong-quan
+          - link "Hộp thoại" [ref=f17e16] [cursor=pointer]:
+            - /url: /hop-thoai
+          - link "Marketing" [ref=f17e20] [cursor=pointer]:
+            - /url: /marketing
+          - link "Cấu hình AI" [ref=f17e26] [cursor=pointer]:
+            - /url: /cau-hinh-ai
+          - link "Cài đặt" [ref=f17e31] [cursor=pointer]:
+            - /url: /cai-dat
+        - link "Đăng xuất" [ref=f17e38] [cursor=pointer]:
+          - /url: /
+      - main [ref=f17e42]:
+        - generic [ref=f17e44]:
+          - heading "Cấu hình AI" [level=1] [ref=f17e45]
+          - paragraph [ref=f17e46]: AI dùng sản phẩm, FAQ và kịch bản email đang bật đã lưu để trả lời khách. Thay đổi đã lưu áp dụng từ câu hỏi tiếp theo.
+        - tablist [ref=f17e47]:
+          - tab "Nguồn sản phẩm" [selected] [ref=f17e48] [cursor=pointer]
+          - tab "Câu hỏi thường gặp" [ref=f17e49] [cursor=pointer]
+          - tab "Email tự động" [ref=f17e50] [cursor=pointer]
+        - generic [ref=f17e52]:
+          - generic [ref=f17e53]:
+            - generic [ref=f17e54]:
+              - heading "Nguồn dữ liệu sản phẩm" [level=2] [ref=f17e55]
+              - paragraph [ref=f17e56]: AI học danh mục này để kiểm tra tồn kho, tư vấn kích thước và phân loại màu sắc khi khách hỏi.
+            - generic [ref=f17e57]:
+              - button "Nhập file CSV" [ref=f17e58] [cursor=pointer]
+              - button "Đồng bộ Shopee" [disabled] [ref=f17e59]
+          - generic [ref=f17e60]:
+            - generic [ref=f17e61]:
+              - generic [ref=f17e62]: S
+              - generic [ref=f17e63]:
+                - generic [ref=f17e64]: Danh mục mẫu · Chưa kết nối Shopee
+                - generic [ref=f17e65]: 20 dòng sản phẩm / phân loại • Chưa đồng bộ Shopee thật
+            - generic [ref=f17e66]:
+              - generic [ref=f17e67]: Chưa kết nối
+              - button "Kết nối Shopee" [ref=f17e69] [cursor=pointer]
+          - alert [ref=f17e70]: Chưa cấu hình SHOPEE_PARTNER_ID, SHOPEE_PARTNER_KEY và SHOPEE_SHOP_ID hợp lệ.
+          - paragraph [ref=f17e71]: Mỗi phân loại Shopee là một dòng có giá và tồn kho riêng. Sản phẩm nhập thủ công được giữ lại khi đồng bộ.
+          - generic [ref=f17e72]:
+            - generic [ref=f17e73]:
+              - textbox "Tìm kiếm theo tên sản phẩm, phân loại..." [ref=f17e78]
+              - combobox "Lọc danh mục" [ref=f17e79]:
+                - option "Tất cả danh mục" [selected]
+                - option "Áo khoác"
+                - option "Áo sơ mi"
+                - option "Áo thun"
+                - option "Chân váy"
+                - option "Phụ kiện"
+                - option "Quần jeans"
+                - option "Quần short"
+                - option "Quần tây"
+                - option "Váy & Đầm"
+              - combobox "Lọc tồn kho" [ref=f17e80]:
+                - option "Mọi trạng thái" [selected]
+                - option "Còn hàng"
+                - option "Sắp hết"
+                - option "Hết hàng"
+            - generic [ref=f17e81]: Hiển thị 8 / 20 sản phẩm
+          - table [ref=f17e83]:
+            - rowgroup [ref=f17e84]:
+              - row [ref=f17e85]:
+                - columnheader "Tên sản phẩm" [ref=f17e86]
+                - columnheader "Phân loại" [ref=f17e87]
+                - columnheader "Giá" [ref=f17e88]
+                - columnheader "Số lượng ↕" [ref=f17e89] [cursor=pointer]
+                - columnheader "Trạng thái tồn" [ref=f17e90]
+            - rowgroup [ref=f17e91]:
+              - row [ref=f17e92]:
+                - 'cell "👕 Áo thun basic cotton Tendly SKU: AT-01 • 100% Cotton Compact" [ref=f17e93]':
+                  - generic [ref=f17e94]:
+                    - generic [ref=f17e95]: 👕
+                    - generic [ref=f17e96]:
+                      - generic [ref=f17e97]: Áo thun basic cotton Tendly
+                      - generic [ref=f17e98]: "SKU: AT-01 • 100% Cotton Compact"
+                - cell "Áo thun Trắng, Đen, Xám • Size S, M, L, XL" [ref=f17e99]:
+                  - generic [ref=f17e100]: Áo thun
+                  - generic [ref=f17e101]: Trắng, Đen, Xám • Size S, M, L, XL
+                - cell "259.000đ" [ref=f17e102]
+                - cell "145" [ref=f17e103]
+                - cell "Còn hàng" [ref=f17e104]
+              - row [ref=f17e107]:
+                - 'cell "🧥 Áo khoác dạ nữ dáng dài AK-23 SKU: AK-23 • Dạ ép 2 lớp cao cấp" [ref=f17e108]':
+                  - generic [ref=f17e109]:
+                    - generic [ref=f17e110]: 🧥
+                    - generic [ref=f17e111]:
+                      - generic [ref=f17e112]: Áo khoác dạ nữ dáng dài AK-23
+                      - generic [ref=f17e113]: "SKU: AK-23 • Dạ ép 2 lớp cao cấp"
+                - cell "Áo khoác Be, Nâu tây, Đen • Size S, M" [ref=f17e114]:
+                  - generic [ref=f17e115]: Áo khoác
+                  - generic [ref=f17e116]: Be, Nâu tây, Đen • Size S, M
+                - cell "1.290.000đ" [ref=f17e117]
+                - cell "42" [ref=f17e118]
+                - cell "Còn hàng" [ref=f17e119]
+              - row [ref=f17e122]:
+                - 'cell "👗 Đầm voan hoa nhí cổ V vintage SKU: DV-12 • Voan tơ lót lụa habutai" [ref=f17e123]':
+                  - generic [ref=f17e124]:
+                    - generic [ref=f17e125]: 👗
+                    - generic [ref=f17e126]:
+                      - generic [ref=f17e127]: Đầm voan hoa nhí cổ V vintage
+                      - generic [ref=f17e128]: "SKU: DV-12 • Voan tơ lót lụa habutai"
+                - cell "Váy & Đầm Vàng pastel, Xanh mint • Freesize" [ref=f17e129]:
+                  - generic [ref=f17e130]: Váy & Đầm
+                  - generic [ref=f17e131]: Vàng pastel, Xanh mint • Freesize
+                - cell "459.000đ" [ref=f17e132]
+                - cell "68" [ref=f17e133]
+                - cell "Còn hàng" [ref=f17e134]
+              - row [ref=f17e137]:
+                - 'cell "👖 Quần jeans ống suông lưng cao QJ-88 SKU: QJ-88 • Denim co giãn nhẹ" [ref=f17e138]':
+                  - generic [ref=f17e139]:
+                    - generic [ref=f17e140]: 👖
+                    - generic [ref=f17e141]:
+                      - generic [ref=f17e142]: Quần jeans ống suông lưng cao QJ-88
+                      - generic [ref=f17e143]: "SKU: QJ-88 • Denim co giãn nhẹ"
+                - cell "Quần jeans Xanh khói, Xanh đen • Size 26, 27, 28, 29" [ref=f17e144]:
+                  - generic [ref=f17e145]: Quần jeans
+                  - generic [ref=f17e146]: Xanh khói, Xanh đen • Size 26, 27, 28, 29
+                - cell "499.000đ" [ref=f17e147]
+                - cell "55" [ref=f17e148]
+                - cell "Còn hàng" [ref=f17e149]
+              - row [ref=f17e152]:
+                - 'cell "👚 Chân váy chữ A kaki túi hộp CV-05 SKU: CV-05 • Kaki chéo dày dặn" [ref=f17e153]':
+                  - generic [ref=f17e154]:
+                    - generic [ref=f17e155]: 👚
+                    - generic [ref=f17e156]:
+                      - generic [ref=f17e157]: Chân váy chữ A kaki túi hộp CV-05
+                      - generic [ref=f17e158]: "SKU: CV-05 • Kaki chéo dày dặn"
+                - cell "Chân váy Be sáng, Đen • Size S, M" [ref=f17e159]:
+                  - generic [ref=f17e160]: Chân váy
+                  - generic [ref=f17e161]: Be sáng, Đen • Size S, M
+                - cell "329.000đ" [ref=f17e162]
+                - cell "12" [ref=f17e163]
+                - cell "Sắp hết" [ref=f17e164]
+              - row [ref=f17e167]:
+                - 'cell "👔 Áo sơ mi lụa satin công sở SM-09 SKU: SM-09 • Lụa ngọc trai mềm mát" [ref=f17e168]':
+                  - generic [ref=f17e169]:
+                    - generic [ref=f17e170]: 👔
+                    - generic [ref=f17e171]:
+                      - generic [ref=f17e172]: Áo sơ mi lụa satin công sở SM-09
+                      - generic [ref=f17e173]: "SKU: SM-09 • Lụa ngọc trai mềm mát"
+                - cell "Áo sơ mi Trắng kem, Hồng phấn • Size M, L" [ref=f17e174]:
+                  - generic [ref=f17e175]: Áo sơ mi
+                  - generic [ref=f17e176]: Trắng kem, Hồng phấn • Size M, L
+                - cell "389.000đ" [ref=f17e177]
+                - cell "89" [ref=f17e178]
+                - cell "Còn hàng" [ref=f17e179]
+              - row [ref=f17e182]:
+                - 'cell "👜 Túi tote vải canvas in chữ Tendly SKU: PK-03 • Canvas dệt sợi đôi" [ref=f17e183]':
+                  - generic [ref=f17e184]:
+                    - generic [ref=f17e185]: 👜
+                    - generic [ref=f17e186]:
+                      - generic [ref=f17e187]: Túi tote vải canvas in chữ Tendly
+                      - generic [ref=f17e188]: "SKU: PK-03 • Canvas dệt sợi đôi"
+                - cell "Phụ kiện Trắng ngà, Đen • One size" [ref=f17e189]:
+                  - generic [ref=f17e190]: Phụ kiện
+                  - generic [ref=f17e191]: Trắng ngà, Đen • One size
+                - cell "159.000đ" [ref=f17e192]
+                - cell "180" [ref=f17e193]
+                - cell "Còn hàng" [ref=f17e194]
+              - row [ref=f17e197]:
+                - 'cell "👕 Áo thun oversize in chữ Tendly SKU: AT-02 • Cotton 2 chiều 250gsm" [ref=f17e198]':
+                  - generic [ref=f17e199]:
+                    - generic [ref=f17e200]: 👕
+                    - generic [ref=f17e201]:
+                      - generic [ref=f17e202]: Áo thun oversize in chữ Tendly
+                      - generic [ref=f17e203]: "SKU: AT-02 • Cotton 2 chiều 250gsm"
+                - cell "Áo thun Trắng, Đen, Be • Size M, L, XL" [ref=f17e204]:
+                  - generic [ref=f17e205]: Áo thun
+                  - generic [ref=f17e206]: Trắng, Đen, Be • Size M, L, XL
+                - cell "289.000đ" [ref=f17e207]
+                - cell "96" [ref=f17e208]
+                - cell "Còn hàng" [ref=f17e209]
+          - generic [ref=f17e212]:
+            - button "Trang trước" [disabled] [ref=f17e213]: ‹
+            - button "1" [ref=f17e214] [cursor=pointer]
+            - button "2" [ref=f17e215] [cursor=pointer]
+            - button "3" [ref=f17e216] [cursor=pointer]
+            - button "Trang sau" [ref=f17e217] [cursor=pointer]: ›
+          - generic [ref=f17e218]:
+            - text: Chưa đồng bộ sàn TMĐT?
+            - button "Nhập kho sản phẩm qua file Excel / CSV" [ref=f17e219] [cursor=pointer]
+            - text: (
+            - button "tải file mẫu" [ref=f17e220] [cursor=pointer]
+            - text: ) hoặc liên kết kho
+            - button "Haravan" [ref=f17e221] [cursor=pointer]
+            - text: ","
+            - button "Sapo" [ref=f17e222] [cursor=pointer]
+            - text: .
+    - status
+  - alert [ref=f17e223]

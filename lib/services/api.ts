@@ -1,9 +1,9 @@
 /**
- * Mock API — mọi hàm đều async + có độ trễ giả lập như gọi mạng thật.
- * Khi làm backend: giữ nguyên chữ ký hàm, thay phần thân bằng fetch(...).
+ * Shopee gọi backend thật; các API quản trị còn lại dùng dữ liệu mô phỏng trong trình duyệt.
  */
 import { readDb, resetDb, writeDb } from '@/lib/services/mockDb';
-import { PLANS, SHOPEE_NEW_PRODUCT } from '@/lib/data/admin';
+import { createSeed, PLANS } from '@/lib/data/admin';
+import { openInboxSession } from '@/lib/services/inboxCredentials';
 import type {
   Channel, ChannelId, EmailLog, EmailTrigger, Faq, Member, MemberRole, Plan, Product,
   ProductSource, Shop, Subscription, TriggerKind,
@@ -131,33 +131,45 @@ export const channelApi = {
 
 /* ---------------- Sản phẩm ---------------- */
 
+async function shopeeFetch(path: string, method = 'GET') {
+  const session = await openInboxSession();
+  if (!session.ready) throw new ApiError(session.error);
+  const response = await fetch(path, { method, cache: 'no-store', signal: AbortSignal.timeout(145000) });
+  const data = await response.json();
+  if (!response.ok) throw new ApiError(data.error || 'Không kết nối được Shopee.');
+  return data;
+}
+
+function applyShopee(products: Product[], source: ProductSource) {
+  const samples = new Map(createSeed().products.map((p) => [p.id, JSON.stringify(p)]));
+  const db = writeDb((d) => {
+    // Giữ sản phẩm CSV/đã sửa; chỉ thay dòng Shopee cũ và bỏ mẫu chưa từng chỉnh sửa.
+    const manual = d.products.filter((p) => !p.id.startsWith('shopee:') && samples.get(p.id) !== JSON.stringify(p));
+    if (products.length + manual.length > 500) throw new ApiError('Danh mục vượt giới hạn 500 dòng của nguồn AI.');
+    d.products = [...products, ...manual];
+    d.productSource = source;
+  });
+  return { products: clone(db.products), source: clone(db.productSource) };
+}
+
 export const productApi = {
   list: () => respond<Product[]>(readDb().products),
-  getSource: () => respond<ProductSource>(readDb().productSource, 100),
+  getSource: () => respond<ProductSource>({ ...readDb().productSource, connected: false }, 100),
 
-  /** Giả lập đồng bộ Shopee: tồn kho thay đổi nhẹ, lần đầu có thêm 1 sản phẩm mới */
-  async syncShopee(): Promise<{ products: Product[]; source: ProductSource; changed: number; added: number }> {
-    await sleep(1600);
-    let changed = 0;
-    let added = 0;
-    const db = writeDb((d) => {
-      d.products.forEach((p) => {
-        if (Math.random() < 0.35) {
-          const delta = Math.round((Math.random() - 0.6) * 12);
-          if (delta !== 0) {
-            p.qty = Math.max(0, p.qty + delta);
-            changed++;
-          }
-        }
-      });
-      if (!d.products.some((p) => p.sku === SHOPEE_NEW_PRODUCT.sku)) {
-        d.products.unshift(clone(SHOPEE_NEW_PRODUCT));
-        added = 1;
-      }
-      d.productSource.lastSyncedAt = Date.now();
-      d.productSource.syncCount += 1;
-    });
-    return { products: clone(db.products), source: clone(db.productSource), changed, added };
+  async loadShopee(): Promise<{ products: Product[]; source: ProductSource }> {
+    const data = await shopeeFetch('/api/shopee') as { products: Product[]; source: ProductSource };
+    if (data.source.lastSyncedAt) return applyShopee(data.products, data.source);
+    writeDb((d) => { d.productSource = data.source; });
+    return { products: clone(readDb().products), source: data.source };
+  },
+
+  async connectShopee(): Promise<string> {
+    return (await shopeeFetch('/api/shopee/connect', 'POST')).url;
+  },
+
+  async syncShopee(): Promise<{ products: Product[]; source: ProductSource; changed: number; added: number; removed: number }> {
+    const data = await shopeeFetch('/api/shopee/sync', 'POST');
+    return { ...data, ...applyShopee(data.products, data.source) };
   },
 
   /** Thêm mới hoặc cập nhật theo SKU */
@@ -167,7 +179,7 @@ export const productApi = {
     let updated = 0;
     const db = writeDb((d) => {
       rows.forEach((row) => {
-        const existing = d.products.find((p) => p.sku.toLowerCase() === row.sku.toLowerCase());
+        const existing = d.products.find((p) => !p.id.startsWith('shopee:') && p.sku.toLowerCase() === row.sku.toLowerCase());
         if (existing) {
           Object.assign(existing, row, { id: existing.id });
           updated++;

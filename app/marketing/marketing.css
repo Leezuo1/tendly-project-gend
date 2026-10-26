@@ -175,6 +175,7 @@
 }
 
 .marketing-root .main {
+  min-width: 0;
   padding: 40px 56px 80px;
   max-width: 1400px;
   margin: 0 auto;
@@ -195,12 +196,14 @@
 
 .marketing-root .tabs {
   display: flex;
+  overflow-x: auto;
   gap: 28px;
   margin-top: 28px;
   border-bottom: 1px solid var(--line);
 }
 
 .marketing-root .tab-btn {
+  white-space: nowrap;
   background: none;
   border: none;
   padding: 0 2px 13px;
@@ -674,7 +677,11 @@
 
 @media (max-width: 880px) {
   .marketing-root .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .marketing-root .sidebar {
+    height: auto;
+    position: static;
   }
   .marketing-root .main {
     padding: 28px 20px 60px;

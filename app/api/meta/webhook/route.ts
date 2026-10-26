@@ -1,5 +1,7 @@
-import { InvalidWebhook, parseMetaMessages, verifyMetaSignature } from '@/lib/services/metaWebhook';
+import { after } from 'next/server';
+import { InvalidWebhook, parseMetaComments, parseMetaMessages, verifyMetaSignature } from '@/lib/services/metaWebhook';
 import { requireMessengerDatabase, persistMessengerMessages } from '@/lib/services/messengerStorage';
+import { processPendingComments, saveFacebookComments } from '@/lib/services/facebookComments';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -46,7 +48,12 @@ export async function POST(request: Request) {
     return new Response('Forbidden', { status: 403 });
   }
   let messages;
-  try { messages = parseMetaMessages(JSON.parse(raw.toString('utf8')), pageId); }
+  let comments;
+  try {
+    const payload = JSON.parse(raw.toString('utf8'));
+    messages = parseMetaMessages(payload, pageId);
+    comments = parseMetaComments(payload, pageId);
+  }
   catch (error) {
     if (error instanceof SyntaxError || error instanceof InvalidWebhook) return new Response('Invalid payload', { status: 400 });
     throw error;
@@ -54,6 +61,13 @@ export async function POST(request: Request) {
   try {
     if (messages.length) {
       await persistMessengerMessages(messages);
+    }
+    if (comments.length) {
+      await saveFacebookComments(comments);
+      after(async () => {
+        try { await processPendingComments(pageId); }
+        catch { console.error('Facebook comment processing deferred; comments remain in the database.'); }
+      });
     }
     return new Response('EVENT_RECEIVED', { headers: { 'Content-Type': 'text/plain' } });
   } catch {

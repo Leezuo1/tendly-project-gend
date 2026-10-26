@@ -7,6 +7,8 @@ import { ApprovalQueueTab } from './ApprovalQueueTab';
 import { CustomerSegmentsTab } from './CustomerSegmentsTab';
 import { CampaignPerformanceTab } from './CampaignPerformanceTab';
 import { PostComposerTab } from './PostComposerTab';
+import { FacebookCommentsTab } from './FacebookCommentsTab';
+import { FacebookPostsTab } from './FacebookPostsTab';
 import { Toast } from '@/components/shared/Toast';
 
 export function MarketingShell() {
@@ -32,6 +34,12 @@ export function MarketingShell() {
           </div>
 
           <div className="tabs">
+            <button type="button" className={`tab-btn ${activeTab === 'facebook-posts' ? 'active' : ''}`} onClick={() => setActiveTab('facebook-posts')}>
+              Bài đăng Facebook
+            </button>
+            <button type="button" className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => setActiveTab('comments')}>
+              Bình luận Facebook
+            </button>
             <button
               type="button"
               className={`tab-btn ${activeTab === 'queue' ? 'active' : ''}`}
@@ -66,6 +74,8 @@ export function MarketingShell() {
           {activeTab === 'segments' && <CustomerSegmentsTab />}
           {activeTab === 'performance' && <CampaignPerformanceTab />}
           {activeTab === 'composer' && <PostComposerTab onToast={showToast} />}
+          {activeTab === 'comments' && <FacebookCommentsTab onToast={showToast} />}
+          {activeTab === 'facebook-posts' && <FacebookPostsTab />}
         </main>
       </div>
 
