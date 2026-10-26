@@ -1,4 +1,4 @@
-import type { MockDb, Plan, Product } from '@/lib/types/admin';
+import type { MockDb, Plan } from '@/lib/types/admin';
 
 export const PLANS: Plan[] = [
   {
@@ -26,12 +26,6 @@ export const PLANS: Plan[] = [
 
 export const TIMEZONES = ['GMT+7 — Hà Nội, TP.HCM', 'GMT+8 — Singapore'];
 
-/** Sản phẩm mới xuất hiện ở lần đồng bộ Shopee đầu tiên — để demo việc đồng bộ có thay đổi dữ liệu */
-export const SHOPEE_NEW_PRODUCT: Product = {
-  id: 'p-at15', sku: 'AT-15', name: 'Áo baby tee cổ vuông AT-15', material: 'Cotton tăm co giãn',
-  emoji: '👕', category: 'Áo thun', colors: ['Trắng', 'Hồng phấn'], sizes: ['S', 'M'], qty: 64, price: 199000,
-};
-
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 
@@ -58,9 +52,9 @@ export function createSeed(): MockDb {
       { id: 'tiktok', name: 'TikTok Shop', connected: false, enabled: false, account: null, comingSoon: true },
     ],
     productSource: {
-      name: 'Gian hàng Shopee chính hãng — Tendly Store',
-      connected: true,
-      lastSyncedAt: now - 2 * HOUR,
+      name: 'Danh mục mẫu · Chưa kết nối Shopee',
+      connected: false,
+      lastSyncedAt: 0,
       syncCount: 0,
     },
     products: [

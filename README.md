@@ -2,6 +2,8 @@
 
 ## Getting Started
 
+Kết nối một shop Shopee thật, cấu hình callback và đồng bộ sản phẩm: [hướng dẫn Shopee demo](docs/shopee-demo.md). Nút đồng bộ ở Cấu hình AI gọi API thật; lựa chọn Shopee trong onboarding vẫn là mô phỏng.
+
 ### Flow onboarding mẫu
 
 Mở `/dang-nhap`, dùng tài khoản `admin` và mật khẩu `admin123` để đi qua `/tao-shop` → `/ket-noi` → `/tong-quan`. Có thể chọn tài khoản mẫu cho Messenger, Zalo, TikTok và Shopee, ngắt kết nối hoặc bỏ qua bước kết nối. Trang tổng quan giữ nguyên giao diện và luồng dữ liệu hiện có.
