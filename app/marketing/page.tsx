@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { MarketingShell } from '@/components/features/marketing/MarketingShell';
 import './marketing.css';
 import './post-composer.css';
+import './facebook-comments.css';
+import './facebook-posts.css';
 
 export const metadata: Metadata = {
   title: 'Marketing — Tendly',

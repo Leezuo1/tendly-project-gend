@@ -136,3 +136,23 @@ Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, t�
 - Dashboard chưa có đăng nhập nên mọi API `/api/posts/*` (kể cả tạo bài) yêu cầu header `Authorization: Bearer <DASHBOARD_KEY>`. Production thiếu `DASHBOARD_KEY` thì trả 503; local (`next dev`) bỏ trống vẫn chạy. Giao diện hỏi mã một lần và lưu trên trình duyệt của chủ shop.
 
 Biến môi trường trên Vercel: `GEMINI_API_KEY`, `DATABASE_URL`, `DASHBOARD_KEY`; thêm `PAGE_ID`, `PAGE_ACCESS_TOKEN` để đăng Fanpage. `npm test` có kiểm thử validate yêu cầu, prompt chỉ chứa sản phẩm đã chọn, làm sạch output, khoá bằng mã quản trị, lưu/khoá bài bằng `pg-mem` và gọi Graph API giả lập.
+
+## Bình luận Facebook và private reply
+
+Tab **Marketing → Bài đăng Facebook** đọc trực tiếp các bài đã xuất bản của Fanpage (kể cả bài đăng ngoài Tendly). Mỗi bài mặc định thu gọn, hiển thị nội dung ngắn, thời gian và số cảm xúc/bình luận/chia sẻ. Bấm hàng bài đăng hoặc mũi tên để mở nội dung đầy đủ, ảnh và bình luận. Comment được tải khi mở bài; có phân trang bài đăng/comment và nút làm mới. Mỗi comment hiển thị tối đa ba phản hồi đầu, chuỗi dài có liên kết mở Facebook. Tab này chỉ đọc, chưa chỉnh sửa/xoá bài hoặc trả lời công khai; dùng cùng Page token và mã quản trị, không cần migration bổ sung. Ảnh/video/nhãn dán trong comment hiển thị bằng nhãn; album/video của bài có ảnh đại diện và liên kết mở bản đầy đủ trên Facebook.
+
+Mở **Marketing → Bình luận Facebook**. Tendly nhận comment mới qua webhook Page `feed`, hiển thị 100 comment mới nhất, cho tìm/lọc, đọc bài gốc, soạn bằng AI, sửa và gửi một tin riêng bằng **Fanpage**. Chưa có tải lịch sử comment, trả lời công khai, ẩn/xoá comment hay nhắn bằng tài khoản cá nhân.
+
+Thiết lập:
+
+1. Chạy `npm run db:migrate` để thêm `008-facebook-comments.sql`; migration không xoá dữ liệu cũ.
+2. Dùng các biến hiện có: `PAGE_ID`, `PAGE_ACCESS_TOKEN`, `META_GRAPH_VERSION`, `APP_SECRET`, `VERIFY_TOKEN`, `DATABASE_URL`, `GEMINI_API_KEY`, `DASHBOARD_KEY`. API quản lý dùng cùng mã quản trị với Marketing.
+3. Trong Meta App, đăng ký trường Page webhook **feed**, giữ các trường Messenger hiện có. Đăng ký Page với app tại `/{PAGE_ID}/subscribed_apps` và giữ `feed` cùng các trường đang dùng; callback vẫn là `/api/meta/webhook`. Token cần quyền đọc Page/comment (`pages_read_engagement`, `pages_read_user_content`), đăng ký webhook (`pages_manage_metadata`) và private reply (`pages_messaging`). Khách ngoài vai trò thử nghiệm còn phụ thuộc quyền Advanced Access/App Review của Meta.
+4. Bấm **Cập nhật dữ liệu AI** để lưu bản sản phẩm/FAQ trong trình duyệt lên PostgreSQL. Khi đổi giá, tồn kho hoặc FAQ, cập nhật lại bản này; webhook không tự đọc localStorage hoặc tự đồng bộ Shopee.
+5. Mặc định shop duyệt và bấm gửi. Bấm **Bật AI tự nhắn riêng** để cho phép tự gửi cho comment mới sau thời điểm bật; AI chỉ tự gửi câu hỏi sản phẩm đủ dữ liệu. Trường hợp mơ hồ/thiếu thông tin/phàn nàn hoặc lỗi AI sẽ chờ shop. Tắt tự gửi có hiệu lực với các yêu cầu chưa được chuyển sang bước gửi; tin đã gửi tới Meta không thể thu hồi bằng nút này.
+
+Luồng gửi sử dụng `POST /{PAGE_ID}/messages` với `recipient: { comment_id }`, kiểm tra trực tiếp `can_reply_privately` và nội dung comment trước khi gửi. Mỗi comment chỉ được một private reply trong 7 ngày; private reply chưa mở cửa sổ nhắn tiếp 24 giờ. Khi khách nhắn lại, webhook Messenger hiện có nhận tin và inbox tiếp tục áp dụng giới hạn 24 giờ. Không coi ID người comment là Messenger PSID: chỉ nối hội thoại từ `recipient_id` Meta trả về hoặc webhook Messenger. Xem [Meta Private Replies](https://developers.facebook.com/docs/messenger-platform/send-messages/private-replies/) và [Page Webhooks](https://developers.facebook.com/docs/pages-api/webhooks-for-pages/) để đối chiếu cấu hình/quyền đang áp dụng.
+
+Comment được lưu trước khi webhook trả 200; `after()` xử lý tối đa ba comment trong mỗi lần, với giới hạn thời gian. Hàng chờ nằm trong PostgreSQL, tác vụ AI bị gián đoạn có thể nhận lại sau hai phút. Khi còn tồn đọng, dùng **Xử lý hàng chờ** hoặc gọi định kỳ `POST /api/facebook/comments`, header `Authorization: Bearer <DASHBOARD_KEY>`, JSON `{"action":"process"}` từ scheduler của hạ tầng. Chưa cài scheduler/queue service riêng; lưu lượng lớn hoặc tiến trình bị dừng có thể cần lần xử lý tiếp theo.
+
+Trước khi gọi Meta, hệ thống giữ chỗ gửi trong database. Timeout/HTTP 5xx/kết quả không rõ hoặc tiến trình dừng ở trạng thái `sending` không tự gửi lại; kiểm tra Messenger trước khi xử lý thủ công. Meta đã chấp nhận nhưng database lỗi sẽ báo cần đồng bộ, tránh gửi lặp. `npm test` kiểm tra SQL bằng PGlite, webhook ký HMAC, cô lập Page, edit/delete, chống gửi đồng thời, tắt tự động giữa chừng và lỗi gửi; Meta/Gemini được giả lập, không gửi tin thật cho khách.

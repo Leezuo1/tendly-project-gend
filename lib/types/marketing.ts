@@ -2,7 +2,7 @@
 // DOMAIN TYPES — Marketing
 // ============================================================
 
-export type MarketingTab = 'queue' | 'segments' | 'performance' | 'composer';
+export type MarketingTab = 'queue' | 'segments' | 'performance' | 'composer' | 'comments' | 'facebook-posts';
 
 /** Nhóm theo hoạt động nhắn tin (chưa có dữ liệu đơn hàng để tính RFM). */
 export type ActivitySegment = 'new' | 'active' | 'quiet' | 'risk';
