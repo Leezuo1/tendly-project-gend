@@ -1,4 +1,6 @@
+import { after } from 'next/server';
 import { requireDashboardKey } from '@/lib/services/postsApi';
+import { syncFacebookComments } from '@/lib/services/facebookCommentSync';
 import { InvalidMarketingRequest, marketingErrorResponse, marketingPageId, readMarketingJson } from '@/lib/services/marketingApi';
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
@@ -43,6 +45,15 @@ export async function POST(request: Request) {
   try {
     const pageId = marketingPageId();
     const body = await readMarketingJson(request);
+    if (body.action === 'sync') {
+      const sync = await syncFacebookComments(pageId);
+      const data = await readFacebookComments(pageId);
+      if (!sync.error && data.pending && data.settings.updatedAt) after(async () => {
+        try { await processPendingComments(pageId); }
+        catch { console.error('Facebook comment processing deferred; comments remain in the database.'); }
+      });
+      return Response.json({ ...data, sync }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     if (body.action === 'process') {
       await processPendingComments(pageId);
       return Response.json({ processed: true });

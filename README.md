@@ -141,7 +141,9 @@ Biến môi trường trên Vercel: `GEMINI_API_KEY`, `DATABASE_URL`, `DASHBOARD
 
 Tab **Marketing → Bài đăng Facebook** đọc trực tiếp các bài đã xuất bản của Fanpage (kể cả bài đăng ngoài Tendly). Mỗi bài mặc định thu gọn, hiển thị nội dung ngắn, thời gian và số cảm xúc/bình luận/chia sẻ. Bấm hàng bài đăng hoặc mũi tên để mở nội dung đầy đủ, ảnh và bình luận. Comment được tải khi mở bài; có phân trang bài đăng/comment và nút làm mới. Mỗi comment hiển thị tối đa ba phản hồi đầu, chuỗi dài có liên kết mở Facebook. Tab này chỉ đọc, chưa chỉnh sửa/xoá bài hoặc trả lời công khai; dùng cùng Page token và mã quản trị, không cần migration bổ sung. Ảnh/video/nhãn dán trong comment hiển thị bằng nhãn; album/video của bài có ảnh đại diện và liên kết mở bản đầy đủ trên Facebook.
 
-Mở **Marketing → Bình luận Facebook**. Tendly nhận comment mới qua webhook Page `feed`, hiển thị 100 comment mới nhất, cho tìm/lọc, đọc bài gốc, soạn bằng AI, sửa và gửi một tin riêng bằng **Fanpage**. Chưa có tải lịch sử comment, trả lời công khai, ẩn/xoá comment hay nhắn bằng tài khoản cá nhân.
+Mở **Marketing → Bình luận Facebook**. Tendly nhận comment mới qua webhook Page `feed`, hiển thị 100 comment mới nhất, cho tìm/lọc, đọc bài gốc, soạn bằng AI, sửa và gửi một tin riêng bằng **Fanpage**. Khi tab mở, danh sách tự cập nhật mỗi 3 giây và lấy bù bình luận trực tiếp từ Meta nếu webhook bị lỡ. Chưa có tải toàn bộ lịch sử comment, trả lời công khai, ẩn/xoá comment hay nhắn bằng tài khoản cá nhân.
+
+Đồng bộ dự phòng dùng `POST /api/facebook/comments` với `action: "sync"`, vẫn yêu cầu mã quản trị. Migration `009-facebook-comment-sync.sql` lưu thời điểm đồng bộ và lease dùng chung giữa các instance; chỉ gọi Meta lại sau ít nhất 10 giây từ lần hoàn tất trước. Mỗi lần đối chiếu tối đa 20 bình luận mới nhất trên 10 bài mới nhất, không coi bình luận vắng trong kết quả là đã xoá. Khi Meta lỗi, giao diện giữ dữ liệu đã lưu và hiện cảnh báo. Bình luận lấy bù dùng chung hàng chờ AI, điều kiện tự gửi và chống gửi lặp với webhook; mở dashboard không bỏ qua bước duyệt khi tự gửi đang tắt. Đóng tab thì cơ chế lấy bù dừng, webhook vẫn hoạt động độc lập.
 
 Thiết lập:
 
