@@ -10,10 +10,13 @@ import { PostComposerTab } from './PostComposerTab';
 import { FacebookCommentsTab } from './FacebookCommentsTab';
 import { FacebookPostsTab } from './FacebookPostsTab';
 import { Toast } from '@/components/shared/Toast';
+import type { FacebookFeedPost } from '@/lib/types/facebookFeed';
 
 export function MarketingShell() {
   const [activeTab, setActiveTab] = useState<MarketingTab>('queue');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [queueCount, setQueueCount] = useState<number | null>(null);
+  const [sourcePost, setSourcePost] = useState<FacebookFeedPost>();
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -45,7 +48,7 @@ export function MarketingShell() {
               className={`tab-btn ${activeTab === 'queue' ? 'active' : ''}`}
               onClick={() => setActiveTab('queue')}
             >
-              Hàng chờ duyệt
+              Hàng chờ duyệt {queueCount !== null && <span className="marketing-tab-badge" aria-label={`${queueCount} khách chờ duyệt`}>{queueCount}</span>}
             </button>
             <button
               type="button"
@@ -63,19 +66,19 @@ export function MarketingShell() {
             </button>
             <button
               type="button"
-              className={`tab-btn ${activeTab === 'composer' ? 'active' : ''}`}
-              onClick={() => setActiveTab('composer')}
+              className={`tab-btn marketing-ai-tab ${activeTab === 'composer' ? 'active' : ''}`}
+              onClick={() => { setSourcePost(undefined); setActiveTab('composer'); }}
             >
               ✨ Soạn bài AI
             </button>
           </div>
 
-          {activeTab === 'queue' && <ApprovalQueueTab onToast={showToast} />}
+          <div hidden={activeTab !== 'queue'}><ApprovalQueueTab onToast={showToast} onCountChange={setQueueCount} /></div>
           {activeTab === 'segments' && <CustomerSegmentsTab />}
           {activeTab === 'performance' && <CampaignPerformanceTab />}
-          {activeTab === 'composer' && <PostComposerTab onToast={showToast} />}
+          {activeTab === 'composer' && <PostComposerTab onToast={showToast} sourcePost={sourcePost} />}
           {activeTab === 'comments' && <FacebookCommentsTab onToast={showToast} />}
-          {activeTab === 'facebook-posts' && <FacebookPostsTab />}
+          {activeTab === 'facebook-posts' && <FacebookPostsTab onCompose={(post) => { setSourcePost(post); setActiveTab('composer'); }} />}
         </main>
       </div>
 
