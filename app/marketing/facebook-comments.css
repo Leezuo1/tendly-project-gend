@@ -1,10 +1,42 @@
 .marketing-root .fc-root { display: grid; gap: 18px; }
 .marketing-root .fc-settings-actions, .marketing-root .fc-toolbar, .marketing-root .fc-comment-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .marketing-root .fc-settings-actions { padding: 0 20px 16px; }
+.marketing-root .fc-settings .card-head { align-items: center; flex-wrap: wrap; }
+.marketing-root .fc-settings-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.marketing-root .fc-settings .fc-settings-actions { padding: 0; }
+.marketing-root .fc-settings .card-desc { margin-top: 0; max-width: none; }
+.marketing-root .fc-settings .fc-note { padding: 0; margin-top: 8px; }
+.marketing-root .fc-mode { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; }
+.marketing-root .fc-mode > span { color: var(--moss); font-size: 9px; }
+.marketing-root .fc-toggle { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.marketing-root .fc-toggle-track { display: inline-flex; align-items: center; width: 40px; height: 24px; padding: 3px; border-radius: 20px; background: var(--ink-soft); flex-shrink: 0; }
+.marketing-root .fc-toggle-track > span { width: 18px; height: 18px; border-radius: 50%; background: var(--paper); }
+.marketing-root .fc-toggle[aria-checked="true"] .fc-toggle-track { background: var(--moss); }
+.marketing-root .fc-toggle[aria-checked="true"] .fc-toggle-track > span { transform: translateX(16px); }
+.marketing-root .fc-warning { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 8px; background: var(--amber-soft); color: #805000; font-size: 12px; }
+.marketing-root .fc-info { display: flex; align-items: flex-start; gap: 9px; margin-top: 18px; padding: 12px; border-radius: 10px; background: var(--canvas); color: var(--ink-soft); font-size: 12px; }
+.marketing-root .fc-info p { margin: 0; }
+.marketing-root .fc-info-icon { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; font-weight: 700; flex-shrink: 0; }
 .marketing-root .fc-note { margin: 0; padding: 0 20px 16px; font-size: 12px; color: var(--ink-soft); }
 .marketing-root .fc-toolbar { align-items: end; }
 .marketing-root .fc-toolbar label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
 .marketing-root .fc-search { flex: 1; min-width: 200px; }
+.marketing-root .fc-search-field { position: relative; display: flex; }
+.marketing-root .fc-search-field svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--ink-soft); pointer-events: none; }
+.marketing-root .fc-search-field .pc-input { padding-left: 38px; }
+.marketing-root .fc-toolbar :is(.pc-input, .btn) { height: 44px; min-height: 44px; }
+.marketing-root .fc-process:disabled { opacity: .5; background: var(--sand); box-shadow: none; }
+.marketing-root .fc-process:not(:disabled) { color: var(--coral-deep); border-color: var(--coral-deep); background: var(--alert-bg); }
+.marketing-root .fc-count { font-size: 12px; color: var(--ink-soft); margin-bottom: -10px; }
+.marketing-root .fc-count:empty { display: none; }
+.marketing-root .fc-empty { padding: 44px 24px; }
+.marketing-root .fc-empty-icon { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; background: var(--moss-soft); color: var(--moss); margin-bottom: 16px; }
+.marketing-root .fc-empty-icon svg { width: 30px; height: 30px; }
+.marketing-root .fc-empty h3 { color: var(--ink); font-size: 17px; margin-bottom: 8px; }
+.marketing-root .fc-empty p { max-width: 520px; margin: 0 auto; }
+.marketing-root .fc-empty-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 20px; }
+.marketing-root .fc-empty .btn { text-decoration: none; }
+.marketing-root .fc-empty-link { color: var(--moss); font-size: 13px; font-weight: 600; }
 .marketing-root .fc-workspace { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.15fr); gap: 18px; align-items: start; }
 .marketing-root .fc-workspace > .card { min-width: 0; margin: 0; }
 .marketing-root .fc-list { padding: 0; }

@@ -45,45 +45,62 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
   return (
     <section className="tab-panel active fc-root" aria-label="Bình luận Facebook">
       <div className="card fc-settings">
-        <div className="card-head"><h2>Bình luận → Messenger</h2><span className="fc-status">{data?.settings.autoReply ? 'Tự gửi đang bật' : 'Shop duyệt trước khi gửi'}</span></div>
+        <div className="card-head">
+          <div className="fc-settings-title">
+            <h2>Bình luận → Messenger</h2>
+            <span className="fc-status fc-mode"><span aria-hidden="true">●</span> {data?.settings.autoReply ? 'Tự gửi đang bật' : 'Shop duyệt trước khi gửi'}</span>
+          </div>
+          <button type="button" className="fc-toggle" role="switch" aria-checked={data?.settings.autoReply ?? false}
+            aria-label="AI tự nhắn riêng" disabled={!!busy || !data}
+            onClick={() => run('settings', () => client.setAutoReply(!data!.settings.autoReply),
+              data?.settings.autoReply ? 'Đã tắt tự gửi.' : 'Đã lưu dữ liệu AI và bật tự gửi cho comment mới.')}>
+            <span>{busy === 'settings' ? 'Đang lưu…' : 'AI tự nhắn riêng'}</span>
+            <span className="fc-toggle-track" aria-hidden="true"><span /></span>
+          </button>
+        </div>
         <div className="card-desc">
-          AI đọc câu hỏi cùng bài đăng, đối chiếu sản phẩm rồi soạn một tin nhắn riêng bằng Fanpage đã kết nối.
-          Câu hỏi thiếu dữ liệu sẽ chờ shop xem.
+          AI dựa vào bài đăng và sản phẩm để soạn tin riêng; câu hỏi thiếu dữ liệu sẽ chờ shop duyệt.
         </div>
         <div className="fc-settings-actions">
-          <button type="button" className={`btn ${data?.settings.autoReply ? 'btn-outline' : 'btn-primary'} btn-sm`}
-            disabled={!!busy || !data} onClick={() => run('settings', () => client.setAutoReply(!data!.settings.autoReply),
-              data?.settings.autoReply ? 'Đã tắt tự gửi.' : 'Đã lưu dữ liệu AI và bật tự gửi cho comment mới.')}>
-            {busy === 'settings' ? 'Đang lưu…' : data?.settings.autoReply ? 'Tắt tự gửi' : 'Bật AI tự nhắn riêng'}
-          </button>
           <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || !data}
+            aria-describedby="fc-knowledge-status fc-knowledge-help"
             onClick={() => run('knowledge', () => client.saveSettings(data!.settings.autoReply), 'Đã cập nhật dữ liệu AI trên máy chủ.')}>
             {busy === 'knowledge' ? 'Đang lưu…' : 'Cập nhật dữ liệu AI'}
           </button>
-          <span className="hint">{data?.settings.updatedAt
-            ? `${data.settings.productCount} sản phẩm · lưu ${relativeTime(data.settings.updatedAt)}`
-            : 'Chưa lưu sản phẩm và FAQ lên máy chủ'}</span>
+          <span id="fc-knowledge-status" className={data?.settings.updatedAt ? 'hint' : 'fc-warning'}>
+            {data?.settings.updatedAt ? `${data.settings.productCount} sản phẩm · lưu ${relativeTime(data.settings.updatedAt)}`
+              : <><span aria-hidden="true">⚠</span> Chưa lưu sản phẩm và FAQ lên máy chủ</>}
+          </span>
         </div>
-        <p className="fc-note">Dữ liệu dùng bản đã lưu gần nhất. Sau khi đổi sản phẩm hoặc FAQ, bấm cập nhật.
-          Mỗi comment chỉ được một private reply trong 7 ngày; khách cần nhắn lại để mở cửa sổ trò chuyện 24 giờ.</p>
+        <p id="fc-knowledge-help" className="fc-note">Cập nhật lại sau khi đổi sản phẩm hoặc FAQ để AI dùng dữ liệu mới nhất.</p>
+        <div className="fc-info"><span className="fc-info-icon" aria-hidden="true">i</span>
+          <p>Mỗi bình luận chỉ được một tin nhắn riêng trong 7 ngày. Khách cần nhắn lại để mở cửa sổ trò chuyện 24 giờ.</p>
+        </div>
       </div>
 
       <div className="fc-toolbar">
-        <label className="fc-search">Tìm bình luận<input className="pc-input" type="search" value={query}
-          onChange={(e) => setQuery(e.target.value)} placeholder="Tên khách, nội dung, mã bài đăng" /></label>
+        <label className="fc-search">Tìm bình luận<span className="fc-search-field">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+          <input className="pc-input" type="search" value={query}
+            onChange={(e) => setQuery(e.target.value)} placeholder="Tên khách, nội dung, mã bài đăng" /></span></label>
         <label>Trạng thái<select className="pc-input" value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="all">Tất cả</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || loading} onClick={reload}>Làm mới</button>
-        <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || !data?.pending || !data.settings.updatedAt}
+        <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || loading} onClick={reload}><span aria-hidden="true">↻</span> Làm mới</button>
+        <button type="button" className="btn btn-outline btn-sm fc-process" disabled={!!busy || !data?.pending || !data.settings.updatedAt}
           onClick={() => run('process', client.process, 'Đã xử lý thêm hàng chờ.')}>
           {busy === 'process' ? 'AI đang xử lý…' : `Xử lý hàng chờ (${data?.pending ?? 0})`}
         </button>
       </div>
-      <div role="status" aria-live="polite" className="hint">{loading ? 'Đang cập nhật bình luận…' : `Hiển thị ${comments.length} bình luận trong 100 bình luận mới nhất`}</div>
-      {!loading && !data?.comments.length ? <div className="card pc-empty">
+      <div role="status" aria-live="polite" className="fc-count">{loading ? 'Đang cập nhật bình luận…' : data?.comments.length ? `Hiển thị ${comments.length} bình luận trong 100 bình luận mới nhất` : ''}</div>
+      {!loading && !data?.comments.length ? <div className="card pc-empty fc-empty">
+        <span className="fc-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2v-10A8.5 8.5 0 0 1 10.5 3h2a8.5 8.5 0 0 1 8.5 8.5Z" /><path d="M7 9h9M7 14h6" /></svg></span>
         <h3>Chưa có bình luận</h3><p>Comment mới sẽ xuất hiện sau khi Page đăng ký webhook <b>feed</b>.
           Hãy lưu dữ liệu AI trước khi dùng tính năng này.</p>
+        <div className="fc-empty-actions">
+          <Link className="btn btn-outline btn-sm" href="/cau-hinh-ai">Đi tới cài đặt dữ liệu AI</Link>
+          <Link className="fc-empty-link" href="/cai-dat?tab=channels">Kiểm tra kết nối Fanpage →</Link>
+        </div>
       </div> : <div className="fc-workspace">
         <div className="card fc-list" aria-label="Danh sách bình luận">
           {!comments.length && <p className="pc-empty">Không có bình luận phù hợp.</p>}

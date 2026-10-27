@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   try {
     const pageId = marketingPageId();
     const [posts, sends] = await Promise.all([listPosts(), readRemarketingSends(pageId)]);
-    const onPage = posts.filter((p) => p.status === 'published' && p.externalId).slice(0, STATS_LIMIT);
+    const onPage = posts.filter((p) => p.status === 'published' && p.externalId?.startsWith(`${pageId}_`)).slice(0, STATS_LIMIT);
 
     let insightsError: string | null = null;
     let stats = new Map<string, { reactions: number; comments: number; shares: number }>();

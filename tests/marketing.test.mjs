@@ -197,6 +197,42 @@ test('Facebook engagement reads each post with the token in a header and survive
   assert.ok(calls.every((c) => c.auth === 'Bearer page-token' && !c.url.includes('page-token')));
 });
 
+test('performance only requests engagement for the connected Page, including after switching Pages', async () => {
+  process.env.PAGE_ID = '111';
+  process.env.PAGE_ACCESS_TOKEN = 'page-token';
+  process.env.DATABASE_URL = 'postgresql://test-only';
+  delete process.env.DASHBOARD_KEY;
+  delete process.env.NODE_ENV;
+  const load = loader();
+  const oldPosts = Array.from({ length: 25 }, (_, i) => ({
+    id: `old-${i}`, status: 'published', channel: 'facebook', externalId: `222_${i}`, content: '',
+  }));
+  let posts = oldPosts;
+  load('lib/services/postsPostgres.ts').listPosts = async () => posts;
+  load('lib/services/marketingInsights.ts').readRemarketingSends = async () => [];
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(new URL(url).pathname);
+    return Response.json({ reactions: { summary: { total_count: 5 } } });
+  };
+  const route = load('app/api/marketing/performance/route.ts');
+  const read = async () => {
+    const response = await route.GET(new Request('http://localhost/api/marketing/performance'));
+    assert.equal(response.status, 200);
+    return (await response.json()).posts;
+  };
+  assert.deepEqual((await read()).items, []);
+  assert.equal(calls.length, 0);
+  posts = [...oldPosts, { id: 'new', status: 'published', channel: 'facebook', externalId: '111_9', content: '' }];
+  const result = await read();
+  assert.deepEqual(calls, ['/v26.0/111_9']);
+  assert.equal(result.insightsError, null);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].id, 'new');
+  assert.equal(result.items[0].reactions, 5);
+  assert.equal(posts.length, 26);
+});
+
 test('Facebook engagement reports which permission the token is missing', async () => {
   const fb = loader()('lib/services/facebookPage.ts');
   process.env.PAGE_ACCESS_TOKEN = 'page-token';
