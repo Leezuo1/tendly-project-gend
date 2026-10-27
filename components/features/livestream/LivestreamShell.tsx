@@ -104,9 +104,19 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
     setComment({ ...comment, text: '' });
   };
   const s = snapshot.summary;
+  const goLive = () => void run(() => liveClient.goLive(session.id), 'Đã bắt đầu live demo');
 
   return (
     <>
+      {session.waiting && (
+        <div className="card pc-notice">
+          <b>⏳ Phiên đã sẵn sàng — đang chờ bạn bật live.</b>
+          <span>{session.platform === 'demo'
+            ? ' Bấm "Giả lập bật live" để kịch bản bình luận bắt đầu.'
+            : ' Mở Facebook, chọn Phát trực tiếp trên Trang của shop. Tendly tự nhận stream trong vài giây.'}</span>
+          {session.platform === 'demo' && <button type="button" className="btn btn-primary btn-sm" onClick={goLive}>▶ Giả lập bật live</button>}
+        </div>
+      )}
       <div className="card">
         <div className="card-head">
           <h2>{live ? '🔴' : '⏹️'} {session.title}</h2>
@@ -245,7 +255,9 @@ export function LivestreamShell() {
   const [platform, setPlatform] = useState<'demo' | 'facebook'>('demo');
   const [title, setTitle] = useState('');
   const [sources, setSources] = useState<LiveSourceOption[] | null>(null);
-  const [sourceKey, setSourceKey] = useState('');
+  // 'auto' = tạo phiên trước rồi bật live trên Facebook, Tendly tự nhận video Live
+  const [sourceKey, setSourceKey] = useState('auto');
+  const [withMini, setWithMini] = useState(true);
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
@@ -256,11 +268,18 @@ export function LivestreamShell() {
   const start = async (e: FormEvent) => {
     e.preventDefault();
     const source = sources?.find((s) => `${s.kind}:${s.id}` === sourceKey);
-    if (platform === 'facebook' && !source) return onToast('Chọn video Live hoặc bài đăng làm nguồn bình luận');
+    if (platform === 'facebook' && sourceKey !== 'auto' && !source) return onToast('Chọn video Live hoặc bài đăng làm nguồn bình luận');
     setStarting(true);
+    // Flow: tạo phiên trên Tendly → (cửa sổ hỗ trợ bật ra ngay) → người bán bật live trên Facebook → tự nhận stream
+    const created = liveClient.start(platform === 'demo'
+      ? { platform, title, waitForLive: true }
+      : sourceKey === 'auto' ? { platform, title, sourceKind: 'auto' } : { platform, title, sourceKind: source!.kind, sourceId: source!.id });
+    // Mở cửa sổ NGAY trong cú bấm (trình duyệt chặn cửa sổ mở sau đó)
+    const mini = withMini ? openLiveMini(created.then((s) => s.id)) : null;
     try {
-      const session = await liveClient.start({ platform, title, ...(source ? { sourceKind: source.kind, sourceId: source.id } : {}) });
+      const session = await created;
       setActiveId(session.id);
+      if (mini && (await mini) === 'blocked') onToast('Trình duyệt chặn cửa sổ hỗ trợ — bấm "Mở cửa sổ nổi" bên dưới');
       list.reload();
     } catch (err) {
       onToast(errorText(err));
@@ -292,10 +311,15 @@ export function LivestreamShell() {
                 </div>
                 {platform === 'facebook' && (
                   <select className="pc-input" value={sourceKey} onChange={(e) => setSourceKey(e.target.value)}>
-                    <option value="">{sources ? (sources.length ? '— Chọn video Live / bài đăng —' : 'Không đọc được nguồn từ Fanpage') : 'Đang tải...'}</option>
+                    <option value="auto">🔄 Tự nhận video khi tôi bật live trên Facebook (khuyên dùng)</option>
+                    <option value="" disabled>{sources ? (sources.length ? '— hoặc chọn video Live / bài đăng có sẵn —' : 'Không đọc được nguồn từ Fanpage') : 'Đang tải...'}</option>
                     {sources?.map((s) => <option key={`${s.kind}:${s.id}`} value={`${s.kind}:${s.id}`}>{s.kind === 'live_video' ? '🔴 ' : '📝 '}{s.title}</option>)}
                   </select>
                 )}
+                <label className="live-row" style={{ justifyContent: 'flex-start' }}>
+                  <input type="checkbox" checked={withMini} onChange={(e) => setWithMini(e.target.checked)} />
+                  Mở cửa sổ hỗ trợ nổi trên màn hình khi bắt đầu
+                </label>
                 <div className="live-row">
                   <input className="pc-input" placeholder="Tên phiên (tuỳ chọn)" value={title} onChange={(e) => setTitle(e.target.value)} />
                   <button className="btn btn-primary" disabled={starting}>{starting ? 'Đang bắt đầu...' : 'Bắt đầu'}</button>

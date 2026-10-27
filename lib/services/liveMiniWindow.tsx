@@ -3,7 +3,10 @@
 /**
  * Mở cửa sổ nhỏ hỗ trợ live, luôn nổi trên cùng (Document Picture-in-Picture — Chrome/Edge),
  * kéo đặt cạnh màn hình phát live. Trình duyệt không hỗ trợ thì mở popup nhỏ /livestream/mini.
- * Dashboard nào cũng gọi được: openLiveMini(sessionId).
+ *
+ * Trình duyệt chỉ cho mở cửa sổ NGAY TRONG cú bấm của người dùng, nên hàm nhận cả Promise mã phiên:
+ * cửa sổ mở trước (hiện "Đang tạo phiên…"), phiên tạo xong thì hiện dữ liệu. Ví dụ:
+ *   onClick={() => openLiveMini(liveClient.start({...}).then((s) => s.id))}
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -37,12 +40,23 @@ function copyStyles(target: Document) {
   }
 }
 
-export async function openLiveMini(sessionId: string): Promise<'pip' | 'popup' | 'blocked'> {
+function Placeholder({ text }: { text: string }) {
+  return <div className="live-mini"><span className="live-mini-empty">{text}</span></div>;
+}
+
+export type MiniOpenResult = 'pip' | 'popup' | 'blocked';
+
+export async function openLiveMini(session: string | Promise<string>): Promise<MiniOpenResult> {
   const pipApi = (window as unknown as { documentPictureInPicture?: DocumentPictureInPicture }).documentPictureInPicture;
   if (pipApi?.requestWindow) {
+    let pip: Window | null = null;
     try {
       pipApi.window?.close(); // mỗi lúc chỉ 1 cửa sổ nổi
-      const pip = await pipApi.requestWindow(SIZE);
+      pip = await pipApi.requestWindow(SIZE); // gọi trước mọi await khác để còn trong cú bấm
+    } catch {
+      pip = null; // bị chặn / không hỗ trợ thật → popup
+    }
+    if (pip) {
       copyStyles(pip.document);
       pip.document.title = 'Tendly Live';
       pip.document.body.style.margin = '0';
@@ -51,16 +65,32 @@ export async function openLiveMini(sessionId: string): Promise<'pip' | 'popup' |
       pip.document.body.appendChild(container);
       const unregister = registerLiveSurface(pip);
       const root = createRoot(container);
-      root.render(<LiveMiniPanel sessionId={sessionId} fullUrl={`${location.origin}/livestream`} />);
       pip.addEventListener('pagehide', () => {
         unregister();
         root.unmount();
       }, { once: true });
+      root.render(<Placeholder text="Đang tạo phiên live…" />);
+      try {
+        const id = await session;
+        root.render(<LiveMiniPanel sessionId={id} fullUrl={`${location.origin}/livestream`} />);
+      } catch {
+        root.render(<Placeholder text="Không tạo được phiên live. Đóng cửa sổ này và thử lại." />);
+      }
       return 'pip';
-    } catch {
-      // Người dùng từ chối / trình duyệt chặn → dùng popup
     }
   }
-  const popup = window.open(miniUrl(sessionId), 'tendly-live-mini', `width=${SIZE.width},height=${SIZE.height}`);
-  return popup ? 'popup' : 'blocked';
+  // Popup: mở ngay trong cú bấm bằng trang thật (một số trình duyệt chặn popup trang trống),
+  // có mã phiên rồi mới chuyển tới đúng phiên
+  const ready = typeof session === 'string' ? session : null;
+  const popup = window.open(ready ? miniUrl(ready) : '/livestream/mini?pending=1', 'tendly-live-mini',
+    `width=${SIZE.width},height=${SIZE.height}`);
+  if (!popup) return 'blocked';
+  if (!ready) {
+    try {
+      popup.location.href = miniUrl(await session);
+    } catch {
+      popup.close();
+    }
+  }
+  return 'popup';
 }

@@ -166,9 +166,11 @@ Trang **Livestream** (`/livestream`) giúp shop bán hàng trong lúc live. Tend
 - `facebook`: bình luận của một video Live hoặc một bài đăng, đọc qua Graph API.
 - Muốn có TikTok/Shopee Live thì viết thêm adapter tương ứng.
 
+**Flow:** bấm **Bắt đầu** trên Tendly. Cửa sổ hỗ trợ nổi bật ra ngay và chờ người bán bật live trên Facebook. Tendly tự nhận video Live của Trang rồi bắt đầu hỗ trợ.
+
 **Chạy demo:**
-1. `npm run db:migrate` (migration `009-livestream.sql`).
-2. Mở `/livestream`, chọn **Live demo**, bấm **Bắt đầu**.
+1. `npm run db:migrate` (migration `009-livestream.sql` và `010-live-waiting.sql`).
+2. Mở `/livestream`, chọn **Live demo**, bấm **Bắt đầu**. Trong cửa sổ hỗ trợ, bấm **Giả lập bật live**.
 3. Bình luận xuất hiện dần theo kịch bản. Có thể gõ thêm bình luận tay.
 
 **Chi phí AI thấp:**

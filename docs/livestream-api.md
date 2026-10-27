@@ -24,6 +24,18 @@ apply(await liveClient.end(id));                                                
 const overview = await liveClient.insights();                                     // dashboard tổng quan
 ```
 
+## Flow bắt đầu live
+
+1. Người bán bấm **Bắt đầu phiên** trên Tendly. Facebook chọn `sourceKind: 'auto'`, demo gửi `waitForLive: true`.
+2. Cửa sổ hỗ trợ **bật ra ngay trong cú bấm đó**: `openLiveMini(liveClient.start(...).then((s) => s.id))`.
+3. Cửa sổ hiện màn hình chờ (`snapshot.session.waiting = true`) kèm hướng dẫn bật live.
+4. Người bán bật **Phát trực tiếp** trên Trang của shop.
+   - Mỗi lượt `sync`, Tendly dò `/{page}/live_videos?broadcast_status=["LIVE"]` (tối đa 10 giây/lần, để không hết hạn mức API của Trang).
+   - Thấy video thì tự gắn video đó làm nguồn bình luận, đặt `liveAt`, và cửa sổ tự chuyển sang hỗ trợ bán hàng.
+   - Phiên demo thì gọi `liveClient.goLive(id)` (nút "Giả lập bật live").
+
+Lưu ý: Meta chỉ cho Trang có **từ 100 người theo dõi** phát Live. Trang chưa đủ thì pitch bằng phiên demo.
+
 ## Cửa sổ nổi hỗ trợ lúc live
 
 `openLiveMini(sessionId)` trong `lib/services/liveMiniWindow.tsx` mở **cửa sổ nhỏ luôn nằm trên cùng** (Document Picture-in-Picture, Chrome/Edge). Người bán kéo cửa sổ này đặt cạnh màn hình đang phát live. Cửa sổ hiện:
@@ -46,6 +58,7 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
 | GET | `/api/live/sessions` | | `{ sessions: LiveSessionListItem[] }` |
 | POST | `/api/live/sessions` | `{ platform, sourceKind?, sourceId?, title?, knowledge }` | `{ session }` |
 | GET | `/api/live/sessions/:id` | | `LiveSnapshot` (không kéo bình luận mới) |
+| POST | `/api/live/sessions/:id/go-live` | (chỉ phiên demo đang chờ) | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/sync` | | `LiveSnapshot` (kéo bình luận mới, phân loại) |
 | POST | `/api/live/sessions/:id/on-air` | `{ sku \| null }` | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/comments` | `{ authorName, text }` (chỉ phiên demo) | `LiveSnapshot` |
