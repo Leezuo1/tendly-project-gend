@@ -11,6 +11,7 @@ import { MarketingDataNotice } from '@/components/features/marketing/MarketingDa
 import { useMarketingData } from '@/lib/hooks/useMarketingData';
 import { useLiveSession } from '@/lib/hooks/useLiveSession';
 import { liveClient } from '@/lib/services/liveClient';
+import { miniUrl, openLiveMini } from '@/lib/services/liveMiniWindow';
 import type { LiveGroup, LiveIntent, LiveOrderStatus, LiveSnapshot, LiveSourceOption } from '@/lib/types/live';
 import { formatMoney } from '@/lib/utils/format';
 
@@ -73,7 +74,6 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
 }) {
   const { session, stats } = snapshot;
   const live = session.status === 'live';
-  const [comment, setComment] = useState({ name: '', text: '' });
   const run = async (action: () => Promise<LiveSnapshot>, ok?: string) => {
     try {
       apply(await action());
@@ -82,20 +82,35 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
       onToast(errorText(e));
     }
   };
-  const addComment = (e: FormEvent) => {
-    e.preventDefault();
-    if (!comment.text.trim()) return;
-    void run(() => liveClient.addComment(session.id, comment.name, comment.text));
-    setComment({ ...comment, text: '' });
+  const openMini = async () => {
+    const how = await openLiveMini(session.id);
+    onToast(how === 'pip' ? 'Đã mở cửa sổ nổi — kéo đặt cạnh màn hình live'
+      : how === 'popup' ? 'Trình duyệt không hỗ trợ cửa sổ nổi, đã mở cửa sổ nhỏ'
+        : 'Trình duyệt chặn cửa sổ bật lên, hãy cho phép popup');
+  };
+  const copyMiniLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${location.origin}${miniUrl(session.id)}`);
+      onToast('Đã chép link — mở trên điện thoại (cần nhập mã quản trị lần đầu)');
+    } catch {
+      onToast(`${location.origin}${miniUrl(session.id)}`);
+    }
   };
   const s = snapshot.summary;
 
   return (
     <>
+      {session.waiting && (
+        <div className="card pc-notice">
+          <b>⏳ Phiên đã sẵn sàng — đang chờ bạn bật live.</b>
+          <span> Mở Facebook, chọn Phát trực tiếp trên Trang của shop. Tendly tự nhận stream trong vài giây.</span>
+          <a className="btn btn-primary btn-sm" href="https://www.facebook.com/live/producer" target="_blank" rel="noreferrer">Mở Facebook Live ↗</a>
+        </div>
+      )}
       <div className="card">
         <div className="card-head">
           <h2>{live ? '🔴' : '⏹️'} {session.title}</h2>
-          <span className="hint">{session.platform === 'demo' ? 'Phiên demo' : 'Facebook'} · bắt đầu {time(session.startedAt)}</span>
+          <span className="hint">Facebook · bắt đầu {time(session.liveAt ?? session.startedAt)}</span>
         </div>
         <div className="live-stats">
           <div><b>{stats.comments}</b><span>bình luận</span></div>
@@ -116,6 +131,8 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
             </select>
           </label>
           {snapshot.onAir && <span className="hint">{formatMoney(snapshot.onAir.price)} · còn {snapshot.onAir.remaining}</span>}
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void openMini()}>🪟 Mở cửa sổ nổi</button>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => void copyMiniLink()}>📱 Link cho điện thoại</button>
           {live && (
             <button type="button" className="btn btn-outline btn-sm pc-danger"
               onClick={() => window.confirm('Kết thúc phiên live và tạo báo cáo?') && void run(() => liveClient.end(session.id), 'Đã kết thúc phiên')}>
@@ -196,13 +213,6 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
 
       <div className="card">
         <div className="card-head"><h2>Bình luận mới nhất</h2></div>
-        {live && session.platform === 'demo' && (
-          <form className="live-row" onSubmit={addComment}>
-            <input className="pc-input" placeholder="Tên khách" value={comment.name} onChange={(e) => setComment({ ...comment, name: e.target.value })} />
-            <input className="pc-input" placeholder="Gõ bình luận thử, vd: chốt M trắng" value={comment.text} onChange={(e) => setComment({ ...comment, text: e.target.value })} />
-            <button className="btn btn-primary btn-sm" disabled={!comment.text.trim()}>Gửi bình luận</button>
-          </form>
-        )}
         {snapshot.recent.map((c) => (
           <div key={c.commentId} className="live-comment">
             <span className="hint">{time(c.createdAt)}</span>
@@ -225,25 +235,33 @@ export function LivestreamShell() {
   const list = useMarketingData(liveClient.sessions);
   const [activeId, setActiveId] = useState<string | null>(null);
   const { snapshot, error, apply, reload } = useLiveSession(activeId);
-  const [platform, setPlatform] = useState<'demo' | 'facebook'>('demo');
   const [title, setTitle] = useState('');
   const [sources, setSources] = useState<LiveSourceOption[] | null>(null);
-  const [sourceKey, setSourceKey] = useState('');
+  // 'auto' = tạo phiên trước rồi bật live trên Facebook, Tendly tự nhận video Live
+  const [sourceKey, setSourceKey] = useState('auto');
+  const [withMini, setWithMini] = useState(true);
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    if (platform !== 'facebook' || sources) return;
+    if (sources) return;
     liveClient.sources().then((r) => setSources(r.sources), (e) => { setSources([]); onToast(errorText(e)); });
-  }, [platform, sources]);
+  }, [sources]);
 
   const start = async (e: FormEvent) => {
     e.preventDefault();
     const source = sources?.find((s) => `${s.kind}:${s.id}` === sourceKey);
-    if (platform === 'facebook' && !source) return onToast('Chọn video Live hoặc bài đăng làm nguồn bình luận');
+    if (sourceKey !== 'auto' && !source) return onToast('Chọn video Live hoặc bài đăng làm nguồn bình luận');
     setStarting(true);
+    // Flow: tạo phiên trên Tendly → (cửa sổ hỗ trợ bật ra ngay) → người bán bật live trên Facebook → tự nhận stream
+    const created = liveClient.start(sourceKey === 'auto' || !source
+      ? { platform: 'facebook', title, sourceKind: 'auto' }
+      : { platform: 'facebook', title, sourceKind: source.kind, sourceId: source.id });
+    // Mở cửa sổ NGAY trong cú bấm (trình duyệt chặn cửa sổ mở sau đó)
+    const mini = withMini ? openLiveMini(created.then((s) => s.id)) : null;
     try {
-      const session = await liveClient.start({ platform, title, ...(source ? { sourceKind: source.kind, sourceId: source.id } : {}) });
+      const session = await created;
       setActiveId(session.id);
+      if (mini && (await mini) === 'blocked') onToast('Trình duyệt chặn cửa sổ hỗ trợ — bấm "Mở cửa sổ nổi" bên dưới');
       list.reload();
     } catch (err) {
       onToast(errorText(err));
@@ -268,17 +286,19 @@ export function LivestreamShell() {
               <form className="card" onSubmit={start}>
                 <div className="card-head"><h2>Bắt đầu phiên live</h2></div>
                 <div className="live-row">
-                  <button type="button" className={`chip${platform === 'demo' ? ' selected' : ''}`} onClick={() => setPlatform('demo')}>🎬 Live demo</button>
-                  <button type="button" className={`chip${platform === 'facebook' ? ' selected' : ''}`} onClick={() => setPlatform('facebook')}>Facebook</button>
+                  <button type="button" className="chip selected">Facebook</button>
                   <button type="button" className="chip" disabled title="Sắp ra mắt">TikTok · sắp ra mắt</button>
                   <button type="button" className="chip" disabled title="Sắp ra mắt">Shopee · sắp ra mắt</button>
                 </div>
-                {platform === 'facebook' && (
-                  <select className="pc-input" value={sourceKey} onChange={(e) => setSourceKey(e.target.value)}>
-                    <option value="">{sources ? (sources.length ? '— Chọn video Live / bài đăng —' : 'Không đọc được nguồn từ Fanpage') : 'Đang tải...'}</option>
+                <select className="pc-input" value={sourceKey} onChange={(e) => setSourceKey(e.target.value)}>
+                    <option value="auto">🔄 Tự nhận video khi tôi bật live trên Facebook (khuyên dùng)</option>
+                    <option value="" disabled>{sources ? (sources.length ? '— hoặc chọn video Live / bài đăng có sẵn —' : 'Không đọc được nguồn từ Fanpage') : 'Đang tải...'}</option>
                     {sources?.map((s) => <option key={`${s.kind}:${s.id}`} value={`${s.kind}:${s.id}`}>{s.kind === 'live_video' ? '🔴 ' : '📝 '}{s.title}</option>)}
-                  </select>
-                )}
+                </select>
+                <label className="live-row" style={{ justifyContent: 'flex-start' }}>
+                  <input type="checkbox" checked={withMini} onChange={(e) => setWithMini(e.target.checked)} />
+                  Mở cửa sổ hỗ trợ nổi trên màn hình khi bắt đầu
+                </label>
                 <div className="live-row">
                   <input className="pc-input" placeholder="Tên phiên (tuỳ chọn)" value={title} onChange={(e) => setTitle(e.target.value)} />
                   <button className="btn btn-primary" disabled={starting}>{starting ? 'Đang bắt đầu...' : 'Bắt đầu'}</button>

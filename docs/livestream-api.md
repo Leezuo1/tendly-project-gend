@@ -15,14 +15,39 @@ Mọi API cần mã quản trị `DASHBOARD_KEY` (header `Authorization: Bearer 
 const { snapshot, error, apply, reload } = useLiveSession(sessionId);
 // snapshot: LiveSnapshot | null — tự cập nhật khi đang live
 
-await liveClient.start({ platform: 'demo', title: 'Live tối thứ 6' });          // phiên demo (kịch bản ~3 phút)
-await liveClient.start({ platform: 'facebook', sourceKind: 'post', sourceId });  // nguồn lấy từ liveClient.sources()
+await liveClient.start({ platform: 'facebook', sourceKind: 'auto', title: 'Live tối thứ 6' }); // tự nhận video khi bật live
+await liveClient.start({ platform: 'facebook', sourceKind: 'post', sourceId });                // hoặc nguồn có sẵn từ liveClient.sources()
 apply(await liveClient.setOnAir(id, 'AT-01'));                                    // mẫu đang lên sóng
 const r = await liveClient.approve(id, group.key, text, group.revision);          // nhắn riêng cả nhóm
 apply(await liveClient.updateOrder(id, order.id, 'confirmed'));
 apply(await liveClient.end(id));                                                  // kết thúc → snapshot.summary
 const overview = await liveClient.insights();                                     // dashboard tổng quan
 ```
+
+## Flow bắt đầu live
+
+1. Người bán bấm **Bắt đầu phiên** trên Tendly với `sourceKind: 'auto'`.
+2. Cửa sổ hỗ trợ **bật ra ngay trong cú bấm đó**: `openLiveMini(liveClient.start(...).then((s) => s.id))`.
+3. Cửa sổ hiện màn hình chờ (`snapshot.session.waiting = true`) kèm hướng dẫn bật live.
+4. Người bán bật **Phát trực tiếp** trên Trang của shop.
+   - Mỗi lượt `sync`, Tendly dò `/{page}/live_videos?broadcast_status=["LIVE"]` (tối đa 10 giây/lần, để không hết hạn mức API của Trang).
+   - Thấy video thì tự gắn video đó làm nguồn bình luận, đặt `liveAt`, và cửa sổ tự chuyển sang hỗ trợ bán hàng.
+
+Lưu ý: Meta chỉ cho Trang có **từ 100 người theo dõi** phát Live. Trang chưa đủ điều kiện thì chọn một **bài đăng** làm nguồn bình luận để thử.
+
+## Cửa sổ nổi hỗ trợ lúc live
+
+`openLiveMini(sessionId)` trong `lib/services/liveMiniWindow.tsx` mở **cửa sổ nhỏ luôn nằm trên cùng** (Document Picture-in-Picture, Chrome/Edge). Người bán kéo cửa sổ này đặt cạnh màn hình đang phát live. Cửa sổ hiện:
+- Mẫu đang lên sóng và số còn lại.
+- Cảnh báo hết hàng, phàn nàn, đổi trả.
+- 3 mẫu nên lên sóng tiếp theo.
+- Các nhóm chờ nhắn riêng. Nút gửi bấm 2 lần mới gửi, không dùng `confirm()`.
+- Bình luận mới.
+
+Trình duyệt không hỗ trợ cửa sổ nổi thì hàm mở popup `/livestream/mini?session=…`. Link đó cũng mở được trên điện thoại.
+Hàm trả về `'pip' | 'popup' | 'blocked'`. Phải gọi hàm **trong lúc người dùng bấm nút**, vì trình duyệt chỉ cho mở cửa sổ khi có thao tác của người dùng.
+
+Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, cửa sổ nổi) **chung một vòng cập nhật**, nên không gọi `sync` trùng nhau. Khi tab chính bị ẩn nhưng cửa sổ nổi vẫn mở, dữ liệu vẫn tiếp tục cập nhật.
 
 ## Endpoints
 
@@ -34,7 +59,6 @@ const overview = await liveClient.insights();                                   
 | GET | `/api/live/sessions/:id` | | `LiveSnapshot` (không kéo bình luận mới) |
 | POST | `/api/live/sessions/:id/sync` | | `LiveSnapshot` (kéo bình luận mới, phân loại) |
 | POST | `/api/live/sessions/:id/on-air` | `{ sku \| null }` | `LiveSnapshot` |
-| POST | `/api/live/sessions/:id/comments` | `{ authorName, text }` (chỉ phiên demo) | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/groups/:key/approve` | `{ text, revision }` | `LiveSendResult & { revision }` |
 | PATCH | `/api/live/sessions/:id/orders/:orderId` | `{ status }` | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/end` | | `LiveSnapshot` có `summary` |
@@ -64,8 +88,7 @@ const overview = await liveClient.insights();                                   
 ## Nhắn riêng
 
 - `liveClient.approve` tự gọi lại API cho tới khi gửi hết, vì mỗi lần API chỉ gửi tối đa 15 tin. Kết quả có dạng `{ sent, failed, notAllowed, unknown, remaining }`.
-- Phiên **demo** chỉ giả lập gửi.
-- Phiên **Facebook** gửi Private Reply thật qua Meta:
+- Gửi Private Reply thật qua Meta:
   - Hệ thống kiểm tra `can_reply_privately` cho từng bình luận trước khi gửi.
   - Tin nào không rõ đã gửi hay chưa (`unknown`) thì **không tự gửi lại**.
   - Meta chỉ cho nhắn riêng **1 lần cho mỗi bình luận, trong 7 ngày**.
@@ -78,4 +101,4 @@ Phần lớn bình luận được xử lý **bằng luật**: nhận ý định
 2. Cần soạn 1 câu trả lời chung cho nhóm tư vấn size hoặc nhóm câu hỏi khác.
 3. Viết tóm tắt và gợi ý nhập hàng: 1 lần khi kết thúc phiên.
 
-Trong lần chạy thử phiên demo (57 bình luận), AI chỉ được gọi 6 lần.
+Trong lần chạy thử với 57 bình luận, AI chỉ được gọi 6 lần.

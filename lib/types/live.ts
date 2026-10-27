@@ -4,7 +4,7 @@
 // ============================================================
 
 /** Nguồn bình luận. Lõi không phụ thuộc nền tảng; TikTok/Shopee sẽ là adapter mới. */
-export type LivePlatform = 'demo' | 'facebook';
+export type LivePlatform = 'facebook';
 export type LiveSourceKind = 'live_video' | 'post';
 
 export type LiveIntent =
@@ -27,6 +27,12 @@ export interface LiveSession {
   endedAt: number | null;
   /** Số lần gọi AI trong phiên — để thấy chi phí thấp vì phần lớn xử lý bằng luật. */
   aiCalls: number;
+  /** Lúc stream thật sự bắt đầu; null khi phiên đã tạo nhưng người bán chưa bật live. */
+  liveAt: number | null;
+  /**
+   * true = đang chờ người bán bật live. Tendly tự nhận video Live của Trang (dò ~10 giây/lần).
+   */
+  waiting: boolean;
 }
 
 export interface LiveComment {

@@ -1,9 +1,8 @@
 /**
  * Shop duyệt 1 câu trả lời cho cả nhóm → nhắn riêng (Private Reply) cho từng người bình luận trong nhóm.
  * Giống sendCommentPrivateReply (lib/services/facebookComments.ts): đặt chỗ trong DB trước khi gửi,
- * kết quả mơ hồ thì để "unknown" và không bao giờ tự gửi lại. Phiên demo chỉ giả lập gửi.
+ * kết quả mơ hồ thì để "unknown" và không bao giờ tự gửi lại.
  */
-import { randomUUID } from 'node:crypto';
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
 import { graphRead } from '@/lib/services/facebookComments';
 import type { LiveOrderItem, LiveSendResult } from '@/lib/types/live';
@@ -64,7 +63,7 @@ async function sendFacebook(pageId: string, commentId: string, text: string): Pr
  */
 export async function approveGroup(pageId: string, sessionId: string, groupKey: string, text: string, revision: number,
   db: Database = getMessengerPool(), now = Date.now()): Promise<LiveSendResult & { revision: number }> {
-  const { session, products } = await loadSession(pageId, sessionId, db);
+  const { products } = await loadSession(pageId, sessionId, db);
   const group = (await db.query('SELECT * FROM live_groups WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey])).rows[0];
   if (!group) throw new LiveError('Không tìm thấy nhóm bình luận.', 404);
   if (Number(group.revision) !== revision) throw new LiveError('Câu trả lời của nhóm vừa thay đổi. Hãy tải lại rồi duyệt.', 409);
@@ -108,10 +107,7 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
     let outcome: Outcome;
     let messageId: string | null = null;
     let recipientId: string | null = null;
-    if (session.platform === 'demo' || m.comment_id.startsWith('manual-')) {
-      outcome = 'sent';
-      messageId = `demo-${randomUUID()}`;
-    } else if (now - Number(m.created_at) >= WEEK) {
+    if (now - Number(m.created_at) >= WEEK) {
       outcome = 'not_allowed'; // Meta chỉ cho nhắn riêng trong 7 ngày
     } else {
       ({ outcome, messageId, recipientId } = await sendFacebook(pageId, m.comment_id, message));
@@ -126,7 +122,7 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
         await db.query(`UPDATE live_orders SET status='awaiting_info', updated_at=$3
           WHERE session_id=$1 AND customer_id=$2 AND status='draft'`, [sessionId, m.author_id, sentAt]);
       }
-      if (recipientId && messageId && session.platform === 'facebook') {
+      if (recipientId && messageId) {
         try {
           await savePostgresMessages([{ pageId, psid: recipientId, messageId, direction: 'out', timestamp: sentAt, text: message, attachments: [] }], db);
         } catch { /* Messenger echo sẽ đồng bộ lại */ }

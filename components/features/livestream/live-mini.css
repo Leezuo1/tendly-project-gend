@@ -1,0 +1,50 @@
+/* Cửa sổ nhỏ hỗ trợ live — tự đủ (có biến màu, nút), vì cửa sổ nổi là một tài liệu HTML riêng. */
+.live-mini-root {
+  --canvas: #FAF9F8; --coral: #F06A6A; --coral-deep: #D8514F; --ink: #2B211E; --ink-soft: #6B5F5A;
+  --sand: #F1EAE3; --line: #E7DED7; --moss: #4B6358; --moss-soft: #DCE6E1; --paper: #FFFFFF;
+  --amber: #B8790A; --amber-soft: #F5E7CC; --alert-bg: #FCE4E2;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--canvas); color: var(--ink); line-height: 1.4; min-height: 100vh; margin: 0;
+}
+.live-mini-root *, .live-mini-root *::before, .live-mini-root *::after { box-sizing: border-box; }
+.live-mini { display: flex; flex-direction: column; gap: 10px; padding: 12px; font-size: 13px; }
+.live-mini b { font-weight: 700; }
+.live-mini .btn { font: inherit; font-size: 12px; font-weight: 600; border-radius: 8px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+.live-mini .btn:disabled { opacity: 0.5; cursor: default; }
+.live-mini .btn-outline { background: var(--paper); color: var(--ink); border: 1px solid var(--line); }
+.live-mini .btn-primary { background: var(--coral); color: #fff; border: 1px solid var(--coral); }
+.live-mini select { font: inherit; font-size: 12px; width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
+
+.live-mini-head { display: flex; align-items: center; gap: 8px; }
+.live-mini-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-soft); }
+.live-mini-dot.on { background: #E02424; animation: live-mini-pulse 1.4s ease-in-out infinite; }
+@keyframes live-mini-pulse { 50% { opacity: 0.35; } }
+.live-mini-time { font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.live-mini-link { margin-left: auto; font-size: 12px; color: var(--coral-deep); text-decoration: none; font-weight: 600; }
+
+.live-mini-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.live-mini-stats > div { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 6px 4px; text-align: center; display: flex; flex-direction: column; }
+.live-mini-stats b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-mini-stats span { font-size: 11px; color: var(--ink-soft); }
+
+.live-mini-onair { display: flex; flex-direction: column; gap: 4px; background: var(--paper); border: 2px solid var(--moss); border-radius: 12px; padding: 10px; }
+.live-mini-onair.level-low { border-color: var(--amber); background: var(--amber-soft); }
+.live-mini-onair.level-out { border-color: var(--coral-deep); background: var(--alert-bg); }
+.live-mini-onair > b { font-size: 15px; }
+.live-mini-big { font-size: 22px; font-weight: 800; }
+.live-mini-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+
+.live-mini-alerts { display: flex; flex-direction: column; gap: 4px; background: var(--alert-bg); border-radius: 10px; padding: 8px 10px; color: var(--coral-deep); font-weight: 600; }
+.live-mini-section { display: flex; flex-direction: column; gap: 6px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.live-mini-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.live-mini-muted, .live-mini-empty { color: var(--ink-soft); }
+.live-mini-feed { gap: 4px; }
+.live-mini-comment { font-size: 12.5px; border-top: 1px solid var(--sand); padding-top: 4px; }
+.live-mini-tag { margin-left: 6px; font-size: 10.5px; font-weight: 700; color: var(--moss); background: var(--moss-soft); border-radius: 6px; padding: 1px 6px; }
+.live-mini-toast { position: sticky; bottom: 8px; background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 12px; text-align: center; font-weight: 600; }
+.live-mini-waiting { display: flex; flex-direction: column; gap: 12px; align-items: stretch; background: var(--paper); border: 1px dashed var(--line); border-radius: 12px; padding: 14px; }
+.live-mini-waiting ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.live-mini-waiting .btn { font-size: 13px; padding: 9px 12px; text-align: center; text-decoration: none; }
+.live-mini-spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--sand); border-top-color: var(--coral); animation: live-mini-spin 0.9s linear infinite; align-self: center; }
+@keyframes live-mini-spin { to { transform: rotate(360deg); } }
+.live-mini-error { color: var(--coral-deep); font-weight: 600; }

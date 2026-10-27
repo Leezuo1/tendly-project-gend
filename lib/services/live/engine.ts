@@ -16,7 +16,7 @@ import type {
   LiveStockItem, LiveSummary,
 } from '@/lib/types/live';
 import { classifyLiveComment, groupKeyOf, HUMAN_INTENTS, type LiveProduct } from '@/lib/services/live/classify';
-import { demoFirstSku, listNewComments, type IncomingComment } from '@/lib/services/live/sources';
+import { findLiveVideo, listNewComments, type IncomingComment } from '@/lib/services/live/sources';
 import { groupTemplate } from '@/lib/services/live/templates';
 
 export type Database = Pick<Pool, 'query' | 'connect'>;
@@ -30,6 +30,7 @@ const ASKING: LiveIntent[] = ['price', 'stock', 'view', 'size_advice', 'question
 const QUEUE_WINDOW = 10 * 60_000;
 const ACTIVE_ORDER: LiveOrderStatus[] = ['draft', 'awaiting_info', 'confirmed'];
 const MAX_COMMENTS_READ = 5000;
+const DETECT_EVERY = 10_000;
 
 // ---------------------------------------------------------------- rows
 
@@ -37,6 +38,7 @@ interface SessionRow {
   id: string; page_id: string; platform: LivePlatform; source_kind: LiveSourceKind | null; source_id: string | null;
   source_post_id: string | null; title: string; status: 'live' | 'ended'; on_air_sku: string | null;
   knowledge_json: unknown; started_at: string; ended_at: string | null; ai_calls: number; summary_json: LiveSummary | null;
+  live_at: string | null; synced_at: string;
 }
 
 export interface LoadedSession {
@@ -51,6 +53,8 @@ function toSession(row: SessionRow): LiveSession {
     id: row.id, platform: row.platform, sourceKind: row.source_kind, sourceId: row.source_id, title: row.title,
     status: row.status, onAirSku: row.on_air_sku, startedAt: Number(row.started_at),
     endedAt: row.ended_at === null ? null : Number(row.ended_at), aiCalls: Number(row.ai_calls),
+    liveAt: row.live_at === null || row.live_at === undefined ? null : Number(row.live_at),
+    waiting: row.status === 'live' && (row.live_at === null || row.live_at === undefined),
   };
 }
 
@@ -72,18 +76,23 @@ export interface CreateSessionInput {
   sourceId: string | null;
   sourcePostId: string | null;
   title: string;
+  /** Tạo phiên trước khi bật stream: Tendly tự nhận video Live của Trang khi người bán bật live. */
+  waitForLive?: boolean;
 }
 
 export async function createSession(pageId: string, input: CreateSessionInput, knowledge: AiKnowledge,
   db: Database = getMessengerPool(), now = Date.now()): Promise<LiveSession> {
   if (!knowledge.products.length) throw new LiveError('Cần có sản phẩm trong Cấu hình AI trước khi bắt đầu phiên live.');
-  if (input.platform === 'facebook' && !input.sourceId) throw new LiveError('Chọn video Live hoặc bài đăng làm nguồn bình luận.');
+  if (input.platform === 'facebook' && !input.sourceId && !input.waitForLive) {
+    throw new LiveError('Chọn video Live hoặc bài đăng làm nguồn bình luận.');
+  }
   const id = randomUUID();
   await db.query(`INSERT INTO live_sessions
-    (id,page_id,platform,source_kind,source_id,source_post_id,title,status,on_air_sku,knowledge_json,started_at)
-    VALUES($1,$2,$3,$4,$5,$6,$7,'live',$8,$9::jsonb,$10)`,
+    (id,page_id,platform,source_kind,source_id,source_post_id,title,status,on_air_sku,knowledge_json,started_at,live_at)
+    VALUES($1,$2,$3,$4,$5,$6,$7,'live',$8,$9::jsonb,$10,$11)`,
   [id, pageId, input.platform, input.sourceKind, input.sourceId, input.sourcePostId, input.title,
-    input.platform === 'demo' ? demoFirstSku(knowledge.products) : null, JSON.stringify(knowledge), now]);
+    null, JSON.stringify(knowledge), now,
+    input.waitForLive ? null : now]);
   return (await loadSession(pageId, id, db)).session;
 }
 
@@ -348,27 +357,27 @@ export async function enrichWithAi(pageId: string, sessionId: string, db: Databa
 
 export async function syncSession(pageId: string, sessionId: string, db: Database = getMessengerPool(),
   now = Date.now()): Promise<LiveSnapshot> {
-  const loaded = await loadSession(pageId, sessionId, db);
-  if (loaded.session.status === 'live') {
+  let loaded = await loadSession(pageId, sessionId, db);
+  if (loaded.session.waiting && loaded.row.platform === 'facebook') {
+    // Đang chờ người bán bật live trên Facebook: dò video LIVE của Trang (tối đa 10 giây/lần, tránh hết hạn mức API)
+    if (now - Number(loaded.row.synced_at) >= DETECT_EVERY) {
+      await db.query('UPDATE live_sessions SET synced_at=$2 WHERE id=$1', [sessionId, now]);
+      const found = await findLiveVideo(pageId, Number(loaded.row.started_at), AbortSignal.timeout(9000));
+      if (found) {
+        await db.query(`UPDATE live_sessions SET source_kind='live_video', source_id=$3, source_post_id=$4, live_at=$5
+          WHERE page_id=$1 AND id=$2 AND live_at IS NULL`, [pageId, sessionId, found.id, found.postId, now]);
+        loaded = await loadSession(pageId, sessionId, db);
+      }
+    }
+  }
+  if (loaded.session.status === 'live' && !loaded.session.waiting) {
     const incoming = await listNewComments({
       id: sessionId, platform: loaded.row.platform, sourceKind: loaded.row.source_kind, sourceId: loaded.row.source_id,
-      startedAt: loaded.session.startedAt, products: loaded.products,
-    }, now, AbortSignal.timeout(9000));
+    }, AbortSignal.timeout(9000));
     await ingestComments(pageId, sessionId, incoming, db, now);
     await enrichWithAi(pageId, sessionId, db, AbortSignal.timeout(25_000), now);
   }
   return buildSnapshot(pageId, sessionId, db, now);
-}
-
-/** Bình luận gõ tay trong phiên demo (người thuyết trình gõ trực tiếp khi pitch). */
-export async function addDemoComment(pageId: string, sessionId: string, authorName: string, text: string,
-  db: Database = getMessengerPool(), now = Date.now()) {
-  const { session } = await loadSession(pageId, sessionId, db);
-  if (session.platform !== 'demo') throw new LiveError('Chỉ thêm bình luận tay được trong phiên demo.');
-  const name = authorName.trim().slice(0, 100) || 'Khách demo';
-  await ingestComments(pageId, sessionId, [{
-    commentId: `manual-${randomUUID()}`, authorId: `manual:${name}`, authorName: name, text: text.slice(0, 2000), createdAt: now,
-  }], db, now);
 }
 
 // ---------------------------------------------------------------- snapshot

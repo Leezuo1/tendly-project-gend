@@ -164,14 +164,15 @@ Trước khi gọi Meta, hệ thống giữ chỗ gửi trong database. Timeout/
 Trang **Livestream** (`/livestream`) giúp shop bán hàng trong lúc live. Tendly đọc bình luận, **gom các câu hỏi trùng ý thành nhóm**, **giữ hàng và tạo đơn nháp** cho khách chốt, và **nhắn riêng cho cả nhóm sau khi shop duyệt một lần**. Kết thúc phiên thì Tendly làm tóm tắt và gợi ý nhập hàng.
 
 **Lõi tách khỏi nền tảng.** `lib/services/live/engine.ts` không phụ thuộc Facebook. Nguồn bình luận là các adapter trong `lib/services/live/sources.ts`:
-- `demo`: kịch bản live khoảng 3 phút dùng SKU thật trong Cấu hình AI. Dùng để pitch vì Meta chỉ cho Trang có từ 100 người theo dõi phát Live.
 - `facebook`: bình luận của một video Live hoặc một bài đăng, đọc qua Graph API.
 - Muốn có TikTok/Shopee Live thì viết thêm adapter tương ứng.
 
-**Chạy demo:**
-1. `npm run db:migrate` (migration `009-livestream.sql`).
-2. Mở `/livestream`, chọn **Live demo**, bấm **Bắt đầu**.
-3. Bình luận xuất hiện dần theo kịch bản. Có thể gõ thêm bình luận tay.
+**Flow:** bấm **Bắt đầu** trên Tendly. Cửa sổ hỗ trợ nổi bật ra ngay và chờ người bán bật live trên Facebook. Tendly tự nhận video Live của Trang rồi bắt đầu hỗ trợ.
+
+**Chạy thử:**
+1. `npm run db:migrate` (migration `009-livestream.sql` và `010-live-waiting.sql`).
+2. Mở `/livestream`, để nguồn **Tự nhận video khi tôi bật live**, bấm **Bắt đầu**, rồi bật Phát trực tiếp trên Trang (Meta yêu cầu Trang có từ 100 người theo dõi). Chưa đủ điều kiện thì chọn một **bài đăng** làm nguồn và bình luận thử dưới bài.
+3. Bình luận mới hiện lên sau khoảng 3 giây. Tendly gom nhóm, tạo đơn nháp, và shop duyệt để nhắn riêng.
 
 **Chi phí AI thấp:**
 - Ý định, sản phẩm, màu, size, số lượng được nhận bằng luật. Luật hiểu cả chữ không dấu và chữ viết tắt.
