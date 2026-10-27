@@ -35,6 +35,28 @@ const post = (extra = {}) => ({ id: '111_500', message: 'Áo thun cotton\nThông
 const comment = (extra = {}) => ({ id: '500_600', message: 'Áo bao nhiêu shop?', from: { id: '222', name: 'Nguyễn An' },
   created_time: '2026-10-26T09:00:00+0700', like_count: 2, ...extra });
 
+test('post filters use Vietnamese search, inclusive Vietnam dates and never mutate the feed', () => {
+  const { filterFacebookPosts } = loader()('lib/utils/facebookPosts.ts');
+  const now = Date.parse('2026-10-27T12:00:00Z');
+  const posts = [
+    { id: 'old', message: 'Áo thun', createdAt: Date.parse('2026-10-20T16:59:59Z'), reactions: 100, comments: 0, shares: 0 },
+    { id: 'week', message: 'Áo mới', createdAt: Date.parse('2026-10-20T17:00:00Z'), reactions: null, comments: null, shares: null },
+    { id: 'today', message: 'Áo THUN mới', createdAt: Date.parse('2026-10-26T17:00:00Z'), reactions: 0, comments: 5, shares: 0 },
+    { id: 'tomorrow', message: 'Túi vải', createdAt: Date.parse('2026-10-27T17:00:00Z'), reactions: 0, comments: 2, shares: 0 },
+  ];
+  const defaults = { query: '', period: 'all', start: '', end: '', sort: 'newest' };
+  const ids = (filters) => filterFacebookPosts(posts, { ...defaults, ...filters }, now).map((p) => p.id);
+  assert.deepEqual(ids({ query: 'ao thun' }), ['today', 'old']);
+  assert.deepEqual(ids({ period: 'today' }), ['today']);
+  assert.deepEqual(ids({ period: 'week' }), ['today', 'week']);
+  assert.deepEqual(ids({ period: 'custom', start: '2026-10-21', end: '2026-10-27' }), ['today', 'week']);
+  assert.deepEqual(ids({ period: 'custom', start: '2026-10-28', end: '2026-10-27' }), []);
+  assert.deepEqual(ids({ period: 'custom', end: '2026-10-20' }), ['old']);
+  assert.deepEqual(ids({ sort: 'comments' }), ['today', 'tomorrow', 'week', 'old']);
+  assert.deepEqual(ids({ sort: 'engagement' }), ['old', 'today', 'tomorrow', 'week']);
+  assert.deepEqual(posts.map((p) => p.id), ['old', 'week', 'today', 'tomorrow']);
+});
+
 test('feed reads real published Page posts with counts and opaque pagination; token and next URL stay server-side', async () => {
   const load = setup(); let called;
   globalThis.fetch = async (url, init) => {

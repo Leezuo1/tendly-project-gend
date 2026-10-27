@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
 import { useMarketingData } from '@/lib/hooks/useMarketingData';
 import { marketingClient } from '@/lib/services/marketingClient';
@@ -11,6 +11,7 @@ import { MarketingDataNotice } from './MarketingDataNotice';
 
 interface ApprovalQueueTabProps {
   onToast?: (msg: string) => void;
+  onCountChange: (count: number | null) => void;
 }
 
 interface RowState {
@@ -37,7 +38,7 @@ function timeLeft(until: number, now: number) {
 }
 
 /** Khách nhắn Fanpage trong 24 giờ qua: AI soạn tin nhắn lại theo đúng hội thoại, chủ shop duyệt rồi mới gửi. */
-export function ApprovalQueueTab({ onToast }: ApprovalQueueTabProps) {
+export function ApprovalQueueTab({ onToast, onCountChange }: ApprovalQueueTabProps) {
   const { data, error, loading, reload } = useMarketingData(marketingClient.customers);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const toast = (msg: string) => onToast?.(msg);
@@ -47,6 +48,10 @@ export function ApprovalQueueTab({ onToast }: ApprovalQueueTabProps) {
     .filter((c) => c.canMessageUntil !== null)
     .sort((a, b) => (b.lastInAt ?? 0) - (a.lastInAt ?? 0)), [data]);
   const visible = queue.filter((c) => !rows[c.psid]?.skipped);
+  const pendingCount = visible.filter((c) => !rows[c.psid]?.sentAt).length;
+  useEffect(() => {
+    onCountChange(loading || error ? null : pendingCount);
+  }, [loading, error, pendingCount, onCountChange]);
 
   const draft = async (c: MarketingCustomer) => {
     update(c.psid, { drafting: true });

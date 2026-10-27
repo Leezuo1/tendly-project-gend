@@ -1,18 +1,47 @@
-.marketing-root .fp-root { display: grid; gap: 16px; }
+.marketing-root .fp-root { display: grid; gap: 14px; }
 .marketing-root .fp-heading, .marketing-root .fp-comments-head, .marketing-root .fp-content-head, .marketing-root .fp-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .marketing-root .fp-heading h2 { font-size: 19px; margin-bottom: 5px; }
 .marketing-root .fp-muted, .marketing-root .fp-date { font-size: 13px; color: var(--ink-soft); }
-.marketing-root .fp-post { padding: 0; overflow: hidden; }
-.marketing-root .fp-summary { display: flex; align-items: center; gap: 16px; padding: 20px; cursor: pointer; list-style: none; }
+.marketing-root .fp-post { padding: 0; overflow: hidden; position: relative; margin: 0; }
+.marketing-root .fp-summary { display: flex; align-items: center; gap: 14px; padding: 14px 18px; cursor: pointer; list-style: none; }
 .marketing-root .fp-summary::-webkit-details-marker { display: none; }
 .marketing-root .fp-summary:hover { background: var(--canvas); }
-.marketing-root .fp-thumbnail { width: 64px; height: 64px; flex-shrink: 0; background: var(--moss-soft); color: var(--moss); font: 700 32px Georgia, serif; border-radius: 12px; display: grid; place-items: center; overflow: hidden; }
+.marketing-root .fp-thumbnail { width: 56px; height: 56px; aspect-ratio: 1; flex-shrink: 0; background: var(--moss-soft); color: var(--moss); border-radius: 8px; display: grid; place-items: center; overflow: hidden; }
+.marketing-root .fp-thumbnail > svg { width: 26px; height: 26px; }
 .marketing-root .fp-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
-.marketing-root .fp-overview { display: grid; gap: 5px; min-width: 0; flex: 1; }
+.marketing-root .fp-overview { display: grid; gap: 5px; min-width: 0; flex: 1; padding-right: 210px; }
 .marketing-root .fp-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .marketing-root .fp-stats { display: flex; gap: 6px 18px; flex-wrap: wrap; color: var(--ink-soft); font-size: 12px; }
+.marketing-root .fp-stats > span { display: inline-flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.marketing-root .fp-stats svg { width: 15px; height: 15px; }
+.marketing-root .fp-stat-muted > svg { opacity: .65; }
+.marketing-root .fp-quick-actions { position: absolute; right: 54px; top: 26px; display: flex; align-items: center; gap: 8px; }
+.marketing-root .fp-root .btn, .marketing-root .fp-external { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; }
+.marketing-root .fp-external { width: 44px; border: 1px solid var(--line); border-radius: 9px; }
+.marketing-root .fp-external:hover { background: var(--moss-soft); }
+.marketing-root .fp-compose { color: var(--moss); background: var(--paper); }
 .marketing-root .fp-chevron { flex-shrink: 0; color: var(--ink-soft); }
-.marketing-root .fp-post[open] > summary .fp-chevron { transform: rotate(180deg); }
+.marketing-root .fp-details[open] > summary .fp-chevron { transform: rotate(180deg); }
+.marketing-root .fp-post-list { display: grid; gap: 10px; min-width: 0; }
+.marketing-root .fp-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) 180px 215px; gap: 12px; align-items: end; }
+.marketing-root .fp-toolbar label { min-width: 0; display: grid; gap: 7px; }
+.marketing-root .fp-filter-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.marketing-root .fp-search-input { position: relative; display: flex; align-items: center; }
+.marketing-root .fp-search-input > svg { position: absolute; left: 12px; color: var(--ink-soft); pointer-events: none; }
+.marketing-root .fp-search-input > input { padding-left: 38px; }
+.marketing-root .fp-toolbar .pc-input { min-height: 44px; }
+.marketing-root .fp-date-range { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; grid-column: 1 / -1; max-width: 450px; }
+.marketing-root .fp-results-info { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; color: var(--ink-soft); font-size: 12px; }
+.marketing-root .fp-results-info > :first-child { color: var(--ink); font-weight: 600; }
+.marketing-root .fp-footer { justify-content: center; padding: 8px 0; }
+.marketing-root .fp-footer > .btn { min-width: 220px; }
+.marketing-root .fp-loading { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 13px; }
+.marketing-root .fp-skeletons { display: grid; gap: 10px; }
+.marketing-root .fp-skeleton { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.marketing-root .fp-skeleton > span { width: 56px; height: 56px; border-radius: 8px; background: var(--sand); }
+.marketing-root .fp-skeleton > div { display: grid; gap: 10px; flex: 1; }
+.marketing-root .fp-skeleton i { display: block; height: 12px; width: 65%; border-radius: 5px; background: var(--sand); }
+.marketing-root .fp-skeleton i + i { width: 35%; }
 .marketing-root .fp-expanded { border-top: 1px solid var(--line); }
 .marketing-root .fp-post-content { padding: 24px; }
 .marketing-root .fp-content-head { margin-bottom: 18px; font-size: 13px; }
@@ -37,8 +66,19 @@
 .marketing-root .fp-error { margin: 12px 0; font-size: 13px; color: #96382f; }
 .marketing-root .fp-root button:disabled { opacity: .55; cursor: not-allowed; }
 .marketing-root .fp-root :is(summary, button, a):focus-visible { outline: 2px solid var(--moss); outline-offset: -3px; }
+@media (max-width: 1100px) {
+  .marketing-root .fp-compose > span { display: none; }
+  .marketing-root .fp-compose { width: 44px; padding: 0; }
+  .marketing-root .fp-overview { padding-right: 104px; }
+  .marketing-root .fp-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .marketing-root .fp-search { grid-column: 1 / -1; }
+}
 @media (max-width: 600px) {
-  .marketing-root .fp-summary { padding: 16px 12px; gap: 10px; }
+  .marketing-root .fp-summary { padding: 14px 12px 66px; gap: 10px; }
+  .marketing-root .fp-overview { padding-right: 0; }
+  .marketing-root .fp-quick-actions { top: 88px; right: 12px; }
+  .marketing-root .fp-compose { width: auto; padding: 0 12px; }
+  .marketing-root .fp-compose > span { display: inline; }
   .marketing-root .fp-thumbnail { width: 44px; height: 44px; border-radius: 8px; }
   .marketing-root .fp-title { font-size: 14px; }
   .marketing-root .fp-post-content, .marketing-root .fp-comments { padding: 18px 14px; }
