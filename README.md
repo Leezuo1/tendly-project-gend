@@ -156,3 +156,28 @@ Luồng gửi sử dụng `POST /{PAGE_ID}/messages` với `recipient: { comment
 Comment được lưu trước khi webhook trả 200; `after()` xử lý tối đa ba comment trong mỗi lần, với giới hạn thời gian. Hàng chờ nằm trong PostgreSQL, tác vụ AI bị gián đoạn có thể nhận lại sau hai phút. Khi còn tồn đọng, dùng **Xử lý hàng chờ** hoặc gọi định kỳ `POST /api/facebook/comments`, header `Authorization: Bearer <DASHBOARD_KEY>`, JSON `{"action":"process"}` từ scheduler của hạ tầng. Chưa cài scheduler/queue service riêng; lưu lượng lớn hoặc tiến trình bị dừng có thể cần lần xử lý tiếp theo.
 
 Trước khi gọi Meta, hệ thống giữ chỗ gửi trong database. Timeout/HTTP 5xx/kết quả không rõ hoặc tiến trình dừng ở trạng thái `sending` không tự gửi lại; kiểm tra Messenger trước khi xử lý thủ công. Meta đã chấp nhận nhưng database lỗi sẽ báo cần đồng bộ, tránh gửi lặp. `npm test` kiểm tra SQL bằng PGlite, webhook ký HMAC, cô lập Page, edit/delete, chống gửi đồng thời, tắt tự động giữa chừng và lỗi gửi; Meta/Gemini được giả lập, không gửi tin thật cho khách.
+
+## Livestream ("Live Cockpit")
+
+Trang **Livestream** (`/livestream`) giúp shop bán hàng trong lúc live. Tendly đọc bình luận, **gom các câu hỏi trùng ý thành nhóm**, **giữ hàng và tạo đơn nháp** cho khách chốt, và **nhắn riêng cho cả nhóm sau khi shop duyệt một lần**. Kết thúc phiên thì Tendly làm tóm tắt và gợi ý nhập hàng.
+
+**Lõi tách khỏi nền tảng.** `lib/services/live/engine.ts` không phụ thuộc Facebook. Nguồn bình luận là các adapter trong `lib/services/live/sources.ts`:
+- `demo`: kịch bản live khoảng 3 phút dùng SKU thật trong Cấu hình AI. Dùng để pitch vì Meta chỉ cho Trang có từ 100 người theo dõi phát Live.
+- `facebook`: bình luận của một video Live hoặc một bài đăng, đọc qua Graph API.
+- Muốn có TikTok/Shopee Live thì viết thêm adapter tương ứng.
+
+**Chạy demo:**
+1. `npm run db:migrate` (migration `009-livestream.sql`).
+2. Mở `/livestream`, chọn **Live demo**, bấm **Bắt đầu**.
+3. Bình luận xuất hiện dần theo kịch bản. Có thể gõ thêm bình luận tay.
+
+**Chi phí AI thấp:**
+- Ý định, sản phẩm, màu, size, số lượng được nhận bằng luật. Luật hiểu cả chữ không dấu và chữ viết tắt.
+- Câu trả lời mẫu điền giá và tồn kho từ dữ liệu shop, không bịa phí ship hay chính sách (những thông tin này lấy từ FAQ).
+- AI chỉ dùng cho câu hỏi luật không hiểu (gọi theo lô), cho câu trả lời chung của nhóm tư vấn, và cho tóm tắt cuối phiên. Số lần gọi AI hiện trong `stats.aiCalls`.
+
+**Nhắn riêng (Facebook):**
+- Dùng chung cách giữ chỗ trước khi gửi như phần bình luận Fanpage. Kiểm tra `can_reply_privately` cho từng bình luận. Không tự gửi lại khi chưa rõ kết quả.
+- Bình luận của bài/video đang live bị luồng bình luận Fanpage bỏ qua, nên không có cảnh gửi trùng.
+
+API và hợp đồng dữ liệu cho dashboard nằm ở [`docs/livestream-api.md`](docs/livestream-api.md). Test nằm ở `tests/livestream.test.mjs`: chạy trên PGlite, giả lập Meta và Gemini.

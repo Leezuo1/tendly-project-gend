@@ -1,0 +1,19 @@
+/* Trang Livestream chạy thử — dùng lại style Marketing (.marketing-root), chỉ thêm bố cục tối thiểu. */
+.marketing-root .live-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 0; }
+.marketing-root .live-row .pc-input { flex: 1; min-width: 180px; }
+.marketing-root .live-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.marketing-root .live-cols > div > div { padding: 4px 0; font-size: 13.5px; }
+.marketing-root .live-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.marketing-root .live-stats > div { background: var(--sand); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.marketing-root .live-stats b { font-size: 18px; }
+.marketing-root .live-stats span { font-size: 12px; color: var(--ink-soft); }
+.marketing-root .live-group { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+.marketing-root .live-group.human { border-color: var(--amber); }
+.marketing-root .live-group-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+.marketing-root .live-samples { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12.5px; color: var(--ink-soft); }
+.marketing-root .live-samples span { background: var(--sand); border-radius: 8px; padding: 2px 8px; }
+.marketing-root .live-order { border-bottom: 1px solid var(--sand); }
+.marketing-root .live-comment { display: grid; grid-template-columns: 70px 120px 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--sand); font-size: 13.5px; }
+@media (max-width: 720px) {
+  .marketing-root .live-comment { grid-template-columns: 1fr; gap: 2px; }
+}

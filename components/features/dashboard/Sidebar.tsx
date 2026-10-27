@@ -8,7 +8,7 @@ import { useUnrepliedCount } from '@/lib/hooks/useUnrepliedCount';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
 
 interface SidebarProps {
-  currentPath?: 'tong-quan' | 'marketing' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat';
+  currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat';
   activeTab?: DashboardTab;
   setActiveTab?: (tab: DashboardTab) => void;
   onToast: (msg: string) => void;
@@ -24,6 +24,7 @@ export function Sidebar({
   const unrepliedCount = useUnrepliedCount();
   const isTongQuan = currentPath === 'tong-quan';
   const isMarketing = currentPath === 'marketing';
+  const isLivestream = currentPath === 'livestream';
   const isHopThoai = currentPath === 'hop-thoai';
   const isCauHinhAi = currentPath === 'cau-hinh-ai';
   const isCaiDat = currentPath === 'cai-dat';
@@ -87,6 +88,21 @@ export function Sidebar({
             <path d="M18 5a8 8 0 0 1 0 14"></path>
           </svg>
           <span>Marketing</span>
+        </Link>
+
+        {/* Livestream */}
+        <Link
+          href="/livestream"
+          className={`nav-item ${isLivestream ? 'active' : ''}`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="2"></circle>
+            <path d="M16.24 7.76a6 6 0 0 1 0 8.49"></path>
+            <path d="M7.76 16.24a6 6 0 0 1 0-8.49"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            <path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path>
+          </svg>
+          <span>Livestream</span>
         </Link>
 
         {/* Cấu hình AI */}
