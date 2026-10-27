@@ -164,6 +164,17 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
   return { status: outcome, persisted: true, reason };
 }
 
+/** Bài đăng/video đang là nguồn của một phiên live (bảng live_sessions, migration 009). */
+async function isActiveLivePost(pageId: string, postId: string, db: Database): Promise<boolean> {
+  try {
+    const live = await db.query(`SELECT 1 FROM live_sessions WHERE page_id=$1 AND status='live' AND source_post_id=$2 LIMIT 1`,
+      [pageId, postId]);
+    return live.rows.length > 0;
+  } catch {
+    return false; // chưa chạy migration livestream
+  }
+}
+
 async function analyzeComment(pageId: string, db: Database, signal: AbortSignal, commentId?: string) {
   const settings = (await db.query('SELECT * FROM facebook_comment_settings WHERE page_id=$1', [pageId])).rows[0];
   if (!settings) {
@@ -180,6 +191,12 @@ async function analyzeComment(pageId: string, db: Database, signal: AbortSignal,
   if (!result.rowCount) return false;
   const row = result.rows[0];
   try {
+    if (await isActiveLivePost(pageId, row.post_id, db)) {
+      // Bình luận của phiên Livestream được gom nhóm và nhắn riêng ở trang Livestream; không gửi trùng ở đây
+      await db.query(`UPDATE facebook_comments SET status='ignored',reason='Bình luận thuộc phiên Livestream đang chạy, xử lý ở trang Livestream.'
+        WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND processing_at=$4 AND status='processing'`, [pageId, row.comment_id, row.revision, now]);
+      return true;
+    }
     if (!row.text.trim() || row.author_id === pageId || now - Number(row.created_at) >= WEEK) {
       await db.query(`UPDATE facebook_comments SET status='ignored',reason='Bình luận không có văn bản, do Page gửi hoặc đã quá 7 ngày.'
         WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND processing_at=$4 AND status='processing'`, [pageId, row.comment_id, row.revision, now]);
