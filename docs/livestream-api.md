@@ -15,8 +15,8 @@ Mọi API cần mã quản trị `DASHBOARD_KEY` (header `Authorization: Bearer 
 const { snapshot, error, apply, reload } = useLiveSession(sessionId);
 // snapshot: LiveSnapshot | null — tự cập nhật khi đang live
 
-await liveClient.start({ platform: 'demo', title: 'Live tối thứ 6' });          // phiên demo (kịch bản ~3 phút)
-await liveClient.start({ platform: 'facebook', sourceKind: 'post', sourceId });  // nguồn lấy từ liveClient.sources()
+await liveClient.start({ platform: 'facebook', sourceKind: 'auto', title: 'Live tối thứ 6' }); // tự nhận video khi bật live
+await liveClient.start({ platform: 'facebook', sourceKind: 'post', sourceId });                // hoặc nguồn có sẵn từ liveClient.sources()
 apply(await liveClient.setOnAir(id, 'AT-01'));                                    // mẫu đang lên sóng
 const r = await liveClient.approve(id, group.key, text, group.revision);          // nhắn riêng cả nhóm
 apply(await liveClient.updateOrder(id, order.id, 'confirmed'));
@@ -26,15 +26,14 @@ const overview = await liveClient.insights();                                   
 
 ## Flow bắt đầu live
 
-1. Người bán bấm **Bắt đầu phiên** trên Tendly. Facebook chọn `sourceKind: 'auto'`, demo gửi `waitForLive: true`.
+1. Người bán bấm **Bắt đầu phiên** trên Tendly với `sourceKind: 'auto'`.
 2. Cửa sổ hỗ trợ **bật ra ngay trong cú bấm đó**: `openLiveMini(liveClient.start(...).then((s) => s.id))`.
 3. Cửa sổ hiện màn hình chờ (`snapshot.session.waiting = true`) kèm hướng dẫn bật live.
 4. Người bán bật **Phát trực tiếp** trên Trang của shop.
    - Mỗi lượt `sync`, Tendly dò `/{page}/live_videos?broadcast_status=["LIVE"]` (tối đa 10 giây/lần, để không hết hạn mức API của Trang).
    - Thấy video thì tự gắn video đó làm nguồn bình luận, đặt `liveAt`, và cửa sổ tự chuyển sang hỗ trợ bán hàng.
-   - Phiên demo thì gọi `liveClient.goLive(id)` (nút "Giả lập bật live").
 
-Lưu ý: Meta chỉ cho Trang có **từ 100 người theo dõi** phát Live. Trang chưa đủ thì pitch bằng phiên demo.
+Lưu ý: Meta chỉ cho Trang có **từ 100 người theo dõi** phát Live. Trang chưa đủ điều kiện thì chọn một **bài đăng** làm nguồn bình luận để thử.
 
 ## Cửa sổ nổi hỗ trợ lúc live
 
@@ -58,10 +57,8 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
 | GET | `/api/live/sessions` | | `{ sessions: LiveSessionListItem[] }` |
 | POST | `/api/live/sessions` | `{ platform, sourceKind?, sourceId?, title?, knowledge }` | `{ session }` |
 | GET | `/api/live/sessions/:id` | | `LiveSnapshot` (không kéo bình luận mới) |
-| POST | `/api/live/sessions/:id/go-live` | (chỉ phiên demo đang chờ) | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/sync` | | `LiveSnapshot` (kéo bình luận mới, phân loại) |
 | POST | `/api/live/sessions/:id/on-air` | `{ sku \| null }` | `LiveSnapshot` |
-| POST | `/api/live/sessions/:id/comments` | `{ authorName, text }` (chỉ phiên demo) | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/groups/:key/approve` | `{ text, revision }` | `LiveSendResult & { revision }` |
 | PATCH | `/api/live/sessions/:id/orders/:orderId` | `{ status }` | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/end` | | `LiveSnapshot` có `summary` |
@@ -91,8 +88,7 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
 ## Nhắn riêng
 
 - `liveClient.approve` tự gọi lại API cho tới khi gửi hết, vì mỗi lần API chỉ gửi tối đa 15 tin. Kết quả có dạng `{ sent, failed, notAllowed, unknown, remaining }`.
-- Phiên **demo** chỉ giả lập gửi.
-- Phiên **Facebook** gửi Private Reply thật qua Meta:
+- Gửi Private Reply thật qua Meta:
   - Hệ thống kiểm tra `can_reply_privately` cho từng bình luận trước khi gửi.
   - Tin nào không rõ đã gửi hay chưa (`unknown`) thì **không tự gửi lại**.
   - Meta chỉ cho nhắn riêng **1 lần cho mỗi bình luận, trong 7 ngày**.
@@ -105,4 +101,4 @@ Phần lớn bình luận được xử lý **bằng luật**: nhận ý định
 2. Cần soạn 1 câu trả lời chung cho nhóm tư vấn size hoặc nhóm câu hỏi khác.
 3. Viết tóm tắt và gợi ý nhập hàng: 1 lần khi kết thúc phiên.
 
-Trong lần chạy thử phiên demo (57 bình luận), AI chỉ được gọi 6 lần.
+Trong lần chạy thử với 57 bình luận, AI chỉ được gọi 6 lần.

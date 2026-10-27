@@ -16,7 +16,7 @@ import type {
   LiveStockItem, LiveSummary,
 } from '@/lib/types/live';
 import { classifyLiveComment, groupKeyOf, HUMAN_INTENTS, type LiveProduct } from '@/lib/services/live/classify';
-import { demoFirstSku, findLiveVideo, listNewComments, type IncomingComment } from '@/lib/services/live/sources';
+import { findLiveVideo, listNewComments, type IncomingComment } from '@/lib/services/live/sources';
 import { groupTemplate } from '@/lib/services/live/templates';
 
 export type Database = Pick<Pool, 'query' | 'connect'>;
@@ -76,7 +76,7 @@ export interface CreateSessionInput {
   sourceId: string | null;
   sourcePostId: string | null;
   title: string;
-  /** Tạo phiên trước khi bật stream: Facebook tự nhận video Live của Trang, demo chờ bấm "Giả lập bật live". */
+  /** Tạo phiên trước khi bật stream: Tendly tự nhận video Live của Trang khi người bán bật live. */
   waitForLive?: boolean;
 }
 
@@ -91,7 +91,7 @@ export async function createSession(pageId: string, input: CreateSessionInput, k
     (id,page_id,platform,source_kind,source_id,source_post_id,title,status,on_air_sku,knowledge_json,started_at,live_at)
     VALUES($1,$2,$3,$4,$5,$6,$7,'live',$8,$9::jsonb,$10,$11)`,
   [id, pageId, input.platform, input.sourceKind, input.sourceId, input.sourcePostId, input.title,
-    input.platform === 'demo' ? demoFirstSku(knowledge.products) : null, JSON.stringify(knowledge), now,
+    null, JSON.stringify(knowledge), now,
     input.waitForLive ? null : now]);
   return (await loadSession(pageId, id, db)).session;
 }
@@ -373,32 +373,11 @@ export async function syncSession(pageId: string, sessionId: string, db: Databas
   if (loaded.session.status === 'live' && !loaded.session.waiting) {
     const incoming = await listNewComments({
       id: sessionId, platform: loaded.row.platform, sourceKind: loaded.row.source_kind, sourceId: loaded.row.source_id,
-      startedAt: loaded.session.liveAt ?? loaded.session.startedAt, products: loaded.products,
-    }, now, AbortSignal.timeout(9000));
+    }, AbortSignal.timeout(9000));
     await ingestComments(pageId, sessionId, incoming, db, now);
     await enrichWithAi(pageId, sessionId, db, AbortSignal.timeout(25_000), now);
   }
   return buildSnapshot(pageId, sessionId, db, now);
-}
-
-/** Phiên demo đang chờ: bấm "Giả lập bật live" → kịch bản bình luận bắt đầu chạy từ lúc này. */
-export async function goLive(pageId: string, sessionId: string, db: Database = getMessengerPool(), now = Date.now()) {
-  const { session } = await loadSession(pageId, sessionId, db);
-  if (session.platform !== 'demo') throw new LiveError('Phiên Facebook tự bắt đầu khi Tendly nhận được video Live của Trang.');
-  if (session.status !== 'live') throw new LiveError('Phiên live đã kết thúc.', 409);
-  await db.query('UPDATE live_sessions SET live_at=$3 WHERE page_id=$1 AND id=$2 AND live_at IS NULL', [pageId, sessionId, now]);
-}
-
-/** Bình luận gõ tay trong phiên demo (người thuyết trình gõ trực tiếp khi pitch). */
-export async function addDemoComment(pageId: string, sessionId: string, authorName: string, text: string,
-  db: Database = getMessengerPool(), now = Date.now()) {
-  const { session } = await loadSession(pageId, sessionId, db);
-  if (session.platform !== 'demo') throw new LiveError('Chỉ thêm bình luận tay được trong phiên demo.');
-  if (session.waiting) throw new LiveError('Bấm "Giả lập bật live" trước khi thêm bình luận.', 409);
-  const name = authorName.trim().slice(0, 100) || 'Khách demo';
-  await ingestComments(pageId, sessionId, [{
-    commentId: `manual-${randomUUID()}`, authorId: `manual:${name}`, authorName: name, text: text.slice(0, 2000), createdAt: now,
-  }], db, now);
 }
 
 // ---------------------------------------------------------------- snapshot

@@ -64,11 +64,50 @@ const knowledge = {
 };
 const START = Date.UTC(2026, 9, 27, 12);
 
-async function demoSession(load, now = START) {
+/** Phiên Facebook (nguồn là bài đăng 111_500), mẫu đang lên sóng AT-01. */
+async function liveSession(load, now = START) {
   const engine = load('lib/services/live/engine.ts');
-  const session = await engine.createSession('111', { platform: 'demo', sourceKind: null, sourceId: null, sourcePostId: null, title: 'Live thử' },
-    knowledge, pool, now);
+  const session = await engine.createSession('111', { platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500',
+    title: 'Live thử' }, knowledge, pool, now);
+  await engine.setOnAir('111', session.id, 'AT-01', pool);
   return { engine, session };
+}
+
+const NAMES = ['Ngọc Anh', 'Thu Hà', 'Minh Thư', 'Lan Phương', 'Bảo Ngân', 'Khánh Linh', 'Hoài An', 'Thảo Vy', 'Gia Hân', 'Mỹ Duyên',
+  'Quỳnh Như', 'Phương Uyên', 'Hải Yến', 'Diệu Linh', 'Tú Anh', 'Kim Chi', 'Thanh Trúc', 'Ánh Dương', 'Hồng Nhung', 'Bích Ngọc',
+  'Yến Nhi', 'Cẩm Tú', 'Thu Trang', 'Bảo Anh', 'Như Ý'];
+/**
+ * Bình luận live mẫu (mẫu đang lên sóng AT-01): 8 câu hỏi giá trùng ý, chốt đơn, 1 khách chốt 2 món,
+ * 4 người chốt DV-12 (chỉ còn 2), xin xem mẫu, phàn nàn, đổi trả, ship/COD, tư vấn size, spam.
+ */
+const SCRIPT = [
+  [0, 'giá bn shop'], [1, 'xin giá'], [2, 'ib giá'], [3, 'giá sao ạ'], [4, 'giá bn'], [5, 'xin giá ạ'], [6, 'giá bao nhiêu shop'], [7, 'ib giá shop'],
+  [8, '1'], [9, 'chốt M trắng'], [10, 'L đen'], [11, 'x2 Trắng'],
+  [12, 'chốt DV-12 S Vàng'], [13, 'chốt DV-12 M Hồng'], [14, 'chốt DV-12 L Vàng'], [15, 'chốt DV-12 S Hồng'],
+  [16, 'cho xem mẫu DV-12'], [17, 'lên mẫu SM-03 đi shop'], [18, 'xem SM-03 với'], [19, 'ib giá SM-03'],
+  [20, 'đơn hôm trước giao chậm quá, hàng bị lỗi đường may'], [21, 'đổi size được không shop'],
+  [22, 'ship hn bao lâu shop'], [23, 'có COD không'], [24, '45kg mặc size gì vậy shop'], [9, 'lấy thêm 1 cái Xanh navy size XL'],
+  [0, 'đẹp quá 😍'],
+];
+/** Dạng Graph API trả về cho /{post}/comments, mới nhất trước. */
+const graphComments = (base = START) => SCRIPT.map(([author, text], i) => ({
+  id: `500_${i + 1}`, message: text, created_time: new Date(base + i * 2000).toISOString(), from: { id: String(900 + author), name: NAMES[author] },
+})).reverse();
+/** Meta giả lập: đọc bình luận của bài 111_500, cho nhắn riêng mọi bình luận và xác nhận đã gửi. */
+function fakeMeta(base = START) {
+  const sent = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    if (u.includes('/111_500/comments')) return Response.json({ data: graphComments(base) });
+    if (u.includes('can_reply_privately')) return Response.json({ can_reply_privately: true });
+    if (u.endsWith('/111/messages')) {
+      const target = JSON.parse(init.body).recipient.comment_id;
+      sent.push(target);
+      return Response.json({ message_id: `m-${target}`, recipient_id: '7001' });
+    }
+    throw new Error(`unexpected ${u}`);
+  };
+  return sent;
 }
 
 test('classifier: Vietnamese with/without accents, abbreviations, and short comments bound to the on-air product', () => {
@@ -100,50 +139,48 @@ test('classifier: Vietnamese with/without accents, abbreviations, and short comm
   void dv;
 });
 
-test('demo session: grouping, merged orders, stock guard and the on-air queue', async () => {
+test('live session: grouping, merged orders, stock guard and the on-air queue', async () => {
   const load = loader();
-  const { engine, session } = await demoSession(load);
-  assert.equal(session.onAirSku, 'AT-01');
-  const snap = await engine.syncSession('111', session.id, pool, START + 200_000);
-  const again = await engine.syncSession('111', session.id, pool, START + 200_000);
+  const { engine, session } = await liveSession(load);
+  fakeMeta();
+  const NOW = START + 120_000;
+  const snap = await engine.syncSession('111', session.id, pool, NOW);
+  const again = await engine.syncSession('111', session.id, pool, NOW);
   assert.equal(again.stats.comments, snap.stats.comments, 'sync lại không nhân đôi bình luận');
-  assert.ok(snap.stats.comments >= 45);
+  assert.equal(snap.stats.comments, SCRIPT.length);
 
-  // Hàng chục câu hỏi giá mẫu đang lên sóng gom vào đúng 1 nhóm
+  // 8 câu hỏi giá mẫu đang lên sóng gom vào đúng 1 nhóm
   const price = snap.groups.find((g) => g.key === 'price:AT-01');
-  assert.ok(price.count >= 8, `price group = ${price.count}`);
+  assert.equal(price.count, 8);
   assert.match(price.replyText, /\{gia\}/);
-  assert.equal(snap.groups.filter((g) => g.key.startsWith('price:AT-01')).length, 1);
 
   // Khách chốt 2 món khác nhau → 1 đơn 2 dòng
-  const merged = snap.orders.find((o) => o.customerName === 'Hoài An');
+  const merged = snap.orders.find((o) => o.customerName === NAMES[9]);
   assert.equal(merged.items.length, 2);
   assert.equal(merged.commentCount, 2);
 
-  // DV-12 chỉ còn 2: không bán lố, phần còn lại vào nhóm "hết hàng"
-  const dv = snap.stock.find((s) => s.sku === 'DV-12');
+  // DV-12 chỉ còn 2: không bán lố, 2 người chốt sau vào nhóm "hết hàng"
+  const dv = snap.stock.find((x) => x.sku === 'DV-12');
   assert.equal(dv.held, 2);
   assert.equal(dv.remaining, 0);
   assert.equal(dv.level, 'out');
-  const out = snap.groups.find((g) => g.key === 'order_out:DV-12');
-  assert.ok(out && out.count >= 2);
+  assert.equal(snap.groups.find((g) => g.key === 'order_out:DV-12').count, 2);
   const dvItems = snap.orders.flatMap((o) => o.items).filter((i) => i.sku === 'DV-12');
-  assert.equal(dvItems.filter((i) => i.stockOk).reduce((s, i) => s + i.qty, 0), 2);
+  assert.equal(dvItems.filter((i) => i.stockOk).reduce((sum, i) => sum + i.qty, 0), 2);
 
   // Phàn nàn / đổi trả cần shop tự xử lý; câu hỏi ship dùng FAQ của shop
   assert.equal(snap.groups.find((g) => g.intent === 'complaint').needsHuman, true);
   assert.match(snap.groups.find((g) => g.intent === 'shipping').replyText, /30k/);
 
-  // Hàng chờ lên sóng không chứa mẫu đang lên sóng; mẫu hết hàng xếp cuối
-  assert.ok(snap.queue.length >= 1);
-  assert.ok(snap.queue.every((q) => q.sku !== 'AT-01'));
-  assert.equal(snap.queue.at(-1).remaining <= 0 || snap.queue.every((q) => q.remaining > 0), true);
+  // Hàng chờ lên sóng: SM-03 (còn hàng) trước, DV-12 (hết) sau, không chứa mẫu đang lên sóng
+  assert.deepEqual(snap.queue.map((q) => q.sku), ['SM-03', 'DV-12']);
+  assert.match(snap.queue[1].recommendation, /Hết hàng/);
   assert.equal(snap.stats.aiCalls, 0, 'không có GEMINI_API_KEY thì không gọi AI');
 });
 
 test('repeating the same order does not double the quantity or message the customer twice', async () => {
   const load = loader();
-  const { engine, session } = await demoSession(load);
+  const { engine, session } = await liveSession(load);
   const say = (id, text, at) => engine.ingestComments('111', session.id,
     [{ commentId: id, authorId: 'u1', authorName: 'Lan', text, createdAt: START + at }], pool, START + at);
   await say('c1', 'chốt M trắng', 1000);
@@ -157,8 +194,9 @@ test('repeating the same order does not double the quantity or message the custo
 
 test('approving a group sends one private reply per comment, in batches, and moves orders to awaiting info', async () => {
   const load = loader();
-  const { engine, session } = await demoSession(load);
+  const { engine, session } = await liveSession(load);
   const reply = load('lib/services/live/reply.ts');
+  const sentTo = fakeMeta();
   const comments = Array.from({ length: 20 }, (_, i) => ({ commentId: `q${i}`, authorId: `u${i}`, authorName: `Khách ${i}`,
     text: i % 2 ? 'giá bn' : 'xin giá', createdAt: START + i }));
   await engine.ingestComments('111', session.id, comments, pool, START + 100);
@@ -167,14 +205,14 @@ test('approving a group sends one private reply per comment, in batches, and mov
   const group = snap.groups.find((g) => g.key === 'price:AT-01');
   assert.equal(group.count, 20);
 
-  await assert.rejects(reply.approveGroup('111', session.id, group.key, group.replyText, group.revision + 5, pool), /vừa thay đổi/);
-  const first = await reply.approveGroup('111', session.id, group.key, group.replyText, group.revision, pool);
+  await assert.rejects(reply.approveGroup('111', session.id, group.key, group.replyText, group.revision + 5, pool, START + 10_000), /vừa thay đổi/);
+  const first = await reply.approveGroup('111', session.id, group.key, group.replyText, group.revision, pool, START + 10_000);
   assert.equal(first.sent, 15);
   assert.equal(first.remaining, 5);
-  const second = await reply.approveGroup('111', session.id, group.key, group.replyText, first.revision, pool);
+  const second = await reply.approveGroup('111', session.id, group.key, group.replyText, first.revision, pool, START + 10_000);
   assert.equal(second.sent, 5);
   assert.equal(second.remaining, 0);
-  const third = await reply.approveGroup('111', session.id, group.key, group.replyText, second.revision, pool);
+  const third = await reply.approveGroup('111', session.id, group.key, group.replyText, second.revision, pool, START + 10_000);
   assert.equal(third.sent, 0, 'không gửi lại bình luận đã gửi');
   const sentText = (await query(`SELECT reply_text FROM live_comments WHERE session_id=$1 AND comment_id='q3'`, [session.id])).rows[0].reply_text;
   assert.match(sentText, /Khách 3/);
@@ -183,15 +221,16 @@ test('approving a group sends one private reply per comment, in batches, and mov
 
   snap = await engine.buildSnapshot('111', session.id, pool);
   const order = snap.groups.find((g) => g.key === 'order:AT-01');
-  await reply.approveGroup('111', session.id, order.key, order.replyText, order.revision, pool);
+  await reply.approveGroup('111', session.id, order.key, order.replyText, order.revision, pool, START + 10_000);
   snap = await engine.buildSnapshot('111', session.id, pool);
   assert.equal(snap.orders[0].status, 'awaiting_info');
   assert.equal(snap.groups.find((g) => g.key === 'price:AT-01').status, 'sent');
   assert.equal(snap.stats.sentReplies, 21);
+  assert.equal(new Set(sentTo).size, sentTo.length, 'mỗi bình luận chỉ nhắn riêng 1 lần');
 
   // Shop sửa câu trả lời → revision tăng, lần sau phải dùng revision mới
   await engine.ingestComments('111', session.id, [{ commentId: 'q99', authorId: 'u99', authorName: 'Mới', text: 'giá sao', createdAt: START + 500 }], pool);
-  const edited = await reply.approveGroup('111', session.id, group.key, 'Dạ {ten_khach}, giá {gia} ạ', second.revision, pool);
+  const edited = await reply.approveGroup('111', session.id, group.key, 'Dạ {ten_khach}, giá {gia} ạ', second.revision, pool, START + 10_000);
   assert.equal(edited.revision, second.revision + 1);
   assert.equal(edited.sent, 1);
 });
@@ -233,11 +272,11 @@ test('Facebook source: reads comments from Graph, checks can_reply_privately, ne
   assert.equal(snap.recent.find((c) => c.commentId === '500_3').authorId, 'c:500_3');
 
   const group = snap.groups.find((g) => g.key === 'price:AT-01');
-  const result = await reply.approveGroup('111', session.id, group.key, group.replyText, group.revision, pool);
+  const result = await reply.approveGroup('111', session.id, group.key, group.replyText, group.revision, pool, START + 10_000);
   assert.deepEqual({ sent: result.sent, notAllowed: result.notAllowed, unknown: result.unknown }, { sent: 1, notAllowed: 1, unknown: 1 });
   const sends = () => calls.filter((c) => c.method === 'POST').length;
   const before = sends();
-  await reply.approveGroup('111', session.id, group.key, group.replyText, result.revision, pool);
+  await reply.approveGroup('111', session.id, group.key, group.replyText, result.revision, pool, START + 10_000);
   assert.equal(sends(), before, 'bình luận "unknown"/"not_allowed" không bị gửi lại');
   const saved = await query(`SELECT direction, text FROM messenger_messages WHERE message_id='m-500_1'`);
   assert.equal(saved.rows[0].direction, 'out');
@@ -245,7 +284,7 @@ test('Facebook source: reads comments from Graph, checks can_reply_privately, ne
 
 test('AI is used sparingly: one batched call for unclear questions, one reply per advice group, counted per session', async () => {
   const load = loader();
-  const { engine, session } = await demoSession(load);
+  const { engine, session } = await liveSession(load);
   process.env.GEMINI_API_KEY = 'test-key';
   process.env.GEMINI_MODEL = 'test-model';
   const prompts = [];
@@ -275,17 +314,19 @@ test('AI is used sparingly: one batched call for unclear questions, one reply pe
 
 test('ending a session builds the summary and restocking advice; later syncs do nothing', async () => {
   const load = loader();
-  const { engine, session } = await demoSession(load);
-  await engine.syncSession('111', session.id, pool, START + 200_000);
+  const { engine, session } = await liveSession(load);
+  fakeMeta();
+  await engine.syncSession('111', session.id, pool, START + 120_000);
   const ended = await engine.endSession('111', session.id, pool, START + 210_000);
   assert.equal(ended.session.status, 'ended');
   const s = ended.summary;
-  assert.ok(s.totalComments >= 45);
-  assert.ok(s.orders >= 3);
+  assert.equal(s.totalComments, SCRIPT.length);
+  assert.ok(s.orders >= 5);
   assert.equal(s.adviceSource, 'rule');
   assert.equal(s.advice.find((a) => a.sku === 'DV-12').action, 'restock');
   assert.ok(s.topOrdered.length >= 1);
-  assert.ok(s.timeline.length >= 3);
+  assert.ok(s.timeline.length >= 1);
+  globalThis.fetch = async (url) => { throw new Error(`phiên đã kết thúc không được gọi Meta: ${url}`); };
   const after = await engine.syncSession('111', session.id, pool, START + 999_000);
   assert.equal(after.stats.comments, s.totalComments);
   const insights = await engine.readInsights('111', pool);
@@ -316,8 +357,9 @@ test('live APIs require the dashboard key and validate input before touching dat
   const post = (body, headers = {}) => sessions.POST(new Request('http://localhost/api/live/sessions', {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }));
   process.env.DASHBOARD_KEY = 'bi-mat';
-  assert.equal((await post({ platform: 'demo', knowledge })).status, 401);
+  assert.equal((await post({ platform: 'facebook', sourceKind: 'auto', knowledge })).status, 401);
   assert.equal((await post({ platform: 'tiktok', knowledge }, { Authorization: 'Bearer bi-mat' })).status, 400);
+  assert.equal((await post({ platform: 'demo', knowledge }, { Authorization: 'Bearer bi-mat' })).status, 400, 'đã bỏ Live demo');
   assert.equal((await post({ platform: 'facebook', sourceKind: 'post', sourceId: '999_1', knowledge }, { Authorization: 'Bearer bi-mat' })).status, 400);
   const approve = load('app/api/live/sessions/[id]/groups/[key]/approve/route.ts');
   const res = await approve.POST(new Request('http://localhost/x', { method: 'POST', headers: { Authorization: 'Bearer bi-mat' },
@@ -327,7 +369,7 @@ test('live APIs require the dashboard key and validate input before touching dat
 
 test('a single unclear question waits for a batch (5 questions or 20 seconds) before calling AI', async () => {
   const load = loader();
-  const { engine, session } = await demoSession(load);
+  const { engine, session } = await liveSession(load);
   process.env.GEMINI_API_KEY = 'test-key';
   process.env.GEMINI_MODEL = 'test-model';
   let calls = 0;
@@ -344,24 +386,6 @@ test('a single unclear question waits for a batch (5 questions or 20 seconds) be
   assert.equal(await engine.enrichWithAi('111', session.id, pool, AbortSignal.timeout(5000), T + 21_000), 2);
   assert.equal(calls, 2);
   assert.equal(await engine.enrichWithAi('111', session.id, pool, AbortSignal.timeout(5000), T + 60_000), 0, 'không gọi lại');
-});
-
-test('flow "tạo phiên trước, bật live sau": demo waits for "Giả lập bật live" before comments start', async () => {
-  const load = loader();
-  const engine = load('lib/services/live/engine.ts');
-  const session = await engine.createSession('111', { platform: 'demo', sourceKind: null, sourceId: null, sourcePostId: null,
-    title: 'Chờ live', waitForLive: true }, knowledge, pool, START);
-  assert.equal(session.waiting, true);
-  assert.equal(session.liveAt, null);
-  let snap = await engine.syncSession('111', session.id, pool, START + 60_000);
-  assert.equal(snap.stats.comments, 0, 'chưa bật live thì chưa có bình luận');
-  await assert.rejects(engine.addDemoComment('111', session.id, 'A', 'chốt M', pool), /Giả lập bật live/);
-
-  await engine.goLive('111', session.id, pool, START + 60_000);
-  snap = await engine.syncSession('111', session.id, pool, START + 60_000 + 15_000);
-  assert.equal(snap.session.waiting, false);
-  assert.equal(snap.session.liveAt, START + 60_000);
-  assert.ok(snap.stats.comments > 3 && snap.stats.comments < 15, 'kịch bản tính giờ từ lúc bật live');
 });
 
 test('Facebook auto mode binds the Page live video as soon as the seller goes live, polling Graph at most every 10s', async () => {

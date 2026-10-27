@@ -15,12 +15,10 @@ const post = (url: string, body: unknown = {}) => dashboardRequest(url, { method
 const session = (id: string) => `/api/live/sessions/${encodeURIComponent(id)}`;
 
 export interface StartLiveInput {
-  platform: 'demo' | 'facebook';
+  platform: 'facebook';
   /** 'auto' = tạo phiên trước, Tendly tự nhận video Live khi người bán bật stream trên Facebook. */
   sourceKind?: LiveSourceKind | 'auto';
   sourceId?: string;
-  /** Demo: chờ bấm "Giả lập bật live" (giống flow thật: tạo phiên → bật live). */
-  waitForLive?: boolean;
   title?: string;
 }
 
@@ -34,11 +32,7 @@ export const liveClient = {
   snapshot: (id: string) => dashboardRequest(session(id)).then(json<LiveSnapshot>),
   /** Kéo bình luận mới rồi trả snapshot — gọi định kỳ khi đang live (useLiveSession lo việc này). */
   sync: (id: string) => post(`${session(id)}/sync`).then(json<LiveSnapshot>),
-  /** Chỉ phiên demo đang chờ: giả lập người bán vừa bật live. */
-  goLive: (id: string) => post(`${session(id)}/go-live`).then(json<LiveSnapshot>),
   setOnAir: (id: string, sku: string | null) => post(`${session(id)}/on-air`, { sku }).then(json<LiveSnapshot>),
-  /** Chỉ phiên demo: thêm bình luận gõ tay. */
-  addComment: (id: string, authorName: string, text: string) => post(`${session(id)}/comments`, { authorName, text }).then(json<LiveSnapshot>),
   updateOrder: (id: string, orderId: string, status: LiveOrderStatus) =>
     dashboardRequest(`${session(id)}/orders/${encodeURIComponent(orderId)}`, { method: 'PATCH', body: JSON.stringify({ status }) })
       .then(json<LiveSnapshot>),

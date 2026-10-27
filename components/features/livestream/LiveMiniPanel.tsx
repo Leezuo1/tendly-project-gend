@@ -56,21 +56,7 @@ function SendButton({ group, sessionId, onMessage }: { group: LiveGroup; session
 }
 
 /** Phiên đã tạo, người bán chưa bật live: hướng dẫn + tự chuyển sang dữ liệu live khi phát hiện stream. */
-function Waiting({ snapshot, apply }: { snapshot: LiveSnapshot; apply: (s: LiveSnapshot) => void }) {
-  const { session } = snapshot;
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const demo = session.platform === 'demo';
-  const start = async () => {
-    setBusy(true);
-    try {
-      apply(await liveClient.goLive(session.id));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+function Waiting() {
   return (
     <div className="live-mini">
       <div className="live-mini-head">
@@ -85,15 +71,7 @@ function Waiting({ snapshot, apply }: { snapshot: LiveSnapshot; apply: (s: LiveS
           <li>Bấm <b>Phát trực tiếp</b> — Tendly tự nhận stream trong vài giây và cửa sổ này chuyển sang hỗ trợ bán hàng.</li>
         </ol>
         <span className="live-mini-muted">Cứ để cửa sổ này mở, kéo đặt cạnh màn hình live.</span>
-        {demo && (
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void start()}>
-            {busy ? 'Đang bắt đầu…' : '▶ Giả lập bật live (demo)'}
-          </button>
-        )}
-        {!demo && (
-          <a className="btn btn-outline" href="https://www.facebook.com/live/producer" target="_blank" rel="noreferrer">Mở Facebook Live ↗</a>
-        )}
-        {error && <span className="live-mini-error">{error}</span>}
+        <a className="btn btn-primary" href="https://www.facebook.com/live/producer" target="_blank" rel="noreferrer">Mở Facebook Live ↗</a>
       </div>
     </div>
   );
@@ -217,6 +195,6 @@ export function LiveMiniPanel({ sessionId, fullUrl = '/livestream' }: { sessionI
       </div>
     );
   }
-  if (snapshot.session.waiting) return <Waiting snapshot={snapshot} apply={apply} />;
+  if (snapshot.session.waiting) return <Waiting />;
   return <MiniBody snapshot={snapshot} apply={apply} fullUrl={fullUrl} />;
 }

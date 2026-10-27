@@ -19,9 +19,8 @@ export async function GET(request: Request) {
 }
 
 /**
- * Bắt đầu phiên: { platform: 'demo'|'facebook', sourceKind?, sourceId?, waitForLive?, title, knowledge } (knowledge = Cấu hình AI).
- * Facebook + sourceKind 'auto': tạo phiên trước, Tendly tự nhận video Live khi người bán bật stream.
- * Demo + waitForLive: chờ bấm "Giả lập bật live".
+ * Bắt đầu phiên: { platform: 'facebook', sourceKind: 'auto'|'live_video'|'post', sourceId?, title, knowledge } (knowledge = Cấu hình AI).
+ * sourceKind 'auto': tạo phiên trước, Tendly tự nhận video Live khi người bán bật stream trên Facebook.
  */
 export async function POST(request: Request) {
   const denied = requireDashboardKey(request);
@@ -30,16 +29,14 @@ export async function POST(request: Request) {
     const pageId = marketingPageId();
     const body = await readMarketingJson(request);
     const platform = body.platform;
-    if (platform !== 'demo' && platform !== 'facebook') throw new InvalidMarketingRequest('Nền tảng không hợp lệ.');
+    if (platform !== 'facebook') throw new InvalidMarketingRequest('Nền tảng không hợp lệ.');
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200)
-      : platform === 'demo' ? 'Phiên live demo' : 'Phiên live Facebook';
+      : 'Phiên live Facebook';
     let sourceKind: LiveSourceKind | null = null;
     let sourceId: string | null = null;
     let sourcePostId: string | null = null;
-    let waitForLive = platform === 'demo' && body.waitForLive === true;
-    if (platform === 'facebook' && body.sourceKind === 'auto') {
-      waitForLive = true;
-    } else if (platform === 'facebook') {
+    const waitForLive = body.sourceKind === 'auto';
+    if (!waitForLive) {
       if (body.sourceKind !== 'live_video' && body.sourceKind !== 'post') throw new InvalidMarketingRequest('Loại nguồn không hợp lệ.');
       if (typeof body.sourceId !== 'string' || !/^\d{1,64}(_\d{1,64})?$/.test(body.sourceId)) {
         throw new InvalidMarketingRequest('Nguồn bình luận không hợp lệ.');
