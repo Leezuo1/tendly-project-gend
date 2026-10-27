@@ -335,11 +335,11 @@ test('ending a session builds the summary and restocking advice; later syncs do 
   assert.equal(insights.monthly[0].orders, s.orders);
 });
 
-test('Fanpage comment flow skips comments of an active live session', async () => {
+test('Fanpage comment flow skips only an actual live video, not an ordinary post used as a Live source', async () => {
   const load = loader();
   const engine = load('lib/services/live/engine.ts');
   const fc = load('lib/services/facebookComments.ts');
-  await engine.createSession('111', { platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500', title: 'FB' },
+  await engine.createSession('111', { platform: 'facebook', sourceKind: 'live_video', sourceId: '500', sourcePostId: '111_500', title: 'FB' },
     knowledge, pool, Date.now());
   await fc.saveCommentSettings('111', true, knowledge, pool);
   await fc.saveFacebookComments([{ pageId: '111', commentId: '500_9', postId: '111_500', authorId: '222', authorName: 'K',

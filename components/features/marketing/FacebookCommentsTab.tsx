@@ -45,7 +45,8 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
   const edit = selected ? edits[selected.commentId] : undefined;
   const text = selected ? (edit?.revision === selected.revision ? edit.text : selected.draft) : '';
   const canDraft = selected && ['pending', 'review', 'ignored', 'failed'].includes(selected.status);
-  const canSend = selected && data && ['review', 'failed'].includes(selected.status) && data.now - selected.createdAt < 7 * 86400_000;
+  const canSend = selected && data && ['pending', 'review', 'ignored', 'failed'].includes(selected.status)
+    && selected.authorId !== selected.pageId && data.now - selected.createdAt < 7 * 86400_000;
   const processDisabledReason = busy ? 'Một tác vụ đang chạy. Vui lòng chờ.' : !data ? 'Đang tải bình luận.'
     : !data.pending ? 'Hiện không có bình luận chờ AI xử lý.'
       : !data.settings.updatedAt ? 'Đồng bộ dữ liệu AI trước khi xử lý hàng chờ.' : '';
@@ -74,7 +75,8 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
         </div>
         <div id="fc-settings-body" hidden={!settingsExpanded}>
         <div className="card-desc">
-          AI dựa vào bài đăng và sản phẩm để soạn tin riêng; câu hỏi thiếu dữ liệu sẽ chờ shop duyệt.
+          Bật để AI tự soạn và gửi tin riêng cho bình luận hỏi sản phẩm trên bài post Facebook khi đủ dữ liệu.
+          Câu hỏi thiếu dữ liệu chờ shop duyệt; cài đặt này không thay đổi hộp thư inbox Messenger.
         </div>
         <div className="fc-settings-actions">
           <button type="button" className="btn btn-outline btn-sm fc-sync" disabled={!!busy || !data}
@@ -161,7 +163,10 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
               onChange={(e) => setEdits((prev) => ({ ...prev, [selected.commentId]: { revision: selected.revision, text: e.target.value } }))} />
             <div className="fc-settings-actions">
               <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || !canDraft || !data?.settings.updatedAt}
-                onClick={() => run('draft', () => client.draft(selected.commentId))}>
+                onClick={() => run('draft', async () => {
+                  await client.draft(selected.commentId);
+                  setEdits((prev) => { const next = { ...prev }; delete next[selected.commentId]; return next; });
+                })}>
                 {busy === 'draft' ? 'AI đang đọc…' : 'AI soạn tin'}
               </button>
               <button type="button" className="btn btn-primary btn-sm" disabled={!!busy || !canSend || !text.trim()}
@@ -171,7 +176,7 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
                 })}>{busy === 'send' ? 'Đang gửi…' : 'Gửi riêng qua Page'}</button>
               <Link href="/hop-thoai">Mở inbox Messenger →</Link>
             </div>
-            <p className="fc-note">Khách nhắn lại sẽ xuất hiện trong inbox Messenger. Chế độ tự gửi chỉ áp dụng cho comment mới sau khi bật.</p>
+            <p className="fc-note">“AI soạn tin” tạo bản nháp; “Gửi riêng qua Page” gửi nội dung bạn đang nhập. Khi bật “AI tự nhắn riêng”, bình luận mới đủ điều kiện sẽ được AI tự trả lời. Hộp thư inbox giữ cách hoạt động hiện tại.</p>
           </div>
         </article>}
       </div>}

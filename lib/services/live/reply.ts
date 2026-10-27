@@ -4,7 +4,7 @@
  * kết quả mơ hồ thì để "unknown" và không bao giờ tự gửi lại.
  */
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
-import { graphRead } from '@/lib/services/facebookComments';
+import { graphRead, saveFacebookComments } from '@/lib/services/facebookComments';
 import type { LiveOrderItem, LiveSendResult } from '@/lib/types/live';
 import { type Database, LiveError, loadSession } from '@/lib/services/live/engine';
 import { fillTemplate, suggestAlternative } from '@/lib/services/live/templates';
@@ -22,7 +22,7 @@ function metaConfig() {
 }
 
 interface MemberRow {
-  comment_id: string; author_id: string; author_name: string; created_at: string;
+  comment_id: string; author_id: string; author_name: string; created_at: string; text: string;
   sku: string | null; color: string | null; size: string | null; qty: number | null; intent: string;
 }
 
@@ -63,7 +63,7 @@ async function sendFacebook(pageId: string, commentId: string, text: string): Pr
  */
 export async function approveGroup(pageId: string, sessionId: string, groupKey: string, text: string, revision: number,
   db: Database = getMessengerPool(), now = Date.now()): Promise<LiveSendResult & { revision: number }> {
-  const { products } = await loadSession(pageId, sessionId, db);
+  const { products, session, row: sessionRow } = await loadSession(pageId, sessionId, db);
   const group = (await db.query('SELECT * FROM live_groups WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey])).rows[0];
   if (!group) throw new LiveError('Không tìm thấy nhóm bình luận.', 404);
   if (Number(group.revision) !== revision) throw new LiveError('Câu trả lời của nhóm vừa thay đổi. Hãy tải lại rồi duyệt.', 409);
@@ -87,7 +87,7 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
   }
   const remainingOf = (sku: string) => (products.find((p) => p.sku === sku)?.qty ?? 0) - (held.get(sku) ?? 0);
 
-  const members = (await db.query(`SELECT comment_id,author_id,author_name,created_at,sku,color,size,qty,intent FROM live_comments
+  const members = (await db.query(`SELECT comment_id,author_id,author_name,created_at,text,sku,color,size,qty,intent FROM live_comments
     WHERE session_id=$1 AND group_key=$2 AND reply_status IN ('review','failed') ORDER BY created_at LIMIT ${BATCH}`,
   [sessionId, groupKey])).rows as MemberRow[];
   const result: LiveSendResult = { sent: 0, failed: 0, notAllowed: 0, unknown: 0, remaining: 0 };
@@ -104,6 +104,22 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
     [sessionId, m.comment_id, message]);
     if (!reserved.rowCount) continue;
 
+    const sharedPostId = session.platform === 'facebook' && session.sourceKind === 'post' ? sessionRow.source_post_id : null;
+    if (sharedPostId) {
+      await saveFacebookComments([{ pageId, commentId: m.comment_id, postId: sharedPostId,
+        authorId: m.author_id, authorName: m.author_name, text: m.text,
+        createdAt: Number(m.created_at), eventAt: now, removed: false }], db);
+      // Both screens reserve the same Page/comment row before sending a post private reply.
+      const shared = await db.query(`UPDATE facebook_comments SET status='sending',draft=$3,reason='Đang gửi qua Meta'
+        WHERE page_id=$1 AND comment_id=$2 AND status IN ('pending','review','ignored','failed')
+        AND author_id<>page_id RETURNING comment_id`, [pageId, m.comment_id, message]);
+      if (!shared.rowCount) {
+        await db.query(`UPDATE live_comments SET reply_status='not_allowed' WHERE session_id=$1 AND comment_id=$2`, [sessionId, m.comment_id]);
+        result.notAllowed++;
+        continue;
+      }
+    }
+
     let outcome: Outcome;
     let messageId: string | null = null;
     let recipientId: string | null = null;
@@ -115,6 +131,11 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
     const sentAt = Date.now();
     await db.query(`UPDATE live_comments SET reply_status=$3, message_id=$4, sent_at=$5 WHERE session_id=$1 AND comment_id=$2`,
       [sessionId, m.comment_id, outcome, messageId, outcome === 'sent' ? sentAt : null]);
+    if (sharedPostId) await db.query(`UPDATE facebook_comments SET status=$3,message_id=$4,recipient_id=$5,sent_at=$6,reason=$7
+      WHERE page_id=$1 AND comment_id=$2 AND status='sending'`,
+    [pageId, m.comment_id, outcome === 'not_allowed' ? 'ignored' : outcome, messageId, recipientId,
+      outcome === 'sent' ? sentAt : null, outcome === 'sent' ? 'Meta đã xác nhận gửi tin.'
+        : outcome === 'unknown' ? 'Chưa xác định kết quả gửi. Kiểm tra Messenger; không tự gửi lại.' : 'Meta chưa cho phép gửi tin.']);
     if (outcome === 'sent') {
       result.sent++;
       // Đơn đã nhắn xin địa chỉ → chờ khách gửi thông tin

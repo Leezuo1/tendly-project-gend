@@ -116,7 +116,11 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
   const { token, version } = graphConfig();
   const row = (await db.query('SELECT * FROM facebook_comments WHERE page_id=$1 AND comment_id=$2', [pageId, commentId])).rows[0];
   if (!row) throw new FacebookCommentError('Không tìm thấy bình luận.', 404);
-  if (!['review', 'failed'].includes(row.status) || row.revision !== revision ||
+  if (await isActiveLivePost(pageId, row.post_id, db)) {
+    throw new FacebookCommentError('Bình luận thuộc video Livestream đang chạy. Hãy duyệt tin tại trang Livestream.');
+  }
+  const allowed = automaticSettingsVersion === undefined ? ['pending', 'review', 'ignored', 'failed'] : ['review', 'failed'];
+  if (!allowed.includes(row.status) || row.revision !== revision ||
       row.author_id === pageId || Date.now() - Number(row.created_at) >= WEEK) {
     throw new FacebookCommentError('Bình luận đã thay đổi, đã xử lý hoặc hết hạn nhắn riêng. Hãy tải lại.');
   }
@@ -125,10 +129,12 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
     throw new FacebookCommentError('Meta không cho phép nhắn riêng hoặc bình luận đã thay đổi.');
   }
   const reserved = await db.query(`UPDATE facebook_comments SET status='sending',draft=$4,reason='Đang gửi qua Meta'
-    WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND status IN ('review','failed')
+    WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND status=ANY($6::text[])
     AND ($5::bigint IS NULL OR EXISTS (SELECT 1 FROM facebook_comment_settings s
       WHERE s.page_id=$1 AND s.auto_reply AND s.updated_at=$5 AND facebook_comments.created_at>=s.enabled_at))
-    RETURNING comment_id`, [pageId, commentId, revision, text, automaticSettingsVersion ?? null]);
+    AND NOT EXISTS (SELECT 1 FROM live_comments c JOIN live_sessions s ON s.id=c.session_id
+      WHERE s.page_id=$1 AND c.comment_id=$2 AND c.reply_status IN ('sending','sent','unknown'))
+    RETURNING comment_id`, [pageId, commentId, revision, text, automaticSettingsVersion ?? null, allowed]);
   if (!reserved.rowCount) throw new FacebookCommentError('Bình luận hoặc chế độ tự gửi đã thay đổi. Hãy tải lại.');
   let outcome: 'sent' | 'unknown' | 'failed' = 'unknown';
   let messageId: string | null = null;
@@ -167,11 +173,13 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
 /** Bài đăng/video đang là nguồn của một phiên live (bảng live_sessions, migration 009). */
 async function isActiveLivePost(pageId: string, postId: string, db: Database): Promise<boolean> {
   try {
-    const live = await db.query(`SELECT 1 FROM live_sessions WHERE page_id=$1 AND status='live' AND source_post_id=$2 LIMIT 1`,
+    const live = await db.query(`SELECT 1 FROM live_sessions WHERE page_id=$1 AND platform='facebook'
+      AND source_kind='live_video' AND status='live' AND source_post_id=$2 LIMIT 1`,
       [pageId, postId]);
     return live.rows.length > 0;
-  } catch {
-    return false; // chưa chạy migration livestream
+  } catch (error) {
+    if ((error as { code?: string }).code === '42P01') return false; // Chưa chạy migration Livestream.
+    throw error;
   }
 }
 
@@ -180,6 +188,12 @@ async function analyzeComment(pageId: string, db: Database, signal: AbortSignal,
   if (!settings) {
     if (commentId) throw new FacebookCommentError('Hãy lưu dữ liệu AI lên máy chủ trước khi phân tích.', 400);
     return false;
+  }
+  if (commentId) {
+    const target = (await db.query('SELECT post_id FROM facebook_comments WHERE page_id=$1 AND comment_id=$2', [pageId, commentId])).rows[0];
+    if (target && await isActiveLivePost(pageId, target.post_id, db)) {
+      throw new FacebookCommentError('Bình luận thuộc video Livestream đang chạy. Hãy duyệt tin tại trang Livestream.');
+    }
   }
   const now = Date.now();
   const result = await db.query(`UPDATE facebook_comments SET status='processing',processing_at=$2
@@ -229,6 +243,8 @@ Bạn đang xử lý một BÌNH LUẬN trên Fanpage để soạn MỘT tin nh�
     await db.query(`UPDATE facebook_comments SET status='review',reason=$5 WHERE page_id=$1 AND comment_id=$2
       AND revision=$3 AND processing_at=$4 AND status IN ('processing','review')`, [pageId, row.comment_id, row.revision, now,
       error instanceof FacebookCommentError ? error.message : 'AI chưa xử lý được. Hãy phân tích lại hoặc trả lời thủ công.']);
+    if (commentId) throw error instanceof FacebookCommentError ? error
+      : new FacebookCommentError('AI chưa soạn được tin. Hãy thử lại hoặc nhập câu trả lời thủ công.', 502);
   }
   return true;
 }
