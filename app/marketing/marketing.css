@@ -182,6 +182,13 @@
   width: 100%;
 }
 
+.marketing-root .page-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
 .marketing-root .page-head h1 {
   font-size: 27px;
   font-weight: 800;
@@ -197,6 +204,8 @@
 .marketing-root .tabs {
   display: flex;
   overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: 4px;
   gap: 28px;
   margin-top: 28px;
   border-bottom: 1px solid var(--line);
@@ -220,8 +229,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
-  height: 2px;
+  bottom: 0;
+  height: 3px;
   background: var(--coral);
   transform: scaleX(0);
   transform-origin: left;
@@ -233,7 +242,13 @@
 }
 
 .marketing-root .tab-btn.active {
-  color: var(--ink);
+  color: var(--coral-deep);
+  font-weight: 700;
+}
+
+.marketing-root .tab-btn:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: -2px;
 }
 
 .marketing-root .tab-btn.active::after {
