@@ -138,6 +138,23 @@ export async function listFacebookSources(pageId: string, signal?: AbortSignal):
   ];
 }
 
+/**
+ * Video đang LIVE của Trang, bắt đầu sau lúc tạo phiên (cho lệch 10 phút) — để phiên tạo trước tự gắn vào stream
+ * ngay khi người bán bật live trên Facebook. Không có thì trả null.
+ */
+export async function findLiveVideo(pageId: string, since: number, signal?: AbortSignal): Promise<{ id: string; postId: string | null } | null> {
+  const data = await graphRead(`${pageId}/live_videos`, 'id,status,creation_time,video{id}', signal,
+    { broadcast_status: '["LIVE"]', limit: '5' });
+  const rows = Array.isArray(data.data) ? data.data as Record<string, unknown>[] : [];
+  const live = rows
+    .filter((r) => typeof r.id === 'string' && /^\d{1,64}$/.test(r.id) && r.status === 'LIVE'
+      && (graphTime(r.creation_time) ?? 0) >= since - 10 * 60_000)
+    .sort((a, b) => (graphTime(b.creation_time) ?? 0) - (graphTime(a.creation_time) ?? 0))[0];
+  if (!live) return null;
+  const videoId = (live.video as Record<string, unknown> | undefined)?.id;
+  return { id: live.id as string, postId: typeof videoId === 'string' && /^\d{1,64}$/.test(videoId) ? `${pageId}_${videoId}` : null };
+}
+
 /** ID bài đăng (pageId_xxx) của nguồn — luồng bình luận Fanpage dùng để bỏ qua bình luận của phiên live. */
 export async function facebookSourcePostId(pageId: string, kind: LiveSourceKind, sourceId: string): Promise<string | null> {
   if (kind === 'post') return sourceId;

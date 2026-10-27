@@ -18,7 +18,11 @@ export async function GET(request: Request) {
   }
 }
 
-/** Bắt đầu phiên: { platform: 'demo'|'facebook', sourceKind?, sourceId?, title, knowledge } (knowledge = Cấu hình AI). */
+/**
+ * Bắt đầu phiên: { platform: 'demo'|'facebook', sourceKind?, sourceId?, waitForLive?, title, knowledge } (knowledge = Cấu hình AI).
+ * Facebook + sourceKind 'auto': tạo phiên trước, Tendly tự nhận video Live khi người bán bật stream.
+ * Demo + waitForLive: chờ bấm "Giả lập bật live".
+ */
 export async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
@@ -32,7 +36,10 @@ export async function POST(request: Request) {
     let sourceKind: LiveSourceKind | null = null;
     let sourceId: string | null = null;
     let sourcePostId: string | null = null;
-    if (platform === 'facebook') {
+    let waitForLive = platform === 'demo' && body.waitForLive === true;
+    if (platform === 'facebook' && body.sourceKind === 'auto') {
+      waitForLive = true;
+    } else if (platform === 'facebook') {
       if (body.sourceKind !== 'live_video' && body.sourceKind !== 'post') throw new InvalidMarketingRequest('Loại nguồn không hợp lệ.');
       if (typeof body.sourceId !== 'string' || !/^\d{1,64}(_\d{1,64})?$/.test(body.sourceId)) {
         throw new InvalidMarketingRequest('Nguồn bình luận không hợp lệ.');
@@ -45,7 +52,7 @@ export async function POST(request: Request) {
       sourcePostId = await facebookSourcePostId(pageId, body.sourceKind, body.sourceId);
     }
     const knowledge = parseAiKnowledge(body.knowledge);
-    const session = await createSession(pageId, { platform, sourceKind, sourceId, sourcePostId, title }, knowledge);
+    const session = await createSession(pageId, { platform, sourceKind, sourceId, sourcePostId, title, waitForLive }, knowledge);
     return liveJson({ session }, 201);
   } catch (error) {
     return liveErrorResponse(error);

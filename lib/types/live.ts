@@ -27,6 +27,13 @@ export interface LiveSession {
   endedAt: number | null;
   /** Số lần gọi AI trong phiên — để thấy chi phí thấp vì phần lớn xử lý bằng luật. */
   aiCalls: number;
+  /** Lúc stream thật sự bắt đầu; null khi phiên đã tạo nhưng người bán chưa bật live. */
+  liveAt: number | null;
+  /**
+   * true = đang chờ người bán bật live. Facebook: Tendly tự nhận video Live của Trang (dò ~10 giây/lần).
+   * Demo: gọi liveClient.goLive(id) ("Giả lập bật live").
+   */
+  waiting: boolean;
 }
 
 export interface LiveComment {

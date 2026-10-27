@@ -345,3 +345,58 @@ test('a single unclear question waits for a batch (5 questions or 20 seconds) be
   assert.equal(calls, 2);
   assert.equal(await engine.enrichWithAi('111', session.id, pool, AbortSignal.timeout(5000), T + 60_000), 0, 'không gọi lại');
 });
+
+test('flow "tạo phiên trước, bật live sau": demo waits for "Giả lập bật live" before comments start', async () => {
+  const load = loader();
+  const engine = load('lib/services/live/engine.ts');
+  const session = await engine.createSession('111', { platform: 'demo', sourceKind: null, sourceId: null, sourcePostId: null,
+    title: 'Chờ live', waitForLive: true }, knowledge, pool, START);
+  assert.equal(session.waiting, true);
+  assert.equal(session.liveAt, null);
+  let snap = await engine.syncSession('111', session.id, pool, START + 60_000);
+  assert.equal(snap.stats.comments, 0, 'chưa bật live thì chưa có bình luận');
+  await assert.rejects(engine.addDemoComment('111', session.id, 'A', 'chốt M', pool), /Giả lập bật live/);
+
+  await engine.goLive('111', session.id, pool, START + 60_000);
+  snap = await engine.syncSession('111', session.id, pool, START + 60_000 + 15_000);
+  assert.equal(snap.session.waiting, false);
+  assert.equal(snap.session.liveAt, START + 60_000);
+  assert.ok(snap.stats.comments > 3 && snap.stats.comments < 15, 'kịch bản tính giờ từ lúc bật live');
+});
+
+test('Facebook auto mode binds the Page live video as soon as the seller goes live, polling Graph at most every 10s', async () => {
+  const load = loader();
+  const engine = load('lib/services/live/engine.ts');
+  const T = Date.now();
+  const session = await engine.createSession('111', { platform: 'facebook', sourceKind: null, sourceId: null, sourcePostId: null,
+    title: 'FB auto', waitForLive: true }, knowledge, pool, T);
+  let isLive = false;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    calls.push(u);
+    if (u.includes('/111/live_videos')) {
+      assert.match(decodeURIComponent(u), /broadcast_status=\["LIVE"\]/);
+      return Response.json({ data: isLive ? [{ id: '777', status: 'LIVE', creation_time: new Date(T + 5000).toISOString(), video: { id: '888' } }] : [] });
+    }
+    if (u.includes('/777/comments')) {
+      assert.match(u, /live_filter=no_filter/);
+      return Response.json({ data: [{ id: '888_1', message: 'chốt AT01 M trắng', created_time: new Date(T + 20_000).toISOString(), from: { id: '901', name: 'An' } }] });
+    }
+    throw new Error(`unexpected ${u}`);
+  };
+  let snap = await engine.syncSession('111', session.id, pool, T + 1000);
+  assert.equal(snap.session.waiting, true);
+  await engine.syncSession('111', session.id, pool, T + 4000);
+  assert.equal(calls.filter((u) => u.includes('live_videos')).length, 1, 'không dò lại trong vòng 10 giây');
+
+  isLive = true;
+  snap = await engine.syncSession('111', session.id, pool, T + 12_000);
+  assert.equal(snap.session.waiting, false);
+  assert.equal(snap.session.sourceId, '777');
+  assert.equal(snap.session.sourceKind, 'live_video');
+  assert.equal(snap.stats.comments, 1);
+  assert.equal(snap.orders[0].items[0].sku, 'AT-01');
+  const row = (await query('SELECT source_post_id FROM live_sessions WHERE id=$1', [session.id])).rows[0];
+  assert.equal(row.source_post_id, '111_888', 'luồng bình luận Fanpage bỏ qua bình luận của video live này');
+});
