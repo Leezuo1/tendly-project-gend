@@ -181,6 +181,8 @@ Trang **Livestream** (`/livestream`) giúp shop bán hàng trong lúc live. Tend
 
 **Nhắn riêng (Facebook):**
 - Dùng chung cách giữ chỗ trước khi gửi như phần bình luận Fanpage. Kiểm tra `can_reply_privately` cho từng bình luận. Không tự gửi lại khi chưa rõ kết quả.
-- Bình luận của bài/video đang live bị luồng bình luận Fanpage bỏ qua, nên không có cảnh gửi trùng.
+- Chỉ bình luận thuộc nguồn `live_video` đang chạy mới nhường cho luồng Livestream. Bài post thường vẫn dùng AI bình luận kể cả khi được chọn làm nguồn thử cho Live Cockpit. Hai màn hình cùng giữ chỗ theo Page/comment trước khi gửi private reply để tránh gửi trùng.
+- Nút **AI tự nhắn riêng** trong Marketing chỉ áp dụng cho bình luận bài post, không bật/tắt AI hộp thư Messenger. Shop vẫn có thể nhập và gửi tay cho bình luận chưa gửi, chưa xoá và còn hạn; lỗi soạn AI được báo rõ thay vì trả thành công khi chưa có bản nháp.
+- Chạy migration `010-restore-post-comments.sql` để đưa các bình luận bài post từng bị nhường nhầm về hàng chờ; không lấy lại những bình luận đã gửi, đang gửi hoặc chưa rõ kết quả.
 
 API và hợp đồng dữ liệu cho dashboard nằm ở [`docs/livestream-api.md`](docs/livestream-api.md). Test nằm ở `tests/livestream.test.mjs`: chạy trên PGlite, giả lập Meta và Gemini.

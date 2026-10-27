@@ -59,7 +59,7 @@ let calls;
 let postResponse;
 async function setup() {
   await ready;
-  await db.exec('TRUNCATE facebook_comment_sync,facebook_comments,facebook_comment_settings,messenger_messages,messenger_conversations,messenger_customers CASCADE');
+  await db.exec('TRUNCATE live_sessions,facebook_comment_sync,facebook_comments,facebook_comment_settings,messenger_messages,messenger_conversations,messenger_customers CASCADE');
   process.env.PAGE_ID = '111'; process.env.PAGE_ACCESS_TOKEN = 'secret-token'; process.env.META_GRAPH_VERSION = 'v26.0';
   process.env.DATABASE_URL = 'postgresql://test-only'; process.env.DASHBOARD_KEY = 'test-dashboard';
   process.env.APP_SECRET = 'test-secret'; process.env.VERIFY_TOKEN = 'verify';
@@ -95,6 +95,92 @@ const graphCommentFeed = (extra = {}) => ({ data: [{ id: '111_500', comments: { 
   id: '500_600', message: 'Áo này bao nhiêu shop?', created_time: new Date(Date.now() - 1000).toISOString().replace(/\.\d{3}Z$/, '+0000'),
   from: { id: '222', name: 'Khách' }, ...extra,
 }] } }] });
+
+test('ordinary post source does not block automatic private replies or change inbox reply eligibility', async () => {
+  const { load, service } = await setup();
+  await load('lib/services/live/engine.ts').createSession('111', {
+    platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500', title: 'Post test',
+  }, knowledge, pool);
+  await service.saveCommentSettings('111', true, knowledge, pool);
+  const enabledAt = Number((await query('SELECT enabled_at FROM facebook_comment_settings')).rows[0].enabled_at);
+  await service.saveFacebookComments([event({ createdAt: enabledAt })], pool);
+  await service.processPendingComments('111', pool);
+  assert.equal((await row()).status, 'sent');
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].recipient, { comment_id: '500_600' });
+  assert.equal((await query('SELECT last_in_at FROM messenger_conversations')).rows[0].last_in_at, null);
+});
+
+test('manual drafts and manual replies work on ignored post comments without automatic mode', async () => {
+  const { load, service } = await setup();
+  await load('lib/services/live/engine.ts').createSession('111', {
+    platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500', title: 'Post test',
+  }, knowledge, pool);
+  await service.saveCommentSettings('111', false, knowledge, pool);
+  await service.saveFacebookComments([event()], pool);
+  await query("UPDATE facebook_comments SET status='ignored'");
+  await service.draftCommentReply('111', '500_600', pool);
+  assert.equal((await row()).status, 'review');
+  assert.ok((await row()).draft);
+  assert.equal(calls.length, 0);
+  await query("UPDATE facebook_comments SET status='ignored',draft=''");
+  await service.sendCommentPrivateReply('111', '500_600', 'Shop còn hàng, bạn cần size nào?', 1, pool);
+  assert.equal(calls.length, 1);
+  assert.equal((await row()).status, 'sent');
+});
+
+test('post and Livestream screens share a reservation and cannot send duplicate private replies', async () => {
+  for (const first of ['post', 'live']) {
+    const { load, service } = await setup();
+    const engine = load('lib/services/live/engine.ts');
+    const session = await engine.createSession('111', {
+      platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500', title: 'Post test',
+    }, knowledge, pool);
+    const e = event();
+    await service.saveFacebookComments([e], pool);
+    await engine.ingestComments('111', session.id, [{ commentId: e.commentId, authorId: e.authorId,
+      authorName: e.authorName, text: e.text, createdAt: e.createdAt }], pool);
+    const group = (await engine.buildSnapshot('111', session.id, pool)).groups[0];
+    const approve = () => load('lib/services/live/reply.ts').approveGroup('111', session.id, group.key, 'Shop còn hàng ạ.', group.revision, pool);
+    const send = () => service.sendCommentPrivateReply('111', '500_600', 'Shop còn hàng ạ.', 1, pool);
+    if (first === 'post') {
+      let finish, started;
+      const sending = new Promise((resolve) => { started = resolve; });
+      postResponse = () => { started(); return new Promise((resolve) => { finish = resolve; }); };
+      const pendingSend = send();
+      await sending;
+      assert.equal((await approve()).notAllowed, 1);
+      finish(Response.json({ message_id: 'mid.1', recipient_id: '333' }));
+      await pendingSend;
+    } else {
+      assert.equal((await approve()).sent, 1);
+      await assert.rejects(send());
+    }
+    assert.equal(calls.length, 1);
+    assert.equal((await row()).status, 'sent');
+  }
+});
+
+test('repair migration recovers blocked post comments without retrying sent or ambiguous Live messages', async () => {
+  const { load, service } = await setup();
+  const engine = load('lib/services/live/engine.ts');
+  const session = await engine.createSession('111', {
+    platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500', title: 'Post test',
+  }, knowledge, pool);
+  const e = event();
+  await service.saveFacebookComments([e], pool);
+  await engine.ingestComments('111', session.id, [{ commentId: e.commentId, authorId: e.authorId,
+    authorName: e.authorName, text: e.text, createdAt: e.createdAt }], pool);
+  for (const status of ['sent', 'unknown', 'sending', 'review']) {
+    await query('UPDATE live_comments SET reply_status=$1', [status]);
+    await query("UPDATE facebook_comments SET status='ignored',reason=$1", ['Bình luận thuộc phiên Livestream đang chạy, xử lý ở trang Livestream.']);
+    await db.exec(readFileSync('db/migrations/010-restore-post-comments.sql', 'utf8'));
+    assert.equal((await row()).status, status === 'review' ? 'pending' : 'ignored');
+  }
+  const revision = (await row()).revision;
+  await db.exec(readFileSync('db/migrations/010-restore-post-comments.sql', 'utf8'));
+  assert.equal((await row()).revision, revision);
+});
 
 test('Meta sync recovers missing webhook comments and throttles repeated dashboard polls', async () => {
   const { load, service } = await setup(); let reads = 0;
@@ -304,7 +390,7 @@ test('interrupted AI leases are recoverable and missing AI or database writes ne
   await service.processPendingComments('111', pool);
   assert.equal((await row()).status, 'review');
   aiHook = async () => { throw new Error('AI unavailable'); };
-  await service.draftCommentReply('111', '500_600', pool);
+  await assert.rejects(service.draftCommentReply('111', '500_600', pool), /AI chưa soạn/);
   assert.equal((await row()).status, 'review'); assert.equal(calls.length, 0);
   const failing = { ...pool, query: async (sql, args) => {
     if (sql.includes("SET status='sending'")) throw new Error('database unavailable');
