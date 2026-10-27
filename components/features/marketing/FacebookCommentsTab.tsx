@@ -14,12 +14,17 @@ const labels: Record<CommentStatus, string> = {
   failed: 'Meta từ chối', deleted: 'Đã xoá trên Facebook',
 };
 
+function RefreshIcon() {
+  return <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 2M5 16a8 8 0 0 0 13 2" /></svg>;
+}
+
 export function FacebookCommentsTab({ onToast }: { onToast: (message: string) => void }) {
   const { data, loading, error, reload } = useMarketingData(client.list);
   const [busy, setBusy] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [selectedId, setSelectedId] = useState('');
+  const [settingsExpanded, setSettingsExpanded] = useState(true);
   const [edits, setEdits] = useState<Record<string, { revision: number; text: string }>>({});
   useEffect(() => {
     const timer = setInterval(() => { if (!document.hidden && !busy) reload(); }, 10_000);
@@ -39,67 +44,90 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
   const text = selected ? (edit?.revision === selected.revision ? edit.text : selected.draft) : '';
   const canDraft = selected && ['pending', 'review', 'ignored', 'failed'].includes(selected.status);
   const canSend = selected && data && ['review', 'failed'].includes(selected.status) && data.now - selected.createdAt < 7 * 86400_000;
+  const processDisabledReason = busy ? 'Một tác vụ đang chạy. Vui lòng chờ.' : !data ? 'Đang tải bình luận.'
+    : !data.pending ? 'Hiện không có bình luận chờ AI xử lý.'
+      : !data.settings.updatedAt ? 'Đồng bộ dữ liệu AI trước khi xử lý hàng chờ.' : '';
 
   if (error && !data) return <MarketingDataNotice error={error} onRetry={reload} />;
 
   return (
     <section className="tab-panel active fc-root" aria-label="Bình luận Facebook">
       <div className="card fc-settings">
-        <div className="card-head">
-          <div className="fc-settings-title">
-            <h2>Bình luận → Messenger</h2>
-            <span className="fc-status fc-mode"><span aria-hidden="true">●</span> {data?.settings.autoReply ? 'Tự gửi đang bật' : 'Shop duyệt trước khi gửi'}</span>
-          </div>
+        <div className="card-head fc-settings-head">
+          <h2>Bình luận → Messenger</h2>
+          <div className="fc-settings-controls">
           <button type="button" className="fc-toggle" role="switch" aria-checked={data?.settings.autoReply ?? false}
             aria-label="AI tự nhắn riêng" disabled={!!busy || !data}
             onClick={() => run('settings', () => client.setAutoReply(!data!.settings.autoReply),
               data?.settings.autoReply ? 'Đã tắt tự gửi.' : 'Đã lưu dữ liệu AI và bật tự gửi cho comment mới.')}>
-            <span>{busy === 'settings' ? 'Đang lưu…' : 'AI tự nhắn riêng'}</span>
+            <span>AI tự nhắn riêng <b>{busy === 'settings' ? 'Đang lưu…' : !data ? 'Đang tải…' : data.settings.autoReply ? 'Bật' : 'Tắt'}</b></span>
             <span className="fc-toggle-track" aria-hidden="true"><span /></span>
           </button>
+          <button type="button" className="fc-collapse" aria-expanded={settingsExpanded} aria-controls="fc-settings-body"
+            onClick={() => setSettingsExpanded(!settingsExpanded)}>
+            {settingsExpanded ? 'Thu gọn' : 'Mở cài đặt'}
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          </div>
         </div>
+        <div id="fc-settings-body" hidden={!settingsExpanded}>
         <div className="card-desc">
           AI dựa vào bài đăng và sản phẩm để soạn tin riêng; câu hỏi thiếu dữ liệu sẽ chờ shop duyệt.
         </div>
         <div className="fc-settings-actions">
-          <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || !data}
+          <button type="button" className="btn btn-outline btn-sm fc-sync" disabled={!!busy || !data}
+            aria-busy={busy === 'knowledge'}
             aria-describedby="fc-knowledge-status fc-knowledge-help"
             onClick={() => run('knowledge', () => client.saveSettings(data!.settings.autoReply), 'Đã cập nhật dữ liệu AI trên máy chủ.')}>
-            {busy === 'knowledge' ? 'Đang lưu…' : 'Cập nhật dữ liệu AI'}
+            <RefreshIcon />{busy === 'knowledge' ? 'Đang đồng bộ…' : 'Đồng bộ dữ liệu AI'}
           </button>
           <span id="fc-knowledge-status" className={data?.settings.updatedAt ? 'hint' : 'fc-warning'}>
-            {data?.settings.updatedAt ? `${data.settings.productCount} sản phẩm · lưu ${relativeTime(data.settings.updatedAt)}`
-              : <><span aria-hidden="true">⚠</span> Chưa lưu sản phẩm và FAQ lên máy chủ</>}
+            {data?.settings.updatedAt ? `${data.settings.productCount} sản phẩm · Đã đồng bộ ${relativeTime(data.settings.updatedAt).toLocaleLowerCase('vi')}`
+              : <><span aria-hidden="true">⚠</span> Chưa đồng bộ sản phẩm và FAQ</>}
           </span>
         </div>
         <p id="fc-knowledge-help" className="fc-note">Cập nhật lại sau khi đổi sản phẩm hoặc FAQ để AI dùng dữ liệu mới nhất.</p>
-        <div className="fc-info"><span className="fc-info-icon" aria-hidden="true">i</span>
+        <div className="fc-info" role="note" aria-label="Chính sách nhắn tin Facebook"><span className="fc-info-icon" aria-hidden="true">i</span>
           <p>Mỗi bình luận chỉ được một tin nhắn riêng trong 7 ngày. Khách cần nhắn lại để mở cửa sổ trò chuyện 24 giờ.</p>
+        </div>
         </div>
       </div>
 
       <div className="fc-toolbar">
-        <label className="fc-search">Tìm bình luận<span className="fc-search-field">
+        <label className="fc-search"><span className="fc-sr-only">Tìm bình luận</span><span className="fc-search-field">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
           <input className="pc-input" type="search" value={query}
-            onChange={(e) => setQuery(e.target.value)} placeholder="Tên khách, nội dung, mã bài đăng" /></span></label>
-        <label>Trạng thái<select className="pc-input" value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="all">Tất cả</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên khách, nội dung, mã bài…" /></span></label>
+        <label><span id="fc-filter-label" className="fc-sr-only">Trạng thái</span><select className="pc-input" aria-labelledby="fc-filter-label" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="all">Tất cả trạng thái</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || loading} onClick={reload}><span aria-hidden="true">↻</span> Làm mới</button>
-        <button type="button" className="btn btn-outline btn-sm fc-process" disabled={!!busy || !data?.pending || !data.settings.updatedAt}
+        <button type="button" className="btn btn-outline btn-sm" disabled={!!busy || loading} onClick={reload}><RefreshIcon /> Làm mới</button>
+        <span className="fc-process-wrap" role="group" aria-label="Xử lý hàng chờ" tabIndex={processDisabledReason ? 0 : undefined}
+          aria-describedby={processDisabledReason ? 'fc-process-tooltip' : undefined}>
+        <button type="button" className="btn btn-outline btn-sm fc-process" disabled={!!processDisabledReason}
           onClick={() => run('process', client.process, 'Đã xử lý thêm hàng chờ.')}>
           {busy === 'process' ? 'AI đang xử lý…' : `Xử lý hàng chờ (${data?.pending ?? 0})`}
         </button>
+        {processDisabledReason && <span className="fc-tooltip" id="fc-process-tooltip" role="tooltip">{processDisabledReason}</span>}
+        </span>
       </div>
       <div role="status" aria-live="polite" className="fc-count">{loading ? 'Đang cập nhật bình luận…' : data?.comments.length ? `Hiển thị ${comments.length} bình luận trong 100 bình luận mới nhất` : ''}</div>
       {!loading && !data?.comments.length ? <div className="card pc-empty fc-empty">
-        <span className="fc-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2v-10A8.5 8.5 0 0 1 10.5 3h2a8.5 8.5 0 0 1 8.5 8.5Z" /><path d="M7 9h9M7 14h6" /></svg></span>
-        <h3>Chưa có bình luận</h3><p>Comment mới sẽ xuất hiện sau khi Page đăng ký webhook <b>feed</b>.
-          Hãy lưu dữ liệu AI trước khi dùng tính năng này.</p>
+        <div className="fc-empty-illustration" aria-hidden="true">
+          <svg viewBox="0 0 280 76" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path className="fc-art-surface" d="M16 12h52a8 8 0 0 1 8 8v26a8 8 0 0 1-8 8H37L22 66V54h-6a8 8 0 0 1-8-8V20a8 8 0 0 1 8-8Z" />
+            <path d="M25 27h34M25 38h23M88 34h19m-5-5 5 5-5 5M173 34h19m-5-5 5 5-5 5" />
+            <circle className="fc-art-surface" cx="140" cy="34" r="24" /><path d="m140 19 4 11 11 4-11 4-4 11-4-11-11-4 11-4 4-11Z" />
+            <path className="fc-art-surface" d="M212 12h52a8 8 0 0 1 8 8v26a8 8 0 0 1-8 8h-6v12l-15-12h-31a8 8 0 0 1-8-8V20a8 8 0 0 1 8-8Z" />
+            <path d="m218 40 13-15 10 10 17-10-13 17-11-10-16 8Z" />
+          </svg>
+          <div className="fc-illustration-labels"><span>Khách bình luận</span><span>AI soạn tin</span><span>Nhắn riêng</span></div>
+        </div>
+        <h3>Chưa có bình luận</h3><p>Bình luận mới sẽ tự động hiển thị tại đây khi khách hàng tương tác trên Fanpage.
+          Đồng bộ dữ liệu sản phẩm để AI sẵn sàng hỗ trợ khách.</p>
         <div className="fc-empty-actions">
-          <Link className="btn btn-outline btn-sm" href="/cau-hinh-ai">Đi tới cài đặt dữ liệu AI</Link>
-          <Link className="fc-empty-link" href="/cai-dat?tab=channels">Kiểm tra kết nối Fanpage →</Link>
+          <Link className="btn btn-primary btn-sm" href="/cai-dat?tab=channels">Kiểm tra kết nối Fanpage →</Link>
+          <Link className="btn btn-outline btn-sm" href="/cau-hinh-ai">Cài đặt dữ liệu AI</Link>
         </div>
       </div> : <div className="fc-workspace">
         <div className="card fc-list" aria-label="Danh sách bình luận">
