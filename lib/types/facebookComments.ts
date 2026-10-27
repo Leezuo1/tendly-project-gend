@@ -32,4 +32,5 @@ export interface CommentsData {
   comments: FacebookComment[];
   settings: CommentSettings;
   pending: number;
+  sync?: { syncedAt: number | null; error: string | null };
 }

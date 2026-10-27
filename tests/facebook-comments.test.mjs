@@ -59,7 +59,7 @@ let calls;
 let postResponse;
 async function setup() {
   await ready;
-  await db.exec('TRUNCATE facebook_comments,facebook_comment_settings,messenger_messages,messenger_conversations,messenger_customers CASCADE');
+  await db.exec('TRUNCATE facebook_comment_sync,facebook_comments,facebook_comment_settings,messenger_messages,messenger_conversations,messenger_customers CASCADE');
   process.env.PAGE_ID = '111'; process.env.PAGE_ACCESS_TOKEN = 'secret-token'; process.env.META_GRAPH_VERSION = 'v26.0';
   process.env.DATABASE_URL = 'postgresql://test-only'; process.env.DASHBOARD_KEY = 'test-dashboard';
   process.env.APP_SECRET = 'test-secret'; process.env.VERIFY_TOKEN = 'verify';
@@ -90,6 +90,117 @@ async function setup() {
   return { load, callbacks, service: load('lib/services/facebookComments.ts') };
 }
 const row = async () => (await query('SELECT * FROM facebook_comments WHERE page_id=$1 AND comment_id=$2', ['111', '500_600'])).rows[0];
+
+const graphCommentFeed = (extra = {}) => ({ data: [{ id: '111_500', comments: { data: [{
+  id: '500_600', message: 'Áo này bao nhiêu shop?', created_time: new Date(Date.now() - 1000).toISOString().replace(/\.\d{3}Z$/, '+0000'),
+  from: { id: '222', name: 'Khách' }, ...extra,
+}] } }] });
+
+test('Meta sync recovers missing webhook comments and throttles repeated dashboard polls', async () => {
+  const { load, service } = await setup(); let reads = 0;
+  globalThis.fetch = async (url, options) => {
+    reads++;
+    assert.equal(options.headers.Authorization, 'Bearer secret-token');
+    const parsed = new URL(url);
+    assert.equal(parsed.pathname, '/v26.0/111/published_posts');
+    assert.equal(parsed.searchParams.get('limit'), '10');
+    assert.match(parsed.searchParams.get('fields'), /reverse_chronological/);
+    assert.ok(!String(url).includes('secret-token'));
+    const feed = graphCommentFeed();
+    feed.data.push({ id: '111_501' });
+    return Response.json(feed);
+  };
+  const sync = load('lib/services/facebookCommentSync.ts').syncFacebookComments;
+  const first = await sync('111', pool);
+  assert.equal(first.error, null);
+  assert.ok(first.syncedAt > 0);
+  assert.equal((await row()).status, 'pending');
+  assert.equal((await row()).author_name, 'Khách');
+  assert.equal((await service.readFacebookComments('111', pool)).pending, 1);
+  assert.deepEqual(await sync('111', pool), first);
+  assert.equal(reads, 1);
+  await query('UPDATE facebook_comments SET status=$1,draft=$2 WHERE comment_id=$3', ['sent', 'Đã gửi', '500_600']);
+  await query('UPDATE facebook_comment_sync SET retry_after=0');
+  await sync('111', pool);
+  assert.equal((await row()).status, 'sent');
+  assert.equal((await row()).revision, 1);
+  assert.equal((await row()).draft, 'Đã gửi');
+});
+
+test('Meta sync validates the whole response before writes and keeps saved comments on failure', async () => {
+  for (const body of [
+    { data: [{ id: '999_500', comments: { data: [] } }] },
+    { data: [{ id: '111_500', comments: { data: 'invalid' } }] },
+    graphCommentFeed({ id: '../invalid' }),
+    graphCommentFeed({ created_time: 'invalid-date' }),
+  ]) {
+    const { load, service } = await setup();
+    await service.saveFacebookComments([event()], pool);
+    globalThis.fetch = async () => Response.json(body);
+    const result = await load('lib/services/facebookCommentSync.ts').syncFacebookComments('111', pool);
+    assert.ok(result.error);
+    assert.equal(result.syncedAt, null);
+    assert.equal((await row()).revision, 1);
+    assert.equal((await query('SELECT * FROM facebook_comments')).rows.length, 1);
+  }
+  const { load, service } = await setup();
+  await service.saveFacebookComments([event()], pool);
+  globalThis.fetch = async () => Response.json({ error: { message: 'secret-token' } }, { status: 403 });
+  const result = await load('lib/services/facebookCommentSync.ts').syncFacebookComments('111', pool);
+  assert.ok(result.error);
+  assert.ok(!result.error.includes('secret-token'));
+  assert.equal((await row()).text, event().text);
+});
+
+test('concurrent Meta sync requests share a database lease', async () => {
+  const { load } = await setup(); let reads = 0, finish, started;
+  const fetching = new Promise((resolve) => { started = resolve; });
+  globalThis.fetch = () => { reads++; started(); return new Promise((resolve) => { finish = resolve; }); };
+  const sync = load('lib/services/facebookCommentSync.ts').syncFacebookComments;
+  const first = sync('111', pool);
+  await fetching;
+  const second = await sync('111', pool);
+  assert.equal(second.syncedAt, null);
+  assert.equal(reads, 1);
+  finish(Response.json(graphCommentFeed()));
+  await first;
+  assert.equal((await row()).revision, 1);
+});
+
+test('sync API requires authorization, returns comments promptly and defers AI without bypassing review', async () => {
+  const { load, service, callbacks } = await setup();
+  await service.saveCommentSettings('111', false, knowledge, pool);
+  const route = load('app/api/facebook/comments/route.ts');
+  const request = (key = 'test-dashboard') => new Request('http://localhost/api/facebook/comments', {
+    method: 'POST', headers: { authorization: `Bearer ${key}` }, body: JSON.stringify({ action: 'sync' }),
+  });
+  assert.equal((await route.POST(request('wrong'))).status, 401);
+  const originalTransport = globalThis.fetch;
+  globalThis.fetch = async (url, options) => String(url).includes('/111/published_posts?')
+    ? Response.json(graphCommentFeed()) : originalTransport(url, options);
+  const response = await route.POST(request());
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  const data = await response.json();
+  assert.equal(data.comments.length, 1);
+  assert.equal(data.pending, 1);
+  assert.equal(data.sync.error, null);
+  assert.equal(callbacks.length, 1);
+  assert.equal((await row()).status, 'pending');
+  await callbacks[0]();
+  assert.equal((await row()).status, 'review');
+  assert.equal(calls.length, 0);
+});
+
+test('comment client polls the authenticated sync action instead of reading only cached database rows', async () => {
+  const client = loader({ 'lib/services/postsClient.ts': { async dashboardRequest(url, options) {
+    assert.equal(url, '/api/facebook/comments');
+    assert.equal(options.method, 'POST');
+    assert.deepEqual(JSON.parse(options.body), { action: 'sync' });
+    return Response.json({ comments: [], pending: 0 });
+  } } })('lib/services/facebookCommentsClient.ts').facebookCommentsClient;
+  assert.deepEqual(await client.list(), { comments: [], pending: 0 });
+});
 
 test('feed parser handles add/edit/remove, scopes Page, validates before persistence and never treats commenter as PSID', () => {
   const { parseMetaComments } = loader()('lib/services/metaWebhook.ts');

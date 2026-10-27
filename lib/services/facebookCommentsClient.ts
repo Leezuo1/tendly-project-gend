@@ -8,7 +8,7 @@ const endpoint = '/api/facebook/comments';
 const post = (body: object) => dashboardRequest(endpoint, { method: 'POST', body: JSON.stringify(body) });
 
 export const facebookCommentsClient = {
-  list: () => dashboardRequest(endpoint).then((r) => r.json() as Promise<CommentsData>),
+  list: () => post({ action: 'sync' }).then((r) => r.json() as Promise<CommentsData>),
   saveSettings: (autoReply: boolean) => dashboardRequest(endpoint, {
     method: 'PUT', body: JSON.stringify({ autoReply, knowledge: currentAiKnowledge() }),
   }),

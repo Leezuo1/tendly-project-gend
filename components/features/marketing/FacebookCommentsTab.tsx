@@ -27,9 +27,11 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
   const [settingsExpanded, setSettingsExpanded] = useState(true);
   const [edits, setEdits] = useState<Record<string, { revision: number; text: string }>>({});
   useEffect(() => {
-    const timer = setInterval(() => { if (!document.hidden && !busy) reload(); }, 10_000);
-    return () => clearInterval(timer);
-  }, [busy, reload]);
+    const refresh = () => { if (!document.hidden && !busy && !loading) reload(); };
+    const timer = setInterval(refresh, 3_000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+  }, [busy, loading, reload]);
 
   const run = async (name: string, action: () => Promise<unknown>, message?: string) => {
     setBusy(name);
@@ -111,8 +113,13 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
         {processDisabledReason && <span className="fc-tooltip" id="fc-process-tooltip" role="tooltip">{processDisabledReason}</span>}
         </span>
       </div>
-      <div role="status" aria-live="polite" className="fc-count">{loading ? 'Đang cập nhật bình luận…' : data?.comments.length ? `Hiển thị ${comments.length} bình luận trong 100 bình luận mới nhất` : ''}</div>
-      {!loading && !data?.comments.length ? <div className="card pc-empty fc-empty">
+      <div role="status" aria-live="polite" className="fc-count">{data && <>
+        {loading ? 'Đang cập nhật…' : 'Tự cập nhật mỗi 3 giây'}
+        {data.sync?.syncedAt && <> · Đồng bộ Facebook {relativeTime(data.sync.syncedAt).toLocaleLowerCase('vi')}</>}
+        {!!data.comments.length && <> · Hiển thị {comments.length} / {data.comments.length} bình luận</>}
+      </>}</div>
+      {data?.sync?.error && <p className="fc-warning" role="alert">{data.sync.error} Danh sách đang hiển thị dữ liệu đã lưu; hệ thống sẽ thử đồng bộ lại.</p>}
+      {!data ? <p role="status" className="fc-note">Đang tải bình luận…</p> : !data.comments.length ? <div className="card pc-empty fc-empty">
         <div className="fc-empty-illustration" aria-hidden="true">
           <svg viewBox="0 0 280 76" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path className="fc-art-surface" d="M16 12h52a8 8 0 0 1 8 8v26a8 8 0 0 1-8 8H37L22 66V54h-6a8 8 0 0 1-8-8V20a8 8 0 0 1 8-8Z" />
