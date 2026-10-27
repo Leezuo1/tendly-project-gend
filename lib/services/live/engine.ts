@@ -227,6 +227,8 @@ const CLASSIFY_SCHEMA = {
   },
   required: ['items'], additionalProperties: false,
 };
+const AI_BATCH_MIN = 5;
+const AI_BATCH_WAIT = 20_000;
 const AI_INTENTS: LiveIntent[] = ['price', 'stock', 'view', 'size_advice', 'shipping', 'return', 'complaint', 'question', 'other'];
 
 const REPLY_SCHEMA = {
@@ -243,14 +245,18 @@ async function bumpAiCalls(db: Queryable, sessionId: string) {
  * Không chuyển bình luận thành "chốt đơn" bằng AI: đơn chỉ tạo khi khách viết rõ.
  */
 export async function enrichWithAi(pageId: string, sessionId: string, db: Database = getMessengerPool(),
-  signal: AbortSignal = AbortSignal.timeout(25_000)): Promise<number> {
+  signal: AbortSignal = AbortSignal.timeout(25_000), now = Date.now()): Promise<number> {
   if (!process.env.GEMINI_API_KEY) return 0;
   const { products, knowledge, row } = await loadSession(pageId, sessionId, db);
   if (row.status !== 'live') return 0;
   let calls = 0;
   const catalog = products.slice(0, 200).map(({ sku, name }) => ({ sku, name }));
 
-  const claimed = (await db.query(`UPDATE live_comments SET ai_checked=true
+  // Gom đủ 5 câu hoặc câu cũ nhất đã chờ 20 giây mới gọi AI — không gọi mỗi lượt sync có 1 câu hỏi mới
+  const waiting = (await db.query(`SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM live_comments
+    WHERE session_id=$1 AND intent='question' AND NOT ai_checked AND reply_status='review'`, [sessionId])).rows[0];
+  const due = Number(waiting.n) >= AI_BATCH_MIN || (Number(waiting.n) > 0 && Number(waiting.oldest) <= now - AI_BATCH_WAIT);
+  const claimed = !due ? [] : (await db.query(`UPDATE live_comments SET ai_checked=true
     WHERE session_id=$1 AND comment_id IN (SELECT comment_id FROM live_comments WHERE session_id=$1 AND intent='question'
       AND NOT ai_checked AND reply_status='review' ORDER BY created_at LIMIT 20)
     RETURNING comment_id, text`, [sessionId])).rows as { comment_id: string; text: string }[];
@@ -298,6 +304,9 @@ export async function enrichWithAi(pageId: string, sessionId: string, db: Databa
     WHERE session_id=$1 AND group_key=(SELECT g.group_key FROM live_groups g WHERE g.session_id=$1 AND g.reply_source='template'
       AND g.intent IN ('size_advice','question')
       AND EXISTS (SELECT 1 FROM live_comments c WHERE c.session_id=g.session_id AND c.group_key=g.group_key AND c.reply_status='review')
+      -- Nhóm "câu hỏi khác" chỉ soạn sau khi AI đã xếp lại các câu hỏi trong nhóm (tránh soạn rồi nhóm bị tách)
+      AND (g.intent='size_advice' OR NOT EXISTS (SELECT 1 FROM live_comments c WHERE c.session_id=g.session_id
+        AND c.group_key=g.group_key AND c.reply_status='review' AND NOT c.ai_checked))
       ORDER BY (g.intent='size_advice') DESC, g.updated_at LIMIT 1)
     RETURNING group_key, intent, sku, revision`, [sessionId])).rows[0] as { group_key: string; intent: string; sku: string | null; revision: number } | undefined;
   if (group) {
@@ -328,7 +337,7 @@ export async function enrichWithAi(pageId: string, sessionId: string, db: Databa
       await db.query(`UPDATE live_groups SET reply_text=$3, reply_source='ai', revision=revision+1, updated_at=$4
         WHERE session_id=$1 AND group_key=$2 AND reply_source='ai_pending'`, [sessionId, group.group_key, result, Date.now()]);
     } catch {
-      await db.query(`UPDATE live_groups SET reply_source='template' WHERE session_id=$1 AND group_key=$2 AND reply_source='ai_pending'`,
+      await db.query(`UPDATE live_groups SET reply_source='ai_failed' WHERE session_id=$1 AND group_key=$2 AND reply_source='ai_pending'`,
         [sessionId, group.group_key]);
     }
   }
@@ -346,7 +355,7 @@ export async function syncSession(pageId: string, sessionId: string, db: Databas
       startedAt: loaded.session.startedAt, products: loaded.products,
     }, now, AbortSignal.timeout(9000));
     await ingestComments(pageId, sessionId, incoming, db, now);
-    await enrichWithAi(pageId, sessionId, db);
+    await enrichWithAi(pageId, sessionId, db, AbortSignal.timeout(25_000), now);
   }
   return buildSnapshot(pageId, sessionId, db, now);
 }
@@ -369,7 +378,10 @@ interface CommentRow {
   sku: string | null; color: string | null; size: string | null; qty: number | null; group_key: string | null;
   reply_status: LiveReplyStatus; sent_at: string | null;
 }
-interface GroupRow { group_key: string; intent: LiveIntent; sku: string | null; reply_text: string; reply_source: LiveGroup['replySource']; revision: number }
+interface GroupRow {
+  group_key: string; intent: LiveIntent; sku: string | null; reply_text: string;
+  reply_source: LiveGroup['replySource'] | 'ai_failed'; revision: number;
+}
 
 function toComment(r: CommentRow): LiveComment {
   return {
@@ -478,7 +490,8 @@ export async function buildSnapshot(pageId: string, sessionId: string, db: Datab
     return {
       key: g.group_key, intent: g.intent, sku: g.sku, productName: productOf(products, g.sku)?.name ?? null,
       count: members.length, pending, sent, notAllowed: count(['not_allowed']),
-      status: groupStatus(pending, count(['sending']), sent), replyText: g.reply_text, replySource: g.reply_source,
+      status: groupStatus(pending, count(['sending']), sent), replyText: g.reply_text,
+      replySource: g.reply_source === 'ai_failed' ? 'template' : g.reply_source,
       needsHuman: HUMAN_INTENTS.includes(g.intent)
         || (!g.sku && ['order', 'price', 'stock', 'view', 'size_advice'].includes(g.intent))
         || (g.intent === 'question' && g.reply_source !== 'ai' && g.reply_source !== 'shop'),

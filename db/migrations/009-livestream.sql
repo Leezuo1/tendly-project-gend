@@ -49,11 +49,17 @@ CREATE TABLE IF NOT EXISTS live_groups (
   intent TEXT NOT NULL,
   sku TEXT,
   reply_text TEXT NOT NULL DEFAULT '',
-  reply_source TEXT NOT NULL DEFAULT 'template' CHECK (reply_source IN ('template', 'ai', 'ai_pending', 'shop')),
+  -- ai_failed: AI soạn lỗi, giữ câu mẫu và không tự gọi lại (tránh tốn chi phí lặp)
+  reply_source TEXT NOT NULL DEFAULT 'template' CHECK (reply_source IN ('template', 'ai', 'ai_pending', 'ai_failed', 'shop')),
   revision INTEGER NOT NULL DEFAULT 1,
   updated_at BIGINT NOT NULL,
   PRIMARY KEY (session_id, group_key)
 );
+
+-- Cập nhật ràng buộc cho database đã tạo bảng bằng bản migration cũ (chạy lại vẫn an toàn)
+ALTER TABLE live_groups DROP CONSTRAINT IF EXISTS live_groups_reply_source_check;
+ALTER TABLE live_groups ADD CONSTRAINT live_groups_reply_source_check
+  CHECK (reply_source IN ('template', 'ai', 'ai_pending', 'ai_failed', 'shop'));
 
 CREATE TABLE IF NOT EXISTS live_orders (
   id TEXT PRIMARY KEY,

@@ -49,7 +49,8 @@ export function demoScript(products: LiveProduct[]): { at: number; author: numbe
   const c = inStock.find((p) => p.sku !== a.sku && p.sku !== b.sku) ?? a;
   const col = (p: LiveProduct, i: number) => pick(p.colors, i);
   const sz = (p: LiveProduct, i: number) => pick(p.sizes, i, 'M');
-  const bOrders = Math.min(Math.max(b.qty + 2, 3), 7);
+  // Đủ người chốt để mẫu B bán hết trong phiên (thấy cảnh báo "hết hàng" + gợi ý mẫu khác)
+  const bOrders = Math.min(Math.max(b.qty + 2, 3), 12);
 
   const lines: [number, number, string][] = [
     [0, 0, 'Chào shop 👋'], [3, 1, 'giá bn shop'], [5, 2, 'xin giá'], [6, 3, 'ib giá'], [8, 4, 'giá sao ạ'],
@@ -64,7 +65,7 @@ export function demoScript(products: LiveProduct[]): { at: number; author: numbe
     [66, 9, 'giặt máy được không'], [70, 11, 'xin giá'], [72, 12, 'giá bn ạ'],
   ];
   // Từ giây 80 shop chuyển sang mẫu B → nhiều người chốt B vượt tồn kho
-  for (let i = 0; i < bOrders; i++) lines.push([80 + i * 4, (13 + i) % DEMO_NAMES.length, `chốt ${b.sku} ${sz(b, i)} ${col(b, i)}`.trim()]);
+  for (let i = 0; i < bOrders; i++) lines.push([80 + i * 3, (13 + i) % DEMO_NAMES.length, `chốt ${b.sku} ${sz(b, i)} ${col(b, i)}`.trim()]);
   lines.push(
     [112, 5, `giá ${b.sku} bn`], [115, 8, `còn ${b.sku} size ${sz(b, 1)} không`], [118, 14, '😍😍😍'],
     [122, 16, `chốt ${c.sku} ${sz(c, 1)}`], [126, 18, `lấy ${c.sku} ${col(c, 0)} ${sz(c, 0)}`], [130, 20, 'ship sài gòn mấy ngày'],

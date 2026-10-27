@@ -324,3 +324,24 @@ test('live APIs require the dashboard key and validate input before touching dat
     body: JSON.stringify({ text: 'x', revision: 1 }) }), { params: Promise.resolve({ id: 'not-a-uuid', key: 'price:AT-01' }) });
   assert.equal(res.status, 400);
 });
+
+test('a single unclear question waits for a batch (5 questions or 20 seconds) before calling AI', async () => {
+  const load = loader();
+  const { engine, session } = await demoSession(load);
+  process.env.GEMINI_API_KEY = 'test-key';
+  process.env.GEMINI_MODEL = 'test-model';
+  let calls = 0;
+  globalThis.fetch = async (url, init) => {
+    calls++;
+    const user = JSON.parse(JSON.parse(init.body).contents[0].parts[0].text);
+    return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items: user.comments.map((c) => ({ id: c.id, intent: 'question', sku: '' })) }) }] } }] });
+  };
+  const T = Date.now();
+  await engine.ingestComments('111', session.id, [{ commentId: 'q1', authorId: 'a', authorName: 'A', text: 'shop ơi mở cửa mấy giờ', createdAt: T }], pool, T);
+  assert.equal(await engine.enrichWithAi('111', session.id, pool, AbortSignal.timeout(5000), T + 1000), 0);
+  assert.equal(calls, 0);
+  // Sau 20 giây: 1 lần phân loại lô câu hỏi, rồi 1 lần soạn câu trả lời chung cho nhóm vừa phân loại xong
+  assert.equal(await engine.enrichWithAi('111', session.id, pool, AbortSignal.timeout(5000), T + 21_000), 2);
+  assert.equal(calls, 2);
+  assert.equal(await engine.enrichWithAi('111', session.id, pool, AbortSignal.timeout(5000), T + 60_000), 0, 'không gọi lại');
+});
