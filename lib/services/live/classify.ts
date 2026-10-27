@@ -91,19 +91,22 @@ function findQty(t: string): number | null {
 export function classifyLiveComment(
   text: string, products: LiveProduct[], onAir: LiveProduct | null = null, shopName = '',
 ): Classified {
-  const t = liveText(text);
-  const words = t.trim().split(' ').filter(Boolean);
-  const mentioned = findProduct(t, products, shopName);
+  // Ý định dò trên chữ đã mở rộng viết tắt; sản phẩm/màu/size dò trên chữ gốc đã bỏ dấu,
+  // vì viết tắt có thể trùng tên màu (vd "hong" = "không" nhưng cũng là màu "Hồng")
+  const raw = ` ${normalize(text)} `;
+  const mentioned = findProduct(raw, products, shopName);
   const product = mentioned ?? onAir;
-  const color = product ? findOption(t, product.colors) : null;
-  const size = product ? findOption(t, product.sizes.length ? product.sizes : GENERIC_SIZES) : findOption(t, GENERIC_SIZES);
-  const qty = findQty(t);
+  const color = product ? findOption(raw, product.colors) : null;
+  const size = product ? findOption(raw, product.sizes.length ? product.sizes : GENERIC_SIZES) : findOption(raw, GENERIC_SIZES);
+  const qty = findQty(raw);
+  const t = liveText(color ? raw.replace(` ${normalize(color)} `, ' ') : raw);
+  const words = t.trim().split(' ').filter(Boolean);
   const isQuestion = text.includes('?') || has(t, QUESTION);
   const out = (intent: LiveIntent, p: LiveProduct | null = product): Classified => ({
     intent, sku: p?.sku ?? null, color: p ? color : null, size, qty: intent === 'order' ? (qty ?? 1) : qty,
   });
 
-  if (!words.length) return out('other', null);
+  if (!raw.trim()) return out('other', null);
   if (has(t, COMPLAINT)) return out('complaint');
   if (has(t, RETURN)) return out('return');
   // Hỏi tư vấn size trước khi xét "chốt/lấy" vì "lấy size nào hợp" là câu hỏi, không phải chốt đơn
