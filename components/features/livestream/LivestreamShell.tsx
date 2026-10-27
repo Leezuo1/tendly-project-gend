@@ -11,6 +11,7 @@ import { MarketingDataNotice } from '@/components/features/marketing/MarketingDa
 import { useMarketingData } from '@/lib/hooks/useMarketingData';
 import { useLiveSession } from '@/lib/hooks/useLiveSession';
 import { liveClient } from '@/lib/services/liveClient';
+import { miniUrl, openLiveMini } from '@/lib/services/liveMiniWindow';
 import type { LiveGroup, LiveIntent, LiveOrderStatus, LiveSnapshot, LiveSourceOption } from '@/lib/types/live';
 import { formatMoney } from '@/lib/utils/format';
 
@@ -82,6 +83,20 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
       onToast(errorText(e));
     }
   };
+  const openMini = async () => {
+    const how = await openLiveMini(session.id);
+    onToast(how === 'pip' ? 'Đã mở cửa sổ nổi — kéo đặt cạnh màn hình live'
+      : how === 'popup' ? 'Trình duyệt không hỗ trợ cửa sổ nổi, đã mở cửa sổ nhỏ'
+        : 'Trình duyệt chặn cửa sổ bật lên, hãy cho phép popup');
+  };
+  const copyMiniLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${location.origin}${miniUrl(session.id)}`);
+      onToast('Đã chép link — mở trên điện thoại (cần nhập mã quản trị lần đầu)');
+    } catch {
+      onToast(`${location.origin}${miniUrl(session.id)}`);
+    }
+  };
   const addComment = (e: FormEvent) => {
     e.preventDefault();
     if (!comment.text.trim()) return;
@@ -116,6 +131,8 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
             </select>
           </label>
           {snapshot.onAir && <span className="hint">{formatMoney(snapshot.onAir.price)} · còn {snapshot.onAir.remaining}</span>}
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void openMini()}>🪟 Mở cửa sổ nổi</button>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => void copyMiniLink()}>📱 Link cho điện thoại</button>
           {live && (
             <button type="button" className="btn btn-outline btn-sm pc-danger"
               onClick={() => window.confirm('Kết thúc phiên live và tạo báo cáo?') && void run(() => liveClient.end(session.id), 'Đã kết thúc phiên')}>

@@ -24,6 +24,20 @@ apply(await liveClient.end(id));                                                
 const overview = await liveClient.insights();                                     // dashboard tổng quan
 ```
 
+## Cửa sổ nổi hỗ trợ lúc live
+
+`openLiveMini(sessionId)` trong `lib/services/liveMiniWindow.tsx` mở **cửa sổ nhỏ luôn nằm trên cùng** (Document Picture-in-Picture, Chrome/Edge). Người bán kéo cửa sổ này đặt cạnh màn hình đang phát live. Cửa sổ hiện:
+- Mẫu đang lên sóng và số còn lại.
+- Cảnh báo hết hàng, phàn nàn, đổi trả.
+- 3 mẫu nên lên sóng tiếp theo.
+- Các nhóm chờ nhắn riêng. Nút gửi bấm 2 lần mới gửi, không dùng `confirm()`.
+- Bình luận mới.
+
+Trình duyệt không hỗ trợ cửa sổ nổi thì hàm mở popup `/livestream/mini?session=…`. Link đó cũng mở được trên điện thoại.
+Hàm trả về `'pip' | 'popup' | 'blocked'`. Phải gọi hàm **trong lúc người dùng bấm nút**, vì trình duyệt chỉ cho mở cửa sổ khi có thao tác của người dùng.
+
+Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, cửa sổ nổi) **chung một vòng cập nhật**, nên không gọi `sync` trùng nhau. Khi tab chính bị ẩn nhưng cửa sổ nổi vẫn mở, dữ liệu vẫn tiếp tục cập nhật.
+
 ## Endpoints
 
 | Method | Đường dẫn | Body | Trả về |
