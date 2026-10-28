@@ -100,3 +100,44 @@ export function suggestAlternative(product: LiveProduct | null, products: LivePr
     ?? products.find((p) => p.sku !== product.sku && remainingOf(p.sku) > 0);
   return alt ? `${alt.name} (${alt.sku})` : null;
 }
+
+const QUESTION_TITLE: Partial<Record<LiveIntent, (name: string) => string>> = {
+  price: (n) => `${n} giá bao nhiêu?`,
+  stock: (n) => `${n} còn hàng không?`,
+  view: (n) => `Cho xem mẫu ${n}`,
+  size_advice: (n) => `${n} mặc size nào vừa?`,
+  order: (n) => `Chốt đơn ${n}`,
+};
+
+/**
+ * Câu hỏi đại diện của nhóm để hiện trên cửa sổ Trợ lý Live: có sản phẩm thì dùng câu chuẩn ("Đầm voan giá bao nhiêu?"),
+ * không thì lấy bình luận rõ nghĩa nhất trong nhóm (dài nhất nhưng không quá 120 ký tự).
+ */
+export function groupQuestion(intent: LiveIntent, productName: string | null, samples: string[]): string {
+  const title = productName ? QUESTION_TITLE[intent] : undefined;
+  if (title && productName) return title(productName);
+  const best = [...samples].map((s) => s.replace(/\s+/g, ' ').trim()).filter((s) => s && s.length <= 120)
+    .sort((a, b) => b.length - a.length)[0] ?? samples[0]?.slice(0, 120) ?? '';
+  if (!best) return 'Câu hỏi của khách';
+  const text = best.charAt(0).toUpperCase() + best.slice(1);
+  return /[?!.]$/.test(text) || intent === 'complaint' ? text : `${text}?`;
+}
+
+/** Phàn nàn / đổi trả: tiêu đề cảnh báo và gợi ý shop nói ngay trên live (lấy chính sách từ FAQ, không bịa). */
+export function groupAlert(intent: LiveIntent, people: number, samples: string[], knowledge: AiKnowledge): { title: string; tip: string } | null {
+  if (intent !== 'complaint' && intent !== 'return') return null;
+  const text = ` ${normalize(samples.join(' '))} `;
+  if (intent === 'return') {
+    const policy = faqAnswer(knowledge, ['doi tra', 'doi hang', 'tra hang', 'hoan tien', 'bao hanh']);
+    return { title: `${people} khách hỏi đổi trả`, tip: policy ? `Nhắc lại chính sách trên live: ${policy}` : 'Mời khách nhắn riêng mã đơn và ảnh sản phẩm để shop kiểm tra đổi trả.' };
+  }
+  const shipping = /\s(giao|ship|cham|chua nhan|van chuyen)/.test(text);
+  if (shipping) {
+    const policy = faqAnswer(knowledge, ['ship', 'giao hang', 'van chuyen', 'phi ship']);
+    return { title: `${people} khách phàn nàn giao hàng chậm`,
+      tip: policy ? `Xin lỗi khách và nói rõ: ${policy}` : 'Xin lỗi khách, hứa kiểm tra đơn và nhắn riêng ngay sau live.' };
+  }
+  const quality = /\s(loi|hong|rach|chat luong|sai hang|thieu)/.test(text);
+  return { title: `${people} khách phàn nàn${quality ? ' về chất lượng sản phẩm' : ''}`,
+    tip: 'Xin lỗi khách trên live, mời khách nhắn riêng mã đơn và ảnh để shop xử lý ngay sau phiên.' };
+}

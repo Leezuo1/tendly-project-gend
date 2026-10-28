@@ -12,7 +12,7 @@ Mọi API cần mã quản trị `DASHBOARD_KEY` (header `Authorization: Bearer 
 ## Dùng nhanh
 
 ```tsx
-const { snapshot, error, apply, reload } = useLiveSession(sessionId);
+const { snapshot, error, paused, setPaused, apply, reload } = useLiveSession(sessionId);
 // snapshot: LiveSnapshot | null — tự cập nhật khi đang live
 
 await liveClient.start({ platform: 'facebook', sourceKind: 'auto', title: 'Live tối thứ 6' }); // tự nhận video khi bật live
@@ -20,6 +20,9 @@ await liveClient.start({ platform: 'facebook', sourceKind: 'post', sourceId }); 
 apply(await liveClient.setOnAir(id, 'AT-01'));                                    // mẫu đang lên sóng
 const r = await liveClient.approve(id, group.key, text, group.revision);          // nhắn riêng cả nhóm
 apply(await liveClient.updateOrder(id, order.id, 'confirmed'));
+apply(await liveClient.markHandled(id, group.key));                               // "Đã trả lời" / "Đã xử lý"
+apply(await liveClient.replyPublicly(id, group.key, text, group.revision));       // trả lời bằng comment công khai
+apply(await liveClient.setFlashPrice(id, 'AT-01', 199000));                       // flash sale (null để tắt)
 apply(await liveClient.end(id));                                                  // kết thúc → snapshot.summary
 const overview = await liveClient.insights();                                     // dashboard tổng quan
 ```
@@ -37,12 +40,17 @@ Lưu ý: Meta chỉ cho Trang có **từ 100 người theo dõi** phát Live. Tr
 
 ## Cửa sổ nổi hỗ trợ lúc live
 
-`openLiveMini(sessionId)` trong `lib/services/liveMiniWindow.tsx` mở **cửa sổ nhỏ luôn nằm trên cùng** (Document Picture-in-Picture, Chrome/Edge). Người bán kéo cửa sổ này đặt cạnh màn hình đang phát live. Cửa sổ hiện:
-- Mẫu đang lên sóng và số còn lại.
-- Cảnh báo hết hàng, phàn nàn, đổi trả.
-- 3 mẫu nên lên sóng tiếp theo.
-- Các nhóm chờ nhắn riêng. Nút gửi bấm 2 lần mới gửi, không dùng `confirm()`.
-- Bình luận mới.
+`openLiveMini(sessionId)` trong `lib/services/liveMiniWindow.tsx` mở **cửa sổ "Trợ lý Live" luôn nằm trên cùng** (Document Picture-in-Picture, Chrome/Edge). Người bán kéo cửa sổ này đặt cạnh màn hình đang phát live.
+Header có chấm đỏ, thời gian live và các nút tạm dừng cập nhật / thu nhỏ / sáng-tối / mở trang đầy đủ. Cửa sổ có 3 tab:
+- **Ưu tiên (N)**: xếp theo bình luận trong livestream.
+  - Thẻ vàng cảnh báo phàn nàn/đổi trả (`group.alert`) kèm gợi ý nói trên live, nút "Đã xử lý".
+  - Thẻ "Trả lời ngay" cho câu hỏi nhiều người hỏi nhất: `question`, `askers`, `people`, câu trả lời gợi ý `preview`.
+    Nút "Đã trả lời", "Nhắn riêng N" và "Trả lời bằng comment".
+  - Danh sách các câu hỏi còn lại ("Set đồ ngủ lụa giá bao nhiêu? — 4 người"), bấm để đưa lên thẻ chính.
+- **Đơn (+N)**: đơn khách chốt trong live để shop chốt lại (Chốt đơn / Huỷ), nút nhắn xác nhận cho nhóm chốt đơn.
+- **Sản phẩm (N sắp hết)**: tồn kho, mẫu đang lên sóng, gợi ý mẫu tiếp theo, bật/sửa/tắt **flash sale**.
+
+Các nút gửi thật (nhắn riêng, comment) bấm 2 lần mới chạy, không dùng `confirm()` để không che màn hình live.
 
 Trình duyệt không hỗ trợ cửa sổ nổi thì hàm mở popup `/livestream/mini?session=…`. Link đó cũng mở được trên điện thoại.
 Hàm trả về `'pip' | 'popup' | 'blocked'`. Phải gọi hàm **trong lúc người dùng bấm nút**, vì trình duyệt chỉ cho mở cửa sổ khi có thao tác của người dùng.
@@ -60,6 +68,9 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
 | POST | `/api/live/sessions/:id/sync` | | `LiveSnapshot` (kéo bình luận mới, phân loại) |
 | POST | `/api/live/sessions/:id/on-air` | `{ sku \| null }` | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/groups/:key/approve` | `{ text, revision }` | `LiveSendResult & { revision }` |
+| POST | `/api/live/sessions/:id/groups/:key/handled` | | `LiveSnapshot` |
+| POST | `/api/live/sessions/:id/groups/:key/public-reply` | `{ text, revision }` | `{ commentId, repliedTo, snapshot }` |
+| POST | `/api/live/sessions/:id/flash` | `{ sku, price | null }` | `LiveSnapshot` |
 | PATCH | `/api/live/sessions/:id/orders/:orderId` | `{ status }` | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/end` | | `LiveSnapshot` có `summary` |
 | GET | `/api/live/insights` | | `LiveInsights` (theo phiên + theo tháng) |
@@ -79,6 +90,11 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
   - `replySource`: `template` (câu mẫu), `ai` (AI soạn), `shop` (shop đã sửa).
   - `replyText` có thể chứa placeholder, server tự điền riêng cho từng khách lúc gửi: `{ten_khach} {san_pham} {mau} {size} {so_luong} {gia} {con_lai} {ds_size} {ds_mau} {goi_y}`.
   - Phải gửi kèm **`revision` hiện tại** khi duyệt. Nếu lệch, API trả `409` ("Hãy tải lại").
+  - Cho cửa sổ Trợ lý Live: `question` (câu hỏi đại diện), `askers` (tối đa 3 tên, mới nhất trước), `people` (số khách khác nhau),
+    `preview` (câu trả lời đã điền sẵn), `alert` (`{ title, tip }` cho phàn nàn/đổi trả, tip lấy từ FAQ), `handledAt`, `publicReplied`.
+  - `handledAt`: lúc shop bấm "Đã trả lời". Các tin nhắn riêng đang chờ của nhóm bị bỏ; nhóm hiện lại khi có bình luận mới (`lastAt > handledAt`).
+- `products[]`: `price` là giá đang áp dụng, `basePrice` giá gốc, `flashPrice` giá flash sale (null = không có).
+  Flash sale áp dụng cho câu trả lời mẫu và đơn chốt **sau khi bật**; đơn chốt trước giữ giá cũ.
 - `orders`: **đơn nháp, mỗi khách một đơn**. Khách chốt nhiều lần thì được gộp vào đơn đó.
   - `items[].stockOk = false`: khách chốt lúc mẫu đã hết hàng. Món này không giữ hàng và vào nhóm `order_out:*` (tin nhắn báo hết và gợi ý mẫu khác).
   - `status`: `draft` → (sau khi nhắn xin SĐT/địa chỉ) `awaiting_info` → `confirmed`, hoặc `cancelled` (huỷ thì trả hàng đang giữ).
@@ -92,6 +108,8 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
   - Hệ thống kiểm tra `can_reply_privately` cho từng bình luận trước khi gửi.
   - Tin nào không rõ đã gửi hay chưa (`unknown`) thì **không tự gửi lại**.
   - Meta chỉ cho nhắn riêng **1 lần cho mỗi bình luận, trong 7 ngày**.
+- **Trả lời bằng comment** (`public-reply`): Trang trả lời công khai 1 lần dưới bình luận mới nhất của nhóm ("mọi người" thay cho tên khách), rồi đánh dấu nhóm đã xử lý.
+  Cần token có quyền **`pages_manage_engagement`**; thiếu thì API trả `403` với `code: 'NEED_PERMISSION'`.
 - Bình luận thuộc bài/video đang là nguồn của một phiên live sẽ bị **luồng Bình luận Fanpage bỏ qua**, để hai luồng không nhắn trùng.
 
 ## Chi phí AI

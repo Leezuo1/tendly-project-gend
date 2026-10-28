@@ -70,6 +70,20 @@ export interface LiveGroup {
   revision: number;
   samples: string[];
   lastAt: number;
+  /** Câu hỏi đại diện của nhóm để hiển thị (vd "Ship ra Hà Nội mấy ngày, có freeship không?"). */
+  question: string;
+  /** Tên vài khách trong nhóm (mới nhất trước), để hiện "Minh Thư, Thùy Dương và 1 người khác". */
+  askers: string[];
+  /** Số khách khác nhau trong nhóm. */
+  people: number;
+  /** Câu trả lời mẫu đã điền sẵn (không có tên khách) — "Có thể trả lời". */
+  preview: string;
+  /** Phàn nàn/đổi trả: tiêu đề cảnh báo + gợi ý shop nói trên live. */
+  alert: { title: string; tip: string } | null;
+  /** Shop đã bấm "Đã trả lời"/"Đã xử lý" (null = chưa). Bình luận mới sau đó vẫn hiện lại. */
+  handledAt: number | null;
+  /** Đã trả lời công khai bằng comment của Trang. */
+  publicReplied: boolean;
 }
 
 export interface LiveOrderItem {
@@ -177,7 +191,8 @@ export interface LiveSnapshot {
   /** Có khi phiên đã kết thúc. */
   summary: LiveSummary | null;
   /** Sản phẩm của phiên (để chọn mẫu đang lên sóng). */
-  products: { sku: string; name: string; price: number; stock: number }[];
+  /** price = giá đang áp dụng (đã tính flash sale), basePrice = giá gốc trong Cấu hình AI. */
+  products: { sku: string; name: string; price: number; basePrice: number; flashPrice: number | null; stock: number }[];
 }
 
 export interface LiveSessionListItem {

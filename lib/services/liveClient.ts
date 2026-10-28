@@ -37,6 +37,15 @@ export const liveClient = {
     dashboardRequest(`${session(id)}/orders/${encodeURIComponent(orderId)}`, { method: 'PATCH', body: JSON.stringify({ status }) })
       .then(json<LiveSnapshot>),
   end: (id: string) => post(`${session(id)}/end`).then(json<LiveSnapshot>),
+  /** "Đã trả lời" / "Đã xử lý": shop đã trả lời trên live, bỏ các tin nhắn riêng đang chờ của nhóm. */
+  markHandled: (id: string, groupKey: string) =>
+    post(`${session(id)}/groups/${encodeURIComponent(groupKey)}/handled`).then(json<LiveSnapshot>),
+  /** "Trả lời bằng comment": Trang trả lời công khai 1 lần cho cả nhóm (cần quyền pages_manage_engagement). */
+  replyPublicly: (id: string, groupKey: string, text: string, revision: number) =>
+    post(`${session(id)}/groups/${encodeURIComponent(groupKey)}/public-reply`, { text, revision })
+      .then(json<{ commentId: string; snapshot: LiveSnapshot }>).then((r) => r.snapshot),
+  /** Flash sale trong phiên: price = null để tắt. */
+  setFlashPrice: (id: string, sku: string, price: number | null) => post(`${session(id)}/flash`, { sku, price }).then(json<LiveSnapshot>),
   insights: () => dashboardRequest('/api/live/insights').then(json<LiveInsights>),
 
   /**

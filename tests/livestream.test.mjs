@@ -424,3 +424,95 @@ test('Facebook auto mode binds the Page live video as soon as the seller goes li
   const row = (await query('SELECT source_post_id FROM live_sessions WHERE id=$1', [session.id])).rows[0];
   assert.equal(row.source_post_id, '111_888', 'luồng bình luận Fanpage bỏ qua bình luận của video live này');
 });
+
+test('Trợ lý Live: question title, askers, suggested answer and complaint alerts with a tip from the FAQ', async () => {
+  const load = loader();
+  const { engine, session } = await liveSession(load);
+  fakeMeta();
+  const snap = await engine.syncSession('111', session.id, pool, START + 120_000);
+  const price = snap.groups.find((g) => g.key === 'price:AT-01');
+  assert.equal(price.question, 'Áo thun basic cotton Tendly giá bao nhiêu?');
+  assert.equal(price.people, 8);
+  assert.equal(price.askers.length, 3);
+  assert.equal(price.askers[0], NAMES[7], 'người hỏi mới nhất trước');
+  assert.match(price.preview, /259\.000đ/);
+  assert.doesNotMatch(price.preview, /\{/);
+  const complaint = snap.groups.find((g) => g.intent === 'complaint');
+  assert.match(complaint.alert.title, /1 khách phàn nàn giao hàng chậm/);
+  assert.match(complaint.alert.tip, /30k/, 'gợi ý lấy chính sách ship từ FAQ');
+  assert.equal(snap.groups.find((g) => g.intent === 'shipping').alert, null);
+  assert.equal(snap.groups.find((g) => g.intent === 'return').alert.title, '1 khách hỏi đổi trả');
+});
+
+test('"Đã trả lời" clears pending private replies of the group; new comments bring it back', async () => {
+  const load = loader();
+  const { engine, session } = await liveSession(load);
+  const ask = (id, author, at) => engine.ingestComments('111', session.id,
+    [{ commentId: id, authorId: author, authorName: author, text: 'giá bn', createdAt: START + at }], pool, START + at);
+  await ask('a1', 'u1', 1000);
+  await ask('a2', 'u2', 2000);
+  await engine.markGroupHandled('111', session.id, 'price:AT-01', pool, START + 3000);
+  let group = (await engine.buildSnapshot('111', session.id, pool)).groups.find((g) => g.key === 'price:AT-01');
+  assert.equal(group.pending, 0);
+  assert.equal(group.handledAt, START + 3000);
+  assert.ok(group.lastAt <= group.handledAt);
+  await ask('a3', 'u3', 4000);
+  group = (await engine.buildSnapshot('111', session.id, pool)).groups.find((g) => g.key === 'price:AT-01');
+  assert.equal(group.pending, 1, 'chỉ bình luận mới chờ nhắn riêng');
+  assert.ok(group.lastAt > group.handledAt);
+  await assert.rejects(engine.markGroupHandled('111', session.id, 'price:XX', pool), /Không tìm thấy nhóm/);
+});
+
+test('flash sale changes the price in suggested replies and new orders; turning it off restores the base price', async () => {
+  const load = loader();
+  const { engine, session } = await liveSession(load);
+  await assert.rejects(engine.setFlashPrice('111', session.id, 'NOPE', 1000, pool), /không có trong danh mục/);
+  await assert.rejects(engine.setFlashPrice('111', session.id, 'AT-01', -5, pool), /không hợp lệ/);
+  await engine.setFlashPrice('111', session.id, 'AT-01', 199000, pool);
+  await engine.ingestComments('111', session.id, [
+    { commentId: 'f1', authorId: 'u1', authorName: 'Lan', text: 'giá bn', createdAt: START + 1000 },
+    { commentId: 'f2', authorId: 'u2', authorName: 'Hà', text: 'chốt M trắng', createdAt: START + 2000 },
+  ], pool, START + 3000);
+  let snap = await engine.buildSnapshot('111', session.id, pool);
+  const p = snap.products.find((x) => x.sku === 'AT-01');
+  assert.deepEqual([p.price, p.basePrice, p.flashPrice], [199000, 259000, 199000]);
+  assert.equal(snap.onAir.price, 199000);
+  assert.match(snap.groups.find((g) => g.key === 'price:AT-01').preview, /199\.000đ/);
+  assert.equal(snap.orders[0].items[0].price, 199000);
+  await engine.setFlashPrice('111', session.id, 'AT-01', null, pool);
+  snap = await engine.buildSnapshot('111', session.id, pool);
+  assert.equal(snap.products.find((x) => x.sku === 'AT-01').flashPrice, null);
+  assert.match(snap.groups.find((g) => g.key === 'price:AT-01').preview, /259\.000đ/);
+  assert.equal(snap.orders[0].items[0].price, 199000, 'đơn đã chốt giữ giá flash sale');
+});
+
+test('public reply posts once under the newest comment of the group and reports a missing permission clearly', async () => {
+  const load = loader();
+  const { engine, session } = await liveSession(load);
+  const reply = load('lib/services/live/reply.ts');
+  await engine.ingestComments('111', session.id, [
+    { commentId: 'p1', authorId: 'u1', authorName: 'Lan', text: 'giá bn', createdAt: START + 1000 },
+    { commentId: 'p2', authorId: 'u2', authorName: 'Hà', text: 'xin giá', createdAt: START + 2000 },
+  ], pool, START + 3000);
+  const group = (await engine.buildSnapshot('111', session.id, pool)).groups.find((g) => g.key === 'price:AT-01');
+
+  globalThis.fetch = async () => Response.json({ error: { code: 200, message: 'Requires pages_manage_engagement permission' } }, { status: 403 });
+  await assert.rejects(reply.replyPublicly('111', session.id, group.key, group.replyText, group.revision, pool, START + 4000),
+    (e) => e.status === 403 && e.code === 'NEED_PERMISSION');
+
+  const posts = [];
+  globalThis.fetch = async (url, init) => {
+    posts.push({ url: String(url), body: JSON.parse(init.body) });
+    return Response.json({ id: 'p2_reply' });
+  };
+  const result = await reply.replyPublicly('111', session.id, group.key, group.replyText, group.revision, pool, START + 5000);
+  assert.deepEqual(result, { commentId: 'p2_reply', repliedTo: 'p2' });
+  assert.match(posts[0].url, /\/p2\/comments$/);
+  assert.match(posts[0].body.message, /mọi người/);
+  assert.match(posts[0].body.message, /259\.000đ/);
+  const after = (await engine.buildSnapshot('111', session.id, pool)).groups.find((g) => g.key === 'price:AT-01');
+  assert.equal(after.publicReplied, true);
+  assert.equal(after.pending, 0, 'đã trả lời công khai thì không nhắn riêng nữa');
+  await assert.rejects(reply.replyPublicly('111', session.id, group.key, group.replyText, group.revision, pool, START + 6000), /vừa được trả lời/);
+  assert.equal(posts.length, 1);
+});

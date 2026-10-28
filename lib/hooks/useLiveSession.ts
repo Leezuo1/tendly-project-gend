@@ -14,6 +14,8 @@ const POLL_MS = 3000;
 interface SessionState {
   snapshot: LiveSnapshot | null;
   error: unknown;
+  /** Người bán bấm tạm dừng: ngừng kéo bình luận mới (dữ liệu cũ vẫn hiển thị). Dùng chung cho mọi cửa sổ. */
+  paused: boolean;
 }
 
 interface Store {
@@ -47,7 +49,7 @@ function start(id: string, store: Store) {
   if (store.timer) clearTimeout(store.timer);
   const tick = async (first: boolean) => {
     if (run !== store.run) return;
-    if (!first && !anySurfaceVisible()) {
+    if (!first && (store.state.paused || !anySurfaceVisible())) {
       store.timer = setTimeout(() => void tick(false), POLL_MS);
       return;
     }
@@ -55,7 +57,7 @@ function start(id: string, store: Store) {
     try {
       const next = first ? await liveClient.snapshot(id) : await liveClient.sync(id);
       if (run !== store.run) return;
-      store.state = { snapshot: next, error: null };
+      store.state = { ...store.state, snapshot: next, error: null };
       live = next.session.status === 'live';
     } catch (error) {
       if (run !== store.run) return;
@@ -70,7 +72,7 @@ function start(id: string, store: Store) {
 function storeFor(id: string): Store {
   let store = stores.get(id);
   if (!store) {
-    store = { state: { snapshot: null, error: null }, listeners: new Set(), run: 0 };
+    store = { state: { snapshot: null, error: null, paused: false }, listeners: new Set(), run: 0 };
     stores.set(id, store);
   }
   return store;
@@ -89,12 +91,13 @@ function subscribe(id: string, listener: () => void) {
   };
 }
 
-const EMPTY: SessionState = { snapshot: null, error: null };
+const EMPTY: SessionState = { snapshot: null, error: null, paused: false };
 const noop = () => () => {};
 
 /**
  * Dữ liệu của 1 phiên live cho dashboard. Đang live: gọi sync, chờ 3 giây sau khi request trước xong rồi gọi tiếp,
  * tạm dừng khi không còn chỗ nào đang hiển thị (tab ẩn và không có cửa sổ nổi). Phiên đã kết thúc: tải snapshot 1 lần.
+ * `setPaused(true)` ngừng kéo bình luận mới cho tới khi bỏ tạm dừng.
  * `apply(snapshot)` cập nhật ngay sau các thao tác (đổi mẫu lên sóng, duyệt nhóm...) trả về snapshot mới.
  */
 export function useLiveSession(sessionId: string | null) {
@@ -105,13 +108,19 @@ export function useLiveSession(sessionId: string | null) {
   );
   const apply = useCallback((next: LiveSnapshot) => {
     const store = storeFor(next.session.id);
-    store.state = { snapshot: next, error: null };
+    store.state = { ...store.state, snapshot: next, error: null };
     notify(store);
   }, []);
+  const setPaused = useCallback((paused: boolean) => {
+    if (!sessionId) return;
+    const store = storeFor(sessionId);
+    store.state = { ...store.state, paused };
+    notify(store);
+  }, [sessionId]);
   const reload = useCallback(() => {
     if (!sessionId) return;
     const store = storeFor(sessionId);
     if (store.listeners.size) start(sessionId, store);
   }, [sessionId]);
-  return { snapshot: state.snapshot, error: state.error, apply, reload };
+  return { snapshot: state.snapshot, error: state.error, paused: state.paused, setPaused, apply, reload };
 }
