@@ -17,7 +17,7 @@ import type {
 } from '@/lib/types/live';
 import { classifyLiveComment, groupKeyOf, HUMAN_INTENTS, type LiveProduct } from '@/lib/services/live/classify';
 import { findLiveVideo, listNewComments, type IncomingComment } from '@/lib/services/live/sources';
-import { groupTemplate } from '@/lib/services/live/templates';
+import { fillTemplate, groupAlert, groupQuestion, groupTemplate, suggestAlternative } from '@/lib/services/live/templates';
 
 export type Database = Pick<Pool, 'query' | 'connect'>;
 type Queryable = Pick<Pool, 'query'> | PoolClient;
@@ -38,14 +38,18 @@ interface SessionRow {
   id: string; page_id: string; platform: LivePlatform; source_kind: LiveSourceKind | null; source_id: string | null;
   source_post_id: string | null; title: string; status: 'live' | 'ended'; on_air_sku: string | null;
   knowledge_json: unknown; started_at: string; ended_at: string | null; ai_calls: number; summary_json: LiveSummary | null;
-  live_at: string | null; synced_at: string;
+  live_at: string | null; synced_at: string; flash_json?: Record<string, number> | string | null;
 }
 
 export interface LoadedSession {
   row: SessionRow;
   session: LiveSession;
+  /** knowledge.products và products đã áp giá flash sale của phiên. */
   knowledge: AiKnowledge;
   products: LiveProduct[];
+  /** Giá flash sale đang bật: { SKU: giá }. */
+  flash: Record<string, number>;
+  basePrice: (sku: string) => number | null;
 }
 
 function toSession(row: SessionRow): LiveSession {
@@ -62,8 +66,17 @@ export async function loadSession(pageId: string, sessionId: string, db: Queryab
   const { rows } = await db.query('SELECT * FROM live_sessions WHERE page_id=$1 AND id=$2', [pageId, sessionId]);
   if (!rows.length) throw new LiveError('Không tìm thấy phiên live.', 404);
   const row = rows[0] as SessionRow;
-  const knowledge = parseAiKnowledge(row.knowledge_json);
-  return { row, session: toSession(row), knowledge, products: knowledge.products };
+  const base = parseAiKnowledge(row.knowledge_json);
+  const rawFlash = typeof row.flash_json === 'string' ? JSON.parse(row.flash_json) : row.flash_json ?? {};
+  const flash: Record<string, number> = {};
+  for (const [sku, price] of Object.entries(rawFlash as Record<string, unknown>)) {
+    if (typeof price === 'number' && Number.isFinite(price) && price >= 0) flash[sku] = price;
+  }
+  // Flash sale áp vào giá dùng cho câu trả lời mẫu, đơn chốt sau khi bật và snapshot
+  const products = base.products.map((p) => (p.sku in flash ? { ...p, price: flash[p.sku] } : p));
+  const knowledge = { ...base, products };
+  const basePrice = (sku: string) => base.products.find((p) => p.sku === sku)?.price ?? null;
+  return { row, session: toSession(row), knowledge, products, flash, basePrice };
 }
 
 const productOf = (products: LiveProduct[], sku: string | null) => (sku ? products.find((p) => p.sku === sku) ?? null : null);
@@ -390,6 +403,7 @@ interface CommentRow {
 interface GroupRow {
   group_key: string; intent: LiveIntent; sku: string | null; reply_text: string;
   reply_source: LiveGroup['replySource'] | 'ai_failed'; revision: number;
+  handled_at?: string | null; public_reply_id?: string | null;
 }
 
 function toComment(r: CommentRow): LiveComment {
@@ -479,9 +493,30 @@ function computeSummary(session: LiveSession, products: LiveProduct[], comments:
   };
 }
 
+/** Trường hiển thị cho cửa sổ Trợ lý Live: câu hỏi đại diện, ai hỏi, câu trả lời gợi ý, cảnh báo. */
+function groupExtras(g: GroupRow, members: CommentRow[], products: LiveProduct[], knowledge: AiKnowledge,
+  remainingOf: (sku: string) => number) {
+  const product = productOf(products, g.sku);
+  const people = new Set(members.map((c) => c.author_id)).size;
+  const askers = [...new Set(members.map((c) => c.author_name.trim()).filter(Boolean))].slice(0, 3);
+  const samples = members.slice(0, 8).map((c) => c.text);
+  return {
+    question: groupQuestion(g.intent, product?.name ?? null, samples),
+    askers,
+    people,
+    preview: fillTemplate(g.reply_text, {
+      customerName: 'bạn', product, color: null, size: null, qty: null,
+      remaining: product ? remainingOf(product.sku) : null, suggestion: suggestAlternative(product, products, remainingOf),
+    }),
+    alert: groupAlert(g.intent, people, samples, knowledge),
+    handledAt: g.handled_at === null || g.handled_at === undefined ? null : Number(g.handled_at),
+    publicReplied: Boolean(g.public_reply_id && !String(g.public_reply_id).startsWith('pending:')),
+  };
+}
+
 export async function buildSnapshot(pageId: string, sessionId: string, db: Database = getMessengerPool(),
   now = Date.now()): Promise<LiveSnapshot> {
-  const { row, session, products } = await loadSession(pageId, sessionId, db);
+  const { row, session, products, knowledge, flash, basePrice } = await loadSession(pageId, sessionId, db);
   const comments = (await db.query(`SELECT comment_id,author_id,author_name,text,created_at,intent,sku,color,size,qty,group_key,
     reply_status,sent_at FROM live_comments WHERE session_id=$1 ORDER BY created_at DESC, comment_id DESC LIMIT ${MAX_COMMENTS_READ}`,
   [sessionId])).rows as CommentRow[];
@@ -507,6 +542,7 @@ export async function buildSnapshot(pageId: string, sessionId: string, db: Datab
       revision: Number(g.revision),
       samples: members.slice(0, 5).map((c) => c.text),
       lastAt: members.length ? Number(members[0].created_at) : 0,
+      ...groupExtras(g, members, products, knowledge, remainingOf),
     };
   }).filter((g) => g.count > 0)
     .sort((a, b) => (b.pending > 0 ? 1 : 0) - (a.pending > 0 ? 1 : 0) || b.count - a.count || b.lastAt - a.lastAt);
@@ -568,7 +604,10 @@ export async function buildSnapshot(pageId: string, sessionId: string, db: Datab
     orders,
     recent: comments.slice(0, 50).map(toComment),
     summary: row.summary_json ? jsonValue(row.summary_json) : null,
-    products: products.map((p) => ({ sku: p.sku, name: p.name, price: p.price, stock: p.qty })),
+    products: products.map((p) => ({
+      sku: p.sku, name: p.name, price: p.price, basePrice: basePrice(p.sku) ?? p.price,
+      flashPrice: p.sku in flash ? flash[p.sku] : null, stock: p.qty,
+    })),
   };
 }
 
@@ -580,6 +619,32 @@ export async function updateOrderStatus(pageId: string, sessionId: string, order
   const result = await db.query('UPDATE live_orders SET status=$3, updated_at=$4 WHERE session_id=$1 AND id=$2',
     [sessionId, orderId, status, Date.now()]);
   if (!result.rowCount) throw new LiveError('Không tìm thấy đơn.', 404);
+}
+
+/**
+ * "Đã trả lời" / "Đã xử lý": shop đã trả lời trên live nên không cần nhắn riêng các bình luận đang chờ của nhóm.
+ * Bình luận mới vào nhóm sau đó vẫn hiện lại để xử lý tiếp.
+ */
+export async function markGroupHandled(pageId: string, sessionId: string, groupKey: string,
+  db: Database = getMessengerPool(), now = Date.now()) {
+  await loadSession(pageId, sessionId, db);
+  const updated = await db.query('UPDATE live_groups SET handled_at=$3 WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey, now]);
+  if (!updated.rowCount) throw new LiveError('Không tìm thấy nhóm bình luận.', 404);
+  await db.query(`UPDATE live_comments SET reply_status='none'
+    WHERE session_id=$1 AND group_key=$2 AND reply_status IN ('review','failed') AND created_at<=$3`, [sessionId, groupKey, now]);
+}
+
+/** Bật/tắt giá flash sale cho 1 mẫu trong phiên (price = null để tắt). Đơn đã chốt trước đó giữ giá cũ. */
+export async function setFlashPrice(pageId: string, sessionId: string, sku: string, price: number | null,
+  db: Database = getMessengerPool()) {
+  const { session, products, flash } = await loadSession(pageId, sessionId, db);
+  if (session.status !== 'live') throw new LiveError('Phiên live đã kết thúc.', 409);
+  if (!productOf(products, sku)) throw new LiveError('Sản phẩm không có trong danh mục của phiên.');
+  if (price !== null && (!Number.isInteger(price) || price < 0 || price > 1_000_000_000)) throw new LiveError('Giá flash sale không hợp lệ.');
+  const next = { ...flash };
+  if (price === null) delete next[sku]; else next[sku] = price;
+  await db.query('UPDATE live_sessions SET flash_json=$3::jsonb WHERE page_id=$1 AND id=$2', [pageId, sessionId, JSON.stringify(next)]);
+  // Câu trả lời mẫu đã sửa tay vẫn giữ; câu mẫu tự điền {gia} nên tự đổi theo giá mới
 }
 
 // ---------------------------------------------------------------- end + reports
