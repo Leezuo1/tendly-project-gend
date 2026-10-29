@@ -59,6 +59,7 @@ export interface CustomerProfile {
 }
 
 export interface Conversation {
+  waitingConfirmation?: boolean;
   memory?: ConversationMemoryEntry[];
   personalitySummary?: string;
   messenger?: { pageId: string; psid: string; hasOlder: boolean; viewStartAt?: number };

@@ -17,7 +17,7 @@ function loadModules(overrides = {}) {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
     }).outputText;
     new Function('require', 'module', 'exports', compiled)(
-      (name) => name.startsWith('@/') ? load(name.slice(2) + '.ts') : require(name), loadedModule, loadedModule.exports);
+      (name) => overrides[name] ?? (name.startsWith('@/') ? load(name.slice(2) + '.ts') : require(name)), loadedModule, loadedModule.exports);
     return loadedModule.exports;
   };
   return load;
@@ -58,11 +58,15 @@ test('webhook verifies challenges, rejects untrusted payloads, writes only signe
   const names = ['APP_SECRET', 'PAGE_ID', 'VERIFY_TOKEN', 'DATABASE_URL', 'VERCEL'];
   const old = Object.fromEntries(names.map((key) => [key, process.env[key]]));
   const stored = new Map();
+  const callbacks = [];
+  const aiCalls = [];
   let failStorage = false;
   try {
     process.env.DATABASE_URL = 'postgresql://test-only'; delete process.env.VERCEL;
     process.env.APP_SECRET = 'test-secret'; process.env.PAGE_ID = '111'; process.env.VERIFY_TOKEN = 'test-verify';
     const load = loadModules({
+      'next/server': { after: (callback) => callbacks.push(callback) },
+      'lib/services/messengerAi.ts': { processMessengerAi: async (...args) => aiCalls.push(args) },
       'lib/services/messengerPostgres.ts': {
         async savePostgresMessages(messages) {
           if (failStorage) throw new Error('Storage unavailable');
@@ -85,6 +89,10 @@ test('webhook verifies challenges, rejects untrusted payloads, writes only signe
     assert.equal((await post('x'.repeat(1024 * 1024 + 1))).status, 413);
     assert.equal((await post(raw)).status, 200);
     assert.equal((await post(raw)).status, 200);
+    assert.equal(aiCalls.length, 0);
+    assert.equal(callbacks.length, 2);
+    for (const callback of callbacks) await callback();
+    assert.deepEqual(aiCalls, [['111', '222'], ['111', '222']]);
     assert.equal(stored.size, 1);
     assert.equal(stored.get('m1').text, event().message.text);
     failStorage = true;

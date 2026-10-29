@@ -65,6 +65,7 @@
 .marketing-root .fc-detail .card-head { flex-wrap: wrap; gap: 8px; }
 .marketing-root .fc-detail a { color: #A73B37; font-size: 13px; font-weight: 600; }
 .marketing-root .fc-detail-body { padding: 20px; display: grid; gap: 16px; }
+.marketing-root .fc-thread { display: grid; gap: 8px; max-height: 300px; overflow: auto; }
 .marketing-root .fc-detail blockquote { margin: 0; padding: 12px 16px; border-left: 3px solid var(--coral); background: var(--canvas); white-space: pre-wrap; overflow-wrap: anywhere; }
 .marketing-root .fc-post { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
 .marketing-root .fc-reason { margin: 0; color: var(--ink-soft); font-size: 13px; }

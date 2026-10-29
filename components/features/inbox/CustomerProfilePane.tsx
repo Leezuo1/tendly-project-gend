@@ -7,6 +7,7 @@ import { EMOTION_LABELS } from '@/lib/services/inboxAi';
 import { CustomerAvatar } from './CustomerAvatar';
 
 interface CustomerProfilePaneProps {
+  waitingConfirmation?: boolean;
   profile: CustomerProfile;
   analysis?: AiMessageAnalysis;
   aiStatus?: 'analyzing' | 'ready' | 'error';
@@ -14,7 +15,7 @@ interface CustomerProfilePaneProps {
   personalitySummary?: string;
 }
 
-export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, personalitySummary }: CustomerProfilePaneProps) {
+export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, personalitySummary, waitingConfirmation }: CustomerProfilePaneProps) {
   return (
     <div className="profile-pane">
       {/* Profile Head */}
@@ -44,7 +45,7 @@ export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, 
           <strong>Hiện tại:</strong> {aiStatus === 'analyzing' ? 'Đang phân tích…'
             : aiStatus === 'error' ? 'Chưa cập nhật cảm xúc'
             : analysis ? EMOTION_LABELS[analysis.emotion] : 'Chưa xác định'}
-          {' · '}{!isUnreplied ? 'Đã trả lời' : analysis?.needsHuman ? 'Cần nhân viên' : analysis?.priority === 'high' ? 'Khẩn cấp' : 'Chờ trả lời'}
+          {' · '}{!isUnreplied ? 'Đã trả lời' : waitingConfirmation ? 'Chờ xác nhận' : analysis?.needsHuman ? 'Cần nhân viên' : analysis?.priority === 'high' ? 'Khẩn cấp' : 'Chờ trả lời'}
         </p>
       </div>
 

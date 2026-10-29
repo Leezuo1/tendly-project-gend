@@ -13,6 +13,7 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/011-messenger-ai.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
@@ -44,6 +45,7 @@ const m = (messageId, extra = {}) => ({ pageId: '111', psid: '222', messageId, d
 async function fixture() {
   await ready;
   await db.exec('TRUNCATE messenger_analysis_history, messenger_outbound_requests, messenger_messages, messenger_conversations, messenger_customers CASCADE');
+  await db.exec('TRUNCATE messenger_ai_settings');
   const load = loader();
   const writer = load('lib/services/messengerPostgres.ts');
   return { load, writer };
@@ -55,6 +57,175 @@ Object.assign(process.env, { PAGE_ID: '111', PAGE_ACCESS_TOKEN: 'test-page-token
 after(() => { for (const [key, value] of Object.entries(original)) {
   if (value === undefined) delete process.env[key]; else process.env[key] = value;
 } });
+
+async function aiFixture(enabled = true) {
+  const { load, writer } = await fixture();
+  const state = { canAutoReply: true, sends: 0, beforeReply: async () => {}, failSend: false, failAi: false };
+  const knowledge = { shop: { name: 'Shop', email: '', phone: '' },
+    productSource: { name: 'Catalog', connected: true, lastSyncedAt: 1 }, products: [],
+    faqs: [{ id: 'f1', question: 'Giờ mở cửa?', answer: '8 giờ', tag: '', keywords: [], active: true }], emailTriggers: [] };
+  const service = loader({
+    'lib/services/gemini.ts': { generateGeminiJson: async (options) => {
+      await state.beforeReply(options);
+      if (state.failAi) throw new Error('AI unavailable');
+      return { model: 'test', result: options.parse(JSON.stringify({ reply: 'Shop mở cửa lúc 8 giờ.', analysis: {
+        sentiment: 'neutral', emotion: 'neutral', priority: 'normal', needsHuman: false,
+        reason: state.canAutoReply ? 'Dựa vào FAQ giờ mở cửa.' : 'Thiếu dữ liệu đơn hàng.',
+        canAutoReply: state.canAutoReply,
+      } })) };
+    } },
+    'lib/services/messengerSend.ts': { sendMessengerMessage: (input) => load('lib/services/messengerSend.ts').sendMessengerMessage(input, pool, async () => {
+      state.sends++;
+      if (state.failSend) throw new Error('Timeout after sending');
+      return Response.json({ message_id: 'auto-' + state.sends });
+    }) },
+  })('lib/services/messengerAi.ts');
+  await service.saveMessengerAiSettings('111', enabled, knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 10000]);
+  const incoming = async (id, extra = {}) => writer.savePostgresMessages([m(id, { timestamp: Date.now() - 10, ...extra })], pool);
+  const process = () => service.processMessengerAi('111', '222', undefined, pool);
+  return { state, service, writer, incoming, process, knowledge, load };
+}
+
+test('Messenger AI defaults off, analyzes without sending, and sends one grounded reply when enabled', async () => {
+  const f = await aiFixture(false);
+  assert.equal((await f.service.readMessengerAiSettings('999', pool)).autoReply, false);
+  await f.incoming('off'); await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'ready');
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  await f.incoming('on');
+  await Promise.all([f.process(), f.process()]);
+  await f.process();
+  assert.equal(f.state.sends, 1);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='on'")).rows[0].status, 'sent');
+});
+
+test('insufficient evidence stays pending above unread/urgent threads, survives enabling AI, and blocks later auto replies until manual response', async () => {
+  const f = await aiFixture(false);
+  f.state.canAutoReply = false;
+  await f.incoming('missing'); await f.process();
+  await f.incoming('unread-other', { psid: '333', timestamp: Date.now() });
+  let snapshot = await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 1, pool);
+  assert.equal(snapshot.conversations[0].psid, '222');
+  assert.equal(snapshot.conversations[0].waitingConfirmation, true);
+  const view = f.load('lib/services/messengerView.ts').mergeMessengerThread(snapshot.conversations[0]);
+  const inbox = f.load('lib/services/inboxAi.ts');
+  assert.equal(inbox.sortReplyQueue([{ ...view, id: 'unread', hasNewMessage: true, waitingConfirmation: false },
+    { ...view, hasNewMessage: false }])[0].id, view.id);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  f.state.canAutoReply = true;
+  await f.incoming('followup'); await f.process();
+  assert.equal(f.state.sends, 0);
+  await f.writer.savePostgresMessages([m('manual', { direction: 'out', timestamp: Date.now() })], pool);
+  snapshot = await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool);
+  assert.equal(snapshot.conversations.find((c) => c.psid === '222').waitingConfirmation, false);
+  await f.incoming('after-manual', { timestamp: Date.now() + 1 }); await f.process();
+  assert.equal(f.state.sends, 1);
+});
+
+test('missing evidence flag, unread attachments and AI errors fail closed with persistent review', async () => {
+  for (const mode of ['missing-flag', 'attachment', 'ai-error']) {
+    const f = await aiFixture();
+    if (mode === 'missing-flag') f.state.canAutoReply = undefined;
+    if (mode === 'ai-error') f.state.failAi = true;
+    await f.incoming(mode, mode === 'attachment' ? { attachments: [{ type: 'image', url: 'https://example.com/a.jpg' }] } : {});
+    if (mode === 'ai-error') await assert.rejects(f.process(), /căn cứ/);
+    else await f.process();
+    assert.equal(f.state.sends, 0);
+    assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'review');
+  }
+});
+
+test('turning off AI, receiving a newer question or a manual reply during generation prevents a stale automatic send', async () => {
+  for (const mode of ['off', 'new-message', 'manual', 'hidden']) {
+    const f = await aiFixture();
+    await f.incoming('original');
+    f.state.beforeReply = async () => {
+      if (mode === 'off') await f.service.saveMessengerAiSettings('111', false, undefined, pool);
+      if (mode === 'new-message') await f.incoming('newer', { timestamp: Date.now() + 1 });
+      if (mode === 'manual') await f.writer.savePostgresMessages([m('manual', { direction: 'out' })], pool);
+      if (mode === 'hidden') await f.load('lib/services/conversationMemory.ts').hideConversation('111', '222', pool);
+    };
+    await f.process();
+    assert.equal(f.state.sends, mode === 'new-message' ? 1 : 0, mode);
+    if (mode === 'new-message') assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='original'")).rows[0].status, 'ready');
+  }
+});
+
+test('a newer message waits for earlier pending analysis; sufficient messages resume and missing evidence blocks the whole conversation', async () => {
+  for (const sufficient of [false, true]) {
+    const f = await aiFixture();
+    let release, started;
+    const hold = new Promise((resolve) => { release = resolve; });
+    const entered = new Promise((resolve) => { started = resolve; });
+    f.state.beforeReply = async (options) => {
+      if (JSON.parse(options.user).latestCustomerMessage === 'original') { started(); await hold; }
+    };
+    await f.incoming('original', { text: 'original' });
+    const older = f.process();
+    await entered;
+    await f.incoming('newer', { text: 'newer', timestamp: Date.now() + 1 });
+    await f.process();
+    assert.equal(f.state.sends, 0);
+    f.state.canAutoReply = sufficient;
+    release(); await older;
+    assert.equal(f.state.sends, sufficient ? 1 : 0);
+  }
+});
+
+test('unknown Meta delivery is never retried, even after a new message or toggling AI', async () => {
+  const f = await aiFixture(); f.state.failSend = true;
+  await f.incoming('unknown'); await f.process(); await f.process();
+  assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'unknown');
+  await f.service.saveMessengerAiSettings('111', false, undefined, pool);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  await f.incoming('next'); await f.process();
+  assert.equal(f.state.sends, 1);
+});
+
+test('old messages and messages from other Pages cannot trigger auto reply', async () => {
+  const f = await aiFixture();
+  await f.incoming('expired', { timestamp: Date.now() - 25 * 3600000 }); await f.process();
+  await f.incoming('other-page', { pageId: '999' });
+  await f.service.processMessengerAi('999', '222', undefined, pool);
+  assert.equal(f.state.sends, 0);
+});
+
+test('manual insufficient-evidence analysis persists review and reanalysis cannot remove it', async () => {
+  const f = await aiFixture(false);
+  await f.incoming('manual-analysis');
+  const save = f.load('lib/services/conversationMemory.ts').saveConversationMemory;
+  const result = { analysis: { sentiment: 'neutral', emotion: 'neutral', priority: 'normal', priorityScore: 40,
+    needsHuman: false, canAutoReply: false, reason: 'Thiếu thông tin.' }, reply: 'Cần shop kiểm tra.', model: 'test', sourceSummary: 'Test' };
+  await save('111', '222', 'manual-analysis', result, pool);
+  await save('111', '222', 'manual-analysis', { ...result, analysis: { ...result.analysis, canAutoReply: true } }, pool);
+  assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'review');
+});
+
+test('Messenger AI API protects settings, validates knowledge and customer, and permits disabling without browser knowledge', async () => {
+  const f = await aiFixture(false);
+  const route = loader({ 'lib/services/messengerAi.ts': {
+    readMessengerAiSettings: (pageId) => f.service.readMessengerAiSettings(pageId, pool),
+    saveMessengerAiSettings: (pageId, enabled, knowledge) => f.service.saveMessengerAiSettings(pageId, enabled, knowledge, pool),
+    processMessengerAi: (pageId, psid, knowledge) => f.service.processMessengerAi(pageId, psid, knowledge, pool),
+  } })('app/api/messenger/ai/route.ts');
+  const req = (method, body) => new Request('http://localhost/api/messenger/ai', { method,
+    headers: { Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  assert.equal((await route.GET(new Request('http://localhost/api/messenger/ai'))).status, 401);
+  const response = await route.GET(req('GET'));
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal((await response.json()).autoReply, false);
+  assert.equal((await route.PUT(req('PUT', { autoReply: 'yes' }))).status, 400);
+  assert.equal((await route.PUT(req('PUT', { autoReply: true }))).status, 400);
+  assert.equal((await route.POST(req('POST', { psid: 'bad', knowledge: f.knowledge }))).status, 400);
+  assert.equal((await route.PUT(req('PUT', { autoReply: true, knowledge: f.knowledge }))).status, 200);
+  assert.equal((await route.PUT(req('PUT', { autoReply: false }))).status, 200);
+  assert.equal((await f.service.readMessengerAiSettings('111', pool)).autoReply, false);
+});
 
 test('Postgres inbox snapshot, page isolation and cursor history use real PostgreSQL SQL', async () => {
   const { load, writer } = await fixture();

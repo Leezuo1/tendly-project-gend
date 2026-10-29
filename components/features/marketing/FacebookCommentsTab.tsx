@@ -6,6 +6,7 @@ import { useMarketingData } from '@/lib/hooks/useMarketingData';
 import { facebookCommentsClient as client } from '@/lib/services/facebookCommentsClient';
 import type { CommentStatus } from '@/lib/types/facebookComments';
 import { relativeTime } from '@/lib/utils/format';
+import { groupCommentsByAuthor } from '@/lib/utils/facebookCommentGroups';
 import { MarketingDataNotice } from './MarketingDataNotice';
 
 const labels: Record<CommentStatus, string> = {
@@ -42,6 +43,8 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
   const comments = (data?.comments ?? []).filter((c) =>
     (filter === 'all' || c.status === filter) && `${c.authorName} ${c.text} ${c.postId}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi')));
   const selected = comments.find((c) => c.commentId === selectedId) ?? comments[0];
+  const groups = groupCommentsByAuthor(comments);
+  const selectedGroup = groups.find((group) => group.includes(selected)) ?? [];
   const edit = selected ? edits[selected.commentId] : undefined;
   const text = selected ? (edit?.revision === selected.revision ? edit.text : selected.draft) : '';
   const canDraft = selected && ['pending', 'review', 'ignored', 'failed'].includes(selected.status);
@@ -118,7 +121,7 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
       <div role="status" aria-live="polite" className="fc-count">{data && <>
         {loading ? 'Đang cập nhật…' : 'Tự cập nhật mỗi 3 giây'}
         {data.sync?.syncedAt && <> · Đồng bộ Facebook {relativeTime(data.sync.syncedAt).toLocaleLowerCase('vi')}</>}
-        {!!data.comments.length && <> · Hiển thị {comments.length} / {data.comments.length} bình luận</>}
+        {!!data.comments.length && <> · Hiển thị {comments.length} / {data.comments.length} bình luận · {groups.length} nhóm người dùng</>}
       </>}</div>
       {data?.sync?.error && <p className="fc-warning" role="alert">{data.sync.error} Danh sách đang hiển thị dữ liệu đã lưu; hệ thống sẽ thử đồng bộ lại.</p>}
       {!data ? <p role="status" className="fc-note">Đang tải bình luận…</p> : !data.comments.length ? <div className="card pc-empty fc-empty">
@@ -139,21 +142,35 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
           <Link className="btn btn-outline btn-sm" href="/cau-hinh-ai">Cài đặt dữ liệu AI</Link>
         </div>
       </div> : <div className="fc-workspace">
-        <div className="card fc-list" aria-label="Danh sách bình luận">
+        <div className="card fc-list" aria-label="Bình luận theo người dùng">
           {!comments.length && <p className="pc-empty">Không có bình luận phù hợp.</p>}
-          {comments.map((comment) => <button type="button" key={comment.commentId}
-            className={`fc-comment ${selected?.commentId === comment.commentId ? 'fc-selected' : ''}`}
-            aria-pressed={selected?.commentId === comment.commentId} onClick={() => setSelectedId(comment.commentId)}>
-            <span className="fc-comment-top"><b>{comment.authorName || 'Người dùng Facebook'}</b><span className={`fc-status fc-${comment.status}`}>{labels[comment.status]}</span></span>
+          {groups.map((group) => {
+            const comment = group[0];
+            return <button type="button" key={comment.commentId}
+            className={`fc-comment ${group === selectedGroup ? 'fc-selected' : ''}`}
+            aria-pressed={group === selectedGroup} onClick={() => setSelectedId(comment.commentId)}>
+            <span className="fc-comment-top"><b>{group.find((c) => c.authorName)?.authorName || 'Người dùng Facebook'}</b><span className="fc-status">{group.length} bình luận</span></span>
             <span className="fc-preview">{comment.text || '[Bình luận không có văn bản]'}</span>
             <span className="hint">{relativeTime(comment.createdAt)} · Bài {comment.postId}</span>
-          </button>)}
+            {!comment.authorId && <span className="hint">Chưa có ID người dùng · giữ riêng bình luận</span>}
+          </button>;
+          })}
         </div>
         {selected && <article className="card fc-detail">
           <div className="card-head"><h2>{selected.authorName || 'Người dùng Facebook'}</h2>
             <a href={`https://www.facebook.com/${selected.postId}?comment_id=${selected.commentId.split('_')[1]}`}
               target="_blank" rel="noreferrer">Xem trên Facebook ↗</a></div>
           <div className="fc-detail-body">
+            <div className="fc-thread" role="group" aria-label="Chọn bình luận để trả lời">
+              <p className="fc-reason">{selectedGroup.length} bình luận phù hợp của người dùng này · Chọn bình luận để trả lời</p>
+              {selectedGroup.map((comment) => <button type="button" key={comment.commentId}
+                className={`fc-comment ${selected.commentId === comment.commentId ? 'fc-selected' : ''}`}
+                aria-pressed={selected.commentId === comment.commentId} onClick={() => setSelectedId(comment.commentId)}>
+                <span className="fc-comment-top"><span className={`fc-status fc-${comment.status}`}>{labels[comment.status]}</span>
+                  <span className="hint">{relativeTime(comment.createdAt)} · Bài {comment.postId}</span></span>
+                <span className="fc-preview">{comment.text || '[Bình luận không có văn bản]'}</span>
+              </button>)}
+            </div>
             <blockquote>{selected.text || '[Bình luận không có văn bản]'}</blockquote>
             {selected.postText && <details><summary>Nội dung bài đăng</summary><p className="fc-post">{selected.postText}</p></details>}
             <p className="fc-reason" role="status">{selected.reason || labels[selected.status]}</p>

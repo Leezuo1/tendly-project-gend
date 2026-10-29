@@ -27,6 +27,7 @@ export interface AiMessageAnalysis {
   priorityScore: number;
   reason: string;
   needsHuman: boolean;
+  canAutoReply?: boolean;
   communicationStyle?: string;
 }
 
