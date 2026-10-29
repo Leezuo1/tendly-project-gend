@@ -24,7 +24,7 @@ export function PricingGrid() {
       <style>{`
         .pricing-grid {
           display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 22px;
           align-items: stretch;
           width: 100%;
@@ -49,41 +49,16 @@ export function PricingGrid() {
           background: var(--line) !important;
           transform: translateY(-2px);
         }
-        @media (max-width: 1280px) {
-          .pricing-grid {
-            grid-template-columns: repeat(6, 1fr);
-            gap: 20px;
-          }
-          .pricing-card:nth-child(1) { grid-column: 1 / span 2; }
-          .pricing-card:nth-child(2) { grid-column: 3 / span 2; }
-          .pricing-card:nth-child(3) { grid-column: 5 / span 2; }
-          .pricing-card:nth-child(4) { grid-column: 2 / span 2; }
-          .pricing-card:nth-child(5) { grid-column: 4 / span 2; }
-        }
-        @media (max-width: 860px) {
+        @media (max-width: 1100px) {
           .pricing-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 18px;
-          }
-          .pricing-card:nth-child(1),
-          .pricing-card:nth-child(2),
-          .pricing-card:nth-child(3),
-          .pricing-card:nth-child(4) { grid-column: auto; }
-          .pricing-card:nth-child(5) {
-            grid-column: 1 / span 2;
-            max-width: 500px;
-            margin: 0 auto;
-            width: 100%;
           }
         }
         @media (max-width: 580px) {
           .pricing-grid {
             grid-template-columns: 1fr;
             gap: 16px;
-          }
-          .pricing-card:nth-child(5) {
-            grid-column: auto;
-            max-width: 100%;
           }
         }
       `}</style>
