@@ -65,17 +65,17 @@ export function PricingCard({ plan }: PricingCardProps) {
         {plan.desc}
       </p>
 
-      <div style={{ margin: '18px 0 16px', display: 'flex', alignItems: 'baseline', gap: 4 }}>
+      <div style={{ margin: '18px 0 16px', display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 4 }}>
         {plan.priceCustom ? (
           <span style={{ fontSize: 19, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
             {plan.priceCustom}
           </span>
         ) : (
           <>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-soft)' }}>đ</span>
             <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
               {plan.price}
             </span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-soft)' }}>VND</span>
             <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{plan.period}</span>
           </>
         )}
