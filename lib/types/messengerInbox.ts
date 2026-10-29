@@ -12,6 +12,7 @@ export interface MessengerCustomerProfile {
 }
 
 export interface MessengerThread {
+  waitingConfirmation?: boolean;
   viewStartAt?: number;
   personalitySummary?: string;
   memory?: ConversationMemoryEntry[];

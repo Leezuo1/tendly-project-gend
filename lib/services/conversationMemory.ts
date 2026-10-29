@@ -18,6 +18,12 @@ export async function saveConversationMemory(pageId: string, psid: string, messa
     ON CONFLICT(page_id,message_id) DO UPDATE SET analysis=EXCLUDED.analysis,reply=EXCLUDED.reply,
       model=EXCLUDED.model,source_summary=EXCLUDED.source_summary,analyzed_at=EXCLUDED.analyzed_at RETURNING message_id`,
   [pageId, JSON.stringify([pageId, psid]), messageId, JSON.stringify(result.analysis), result.reply, result.model, result.sourceSummary, Date.now()]);
+  if (saved.rowCount && result.analysis.canAutoReply === false) {
+    await db.query(`INSERT INTO messenger_ai_jobs(page_id,message_id,conversation_id,sent_at,status,updated_at)
+      SELECT page_id,message_id,conversation_id,sent_at,'review',$3 FROM messenger_messages WHERE page_id=$1 AND message_id=$2
+      ON CONFLICT(page_id,message_id) DO UPDATE SET status='review',updated_at=$3
+      WHERE messenger_ai_jobs.status IN ('processing','ready','review')`, [pageId, messageId, Date.now()]);
+  }
   return (saved.rowCount ?? 0) > 0;
 }
 

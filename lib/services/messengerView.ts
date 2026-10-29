@@ -37,6 +37,7 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     : 'FB';
   const avatarUrl = thread.customer?.avatarUrl || undefined;
   const base: Conversation = {
+    waitingConfirmation: unanswered && thread.waitingConfirmation === true,
     memory: thread.memory || previous?.memory || [],
     personalitySummary: thread.personalitySummary || '',
     id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid, viewStartAt: thread.viewStartAt,

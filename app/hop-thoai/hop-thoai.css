@@ -329,6 +329,15 @@
   margin-bottom: 8px;
 }
 
+.inbox-root .inbox-ai-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 44px; padding: 8px 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.inbox-root .inbox-ai-toggle b { margin-left: 4px; }
+.inbox-root .inbox-ai-track { display: flex; flex-shrink: 0; width: 40px; height: 24px; padding: 3px; border-radius: 20px; background: var(--ink-soft); }
+.inbox-root .inbox-ai-track > span { width: 18px; height: 18px; border-radius: 50%; background: var(--paper); }
+.inbox-root .inbox-ai-toggle[aria-checked="true"] .inbox-ai-track { background: var(--coral-deep); }
+.inbox-root .inbox-ai-toggle[aria-checked="true"] .inbox-ai-track > span { transform: translateX(16px); }
+.inbox-root .inbox-ai-toggle:disabled { opacity: .55; cursor: not-allowed; }
+.inbox-root .inbox-ai-toggle:focus-visible { outline: 2px solid var(--coral-deep); outline-offset: 2px; }
+
 .inbox-root .conv-queue-note,
 .inbox-root .emotion-analysis-note {
   font-size: 11.5px;

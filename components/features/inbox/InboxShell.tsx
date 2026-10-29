@@ -7,7 +7,7 @@ import { ConversationList } from './ConversationList';
 import { ThreadPane } from './ThreadPane';
 import { CustomerProfilePane } from './CustomerProfilePane';
 import { Toast } from '@/components/shared/Toast';
-import { askShopAi } from '@/lib/services/aiChat';
+import { askShopAi, currentAiKnowledge } from '@/lib/services/aiChat';
 import { applyConversationAnalysis, automaticAnalysisCandidates, latestCustomerMessage, markConversationAnswered, sessionContext, sortReplyQueue } from '@/lib/services/inboxAi';
 import { mergeMessengerThread, messengerChatMessage } from '@/lib/services/messengerView';
 import type { MessengerInboxSnapshot } from '@/lib/types/messengerInbox';
@@ -33,12 +33,26 @@ export function InboxShell() {
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
   const { ready, error: sessionError } = useInboxSession();
   const [syncStatus, setSyncStatus] = useState('');
+  const [autoReply, setAutoReply] = useState(false);
+  const [aiSettingsReady, setAiSettingsReady] = useState(false);
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
   const [limit, setLimit] = useState(100);
   const [hasMore, setHasMore] = useState(false);
   const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
   const sendLocks = useRef(new Set<string>());
   const outboundRequests = useRef(new Map<string, string>());
   const hiddenConversations = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    void fetch('/api/messenger/ai', { cache: 'no-store' }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      if (!cancelled) { setAutoReply(data.autoReply === true); setAiSettingsReady(true); }
+    }).catch(() => { if (!cancelled) setSyncStatus('Không tải được cài đặt AI. Kiểm tra kết nối và migration.'); });
+    return () => { cancelled = true; };
+  }, [ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -173,11 +187,21 @@ export function InboxShell() {
 
   const analyzeMessage = useCallback(async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages, automatic = false) => {
     try {
-      const data = await askShopAi(text, sessionContext(contextMessages, messageId));
-      if (conversation.messenger) {
-        const response = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ psid: conversation.messenger.psid, messageId, ...data }) });
-        if (!response.ok) throw new Error('Không lưu được phân tích vào database.');
+      let data: AiChatReply;
+      if (conversation.messenger && automatic) {
+        const response = await fetch('/api/messenger/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ psid: conversation.messenger.psid, knowledge: currentAiKnowledge() }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Không phân tích được hội thoại.');
+        if (!result.reply || result.messageId !== messageId) return;
+        data = result.reply;
+      } else {
+        data = await askShopAi(text, sessionContext(contextMessages, messageId));
+        if (conversation.messenger) {
+          const response = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ psid: conversation.messenger.psid, messageId, ...data }) });
+          if (!response.ok) throw new Error('Không lưu được phân tích vào database.');
+        }
       }
       setConversations((prev) => prev.map((c) => c.id === conversation.id
         ? applyConversationAnalysis(c, messageId, data) : c));
@@ -273,6 +297,25 @@ export function InboxShell() {
           <div className="inbox-shell">
             <ConversationList
               toolbar={<div className="messenger-toolbar">
+                  <button type="button" className="inbox-ai-toggle" role="switch" aria-checked={autoReply}
+                    aria-label="AI tự động trả lời" aria-describedby="inbox-ai-help"
+                    disabled={!aiSettingsReady || savingAiSettings}
+                    onClick={async () => {
+                      setSavingAiSettings(true);
+                      try {
+                        const response = await fetch('/api/messenger/ai', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ autoReply: !autoReply, ...(!autoReply ? { knowledge: currentAiKnowledge() } : {}) }) });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error);
+                        setAutoReply(result.autoReply === true);
+                        showToast(result.autoReply ? 'Đã bật tự trả lời tin mới đủ căn cứ.' : 'Đã tắt AI tự động trả lời.');
+                      } catch (error) { showToast(error instanceof Error ? error.message : 'Không lưu được cài đặt AI.'); }
+                      finally { setSavingAiSettings(false); }
+                    }}>
+                    <span>AI tự động trả lời <b>{savingAiSettings ? 'Đang lưu…' : !aiSettingsReady ? 'Đang tải…' : autoReply ? 'Bật' : 'Tắt'}</b></span>
+                    <span className="inbox-ai-track" aria-hidden="true"><span /></span>
+                  </button>
+                  <p id="inbox-ai-help" className="conv-queue-note">Chỉ tự trả lời tin mới đủ căn cứ. Thiếu căn cứ: chờ shop xác nhận. Dữ liệu AI được lưu khi bật; bật lại sau khi cập nhật sản phẩm hoặc FAQ.</p>
                   {syncStatus && <p role="status">{syncStatus}</p>}
                   {hasMore && limit < 1000 && <button className="btn btn-outline btn-sm" onClick={() => setLimit((n) => n + 100)}>Tải thêm hội thoại</button>}
               </div>}
@@ -317,6 +360,7 @@ export function InboxShell() {
                 />
 
                 <CustomerProfilePane
+                  waitingConfirmation={selectedConv.waitingConfirmation}
                   profile={selectedConv.profile}
                   analysis={selectedConv.analysis}
                   aiStatus={selectedConv.aiStatus}

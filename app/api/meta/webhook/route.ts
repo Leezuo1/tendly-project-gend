@@ -2,6 +2,7 @@ import { after } from 'next/server';
 import { InvalidWebhook, parseMetaComments, parseMetaMessages, verifyMetaSignature } from '@/lib/services/metaWebhook';
 import { requireMessengerDatabase, persistMessengerMessages } from '@/lib/services/messengerStorage';
 import { processPendingComments, saveFacebookComments } from '@/lib/services/facebookComments';
+import { processMessengerAi } from '@/lib/services/messengerAi';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -61,6 +62,11 @@ export async function POST(request: Request) {
   try {
     if (messages.length) {
       await persistMessengerMessages(messages);
+      const customers = [...new Set(messages.filter((m) => m.direction === 'in').map((m) => m.psid))];
+      // shortcut: AI runs within the webhook lifetime; add a durable worker for sustained traffic.
+      if (customers.length) after(async () => {
+        await Promise.allSettled(customers.map((psid) => processMessengerAi(pageId, psid)));
+      });
     }
     if (comments.length) {
       await saveFacebookComments(comments);

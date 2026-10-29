@@ -26,10 +26,12 @@ export function messageFromRow(row: MessageRow): MessengerMessage {
 }
 
 export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<Pool, 'query'> = getMessengerPool()): Promise<MessengerInboxSnapshot> {
-  const rows = await db.query(`SELECT c.*, u.psid, u.display_name, u.first_name, u.last_name,
+  const rows = await db.query(`SELECT c.*, EXISTS(SELECT 1 FROM messenger_ai_jobs j WHERE j.conversation_id=c.id
+    AND j.status IN ('review','unknown','sending') AND j.sent_at>COALESCE(c.last_out_at,0)) AS waiting_confirmation,
+    u.psid, u.display_name, u.first_name, u.last_name,
     u.avatar_url, u.profile_status, u.profile_refreshed_at, u.profile_retry_after FROM messenger_conversations c
     JOIN messenger_customers u ON c.customer_id=u.id WHERE c.page_id=$1 AND c.hidden_at IS NULL
-    ORDER BY c.last_message_at DESC NULLS LAST, c.id LIMIT $2`, [pageId, limit + 1]);
+    ORDER BY waiting_confirmation DESC,c.last_message_at DESC NULLS LAST, c.id LIMIT $2`, [pageId, limit + 1]);
   const conversations: MessengerThread[] = [];
   // A bounded, single-query message fetch for every thread shown in the list.
   const ids = rows.rows.slice(0, limit).map((r) => r.id);
@@ -43,6 +45,7 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
     const messages = recent.rows.filter((m) => m.conversation_id === row.id);
     conversations.push({ id: row.id, pageId, psid: row.psid, createdAt: Number(row.created_at), memory: memories.get(row.id) || [],
       viewStartAt: row.view_start_at == null ? undefined : Number(row.view_start_at), personalitySummary: row.personality_summary || '',
+      waitingConfirmation: row.waiting_confirmation === true,
       lastInAt: row.last_in_at === null ? null : Number(row.last_in_at),
       lastOutAt: row.last_out_at === null ? null : Number(row.last_out_at),
       messages: messages.slice(-50).map((m) => messageFromRow({ ...m, psid: row.psid })), hasOlder: messages.length > 50,

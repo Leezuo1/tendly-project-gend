@@ -24,6 +24,8 @@ export function sessionContext(messages: ChatMessage[], latestMessageId?: string
 export function sortReplyQueue(conversations: Conversation[]): Conversation[] {
   const score = (c: Conversation) => c.analysis?.priorityScore ?? (c.isUrgent ? 80 : 40);
   return [...conversations].sort((a, b) => {
+    const confirmation = Number(Boolean(b.isUnreplied && b.waitingConfirmation)) - Number(Boolean(a.isUnreplied && a.waitingConfirmation));
+    if (confirmation) return confirmation;
     const unread = Number(Boolean(b.hasNewMessage)) - Number(Boolean(a.hasNewMessage));
     if (unread) return unread;
     if (a.hasNewMessage && b.hasNewMessage) {
@@ -64,6 +66,7 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
   };
   return {
     ...conversation,
+    waitingConfirmation: conversation.waitingConfirmation || a.canAutoReply === false,
     analysis: { ...a, messageId }, aiStatus: 'ready', aiError: undefined,
     isUrgent: a.priority === 'high',
     // Thay các nhãn cảm xúc demo/cũ; giữ nhãn khách VIP trong danh sách.
@@ -82,7 +85,7 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
 export function markConversationAnswered(conversation: Conversation, message: ChatMessage): Conversation {
   return {
     ...conversation, time: 'Vừa xong', preview: message.text,
-    isUnreplied: false, isUrgent: false, aiSuggestion: undefined,
+    isUnreplied: false, isUrgent: false, aiSuggestion: undefined, waitingConfirmation: false,
     aiStatus: conversation.analysis ? 'ready' : undefined, aiError: undefined, pendingSince: undefined,
     tags: conversation.tags.filter((t) => t.kind !== 'priority'),
     messages: [...conversation.messages, message],

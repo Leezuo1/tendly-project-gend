@@ -109,8 +109,9 @@ export function ConversationList({
                     <span className="conv-time">{conv.time}</span>
                   </div>
                   <div className="conv-preview">{conv.preview}</div>
-                  {(conv.tags.length > 0 || conv.hasNewMessage || conv.aiStatus === 'analyzing' || conv.aiStatus === 'error') && (
+                  {(conv.tags.length > 0 || conv.waitingConfirmation || conv.hasNewMessage || conv.aiStatus === 'analyzing' || conv.aiStatus === 'error') && (
                     <div className="conv-tags">
+                    {conv.isUnreplied && conv.waitingConfirmation && <span className="tag tag-risk">Chờ xác nhận</span>}
                     {conv.hasNewMessage && <span className="tag tag-high">Tin mới</span>}
                     {conv.aiStatus === 'analyzing' && <span className="tag tag-neutral">Đang phân tích...</span>}
                     {conv.aiStatus === 'error' && <span className="tag tag-risk">Cần phân tích lại</span>}
