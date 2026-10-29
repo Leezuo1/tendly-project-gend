@@ -298,7 +298,7 @@ export function InboxShell() {
             <ConversationList
               toolbar={<div className="messenger-toolbar">
                   <button type="button" className="inbox-ai-toggle" role="switch" aria-checked={autoReply}
-                    aria-label="AI tự động trả lời" aria-describedby="inbox-ai-help"
+                    aria-label="AI tự động trả lời"
                     disabled={!aiSettingsReady || savingAiSettings}
                     onClick={async () => {
                       setSavingAiSettings(true);
@@ -315,7 +315,6 @@ export function InboxShell() {
                     <span>AI tự động trả lời <b>{savingAiSettings ? 'Đang lưu…' : !aiSettingsReady ? 'Đang tải…' : autoReply ? 'Bật' : 'Tắt'}</b></span>
                     <span className="inbox-ai-track" aria-hidden="true"><span /></span>
                   </button>
-                  <p id="inbox-ai-help" className="conv-queue-note">Chỉ tự trả lời tin mới đủ căn cứ. Thiếu căn cứ: chờ shop xác nhận. Dữ liệu AI được lưu khi bật; bật lại sau khi cập nhật sản phẩm hoặc FAQ.</p>
                   {syncStatus && <p role="status">{syncStatus}</p>}
                   {hasMore && limit < 1000 && <button className="btn btn-outline btn-sm" onClick={() => setLimit((n) => n + 100)}>Tải thêm hội thoại</button>}
               </div>}
