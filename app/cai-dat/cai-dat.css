@@ -8,6 +8,12 @@
 .admin-root .logo-circle img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
 .admin-root .logo-circle img.custom { object-fit: cover; padding: 0; }
 .admin-root .logo-hint { font-size: 12px; color: var(--ink-soft); }
+.admin-root .setup-sync-note { font-size: 13px; color: var(--ink-soft); margin: -8px 0 22px; }
+.admin-root .workspace-appearance { margin-bottom: 20px; }
+.admin-root .workspace-symbol { font-size: 30px; font-weight: 700; }
+.admin-root .workspace-tone-coral { background: #FCE4E2; color: #8A3433; }
+.admin-root .workspace-tone-sage { background: #DCE6E1; color: #3D5248; }
+.admin-root .workspace-tone-sand { background: #F1EAE3; color: #6B5F5A; }
 .admin-root .dirty-note { font-size: 12.5px; color: var(--amber); font-weight: 600; margin-right: auto; }
 .admin-root .plan-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .admin-root .plan-name { font-size: 15px; font-weight: 800; }

@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { requireDashboardKey } from '@/lib/services/postsApi';
 import { marketingErrorResponse } from '@/lib/services/marketingApi';
 import { FacebookCommentError } from '@/lib/services/facebookComments';
@@ -5,7 +6,7 @@ import { parseFacebookCursor, readFacebookFeed, readFacebookPostComments } from 
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -19,4 +20,4 @@ export async function GET(request: Request) {
   } catch (error) {
     return error instanceof FacebookCommentError ? Response.json({ error: error.message }, { status: error.status }) : marketingErrorResponse(error);
   }
-}
+});

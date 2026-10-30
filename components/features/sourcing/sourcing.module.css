@@ -1,0 +1,77 @@
+.root { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.root header .eyebrow, .root .eyebrow { margin: 0 0 8px; color: var(--moss); font-size: 10px; font-weight: 800; letter-spacing: .1em; overflow-wrap: anywhere; }
+.root .demoBadge, .root .softBadge { background: var(--sand); color: var(--ink-soft); border: 1px solid var(--line); border-radius: 20px; padding: 5px 11px; font-size: 11px; font-weight: 600; }
+.root .demoBadge { background: var(--moss-soft); color: var(--moss); border-color: transparent; }
+.root .notice { display: flex; gap: 12px; align-items: flex-start; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
+.root .notice svg { flex-shrink: 0; width: 18px; height: 18px; margin-top: 2px; color: var(--moss); }
+.root .context { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; padding: 26px; background: #edf1ed; border: 1px solid #d4dfd7; border-radius: 16px; }
+.root .context h2 { font-size: 22px; letter-spacing: -.02em; margin-bottom: 8px; }
+.root .context a { font-size: 12px; color: var(--moss); text-decoration: underline; text-underline-offset: 3px; }
+.root .context button { background: #4b6358; min-height: 44px; }
+.root .context button svg { width: 17px; height: 17px; flex-shrink: 0; }
+.root .context button:hover:not(:disabled) { background: #3b5146; box-shadow: none; }
+.root .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; list-style: none; }
+.root .steps li { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-soft); }
+.root .steps li > span { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: white; flex-shrink: 0; }
+.root .steps .stepDone { color: var(--moss); font-weight: 700; }
+.root .steps .stepDone > span { background: var(--moss); color: white; border-color: var(--moss); }
+.root .status { font-size: 12px; color: var(--ink-soft); margin-top: -8px; }
+.root section.empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 56px 24px; gap: 16px; }
+.root .empty > svg { width: 36px; height: 36px; color: var(--moss); }
+.root .empty h2 { max-width: 450px; font-size: 20px; }
+.root .empty p { max-width: 540px; color: var(--ink-soft); font-size: 13px; line-height: 1.8; }
+.root .channels { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.root .channels span { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 11px; color: var(--ink-soft); }
+.root .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.root .metrics > div { border: 1px solid var(--line); background: white; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 4px; }
+.root .metrics span { font-size: 12px; color: var(--ink-soft); }
+.root .metrics strong { font-size: 30px; line-height: 1.4; font-weight: 700; }
+.root .metrics small { font-size: 10px; color: var(--ink-soft); }
+.root .sectionHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.root .sectionHeading h2 { font-size: 17px; font-weight: 700; }
+.root .muted { font-size: 13px; color: var(--ink-soft); }
+.root .keywordList { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+.root .keywordList button { background: white; border: 1px solid var(--line); border-radius: 8px; min-height: 44px; padding: 10px 14px; font-size: 12px; color: var(--ink); display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.root .keywordList button:hover, .root .keywordList button[aria-pressed="true"] { background: var(--moss-soft); border-color: var(--moss); }
+.root .keywordList strong { color: #365a42; font-size: 11px; }
+.root .caption { color: var(--ink-soft); font-size: 10px; line-height: 1.7; }
+.root .products { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.root .product { display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid var(--line); background: white; border-radius: 14px; }
+.root .productTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.root .productIcon { width: 38px; height: 38px; display: grid; place-items: center; background: var(--sand); color: var(--moss); border-radius: 10px; }
+.root .productIcon svg { width: 20px; height: 20px; }
+.root .growth { font-size: 10px; font-weight: 600; color: #365a42; }
+.root .product h3 { font-size: 16px; line-height: 1.5; }
+.root .productSignal { font-size: 12px; line-height: 1.8; color: var(--ink-soft); }
+.root .evidence { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; margin-top: auto; border-top: 1px solid var(--line); font-size: 11px; }
+.root .evidence span { color: var(--moss); }
+.root .evidence strong { font-weight: 500; color: var(--ink-soft); }
+.root .product button { width: 100%; min-height: 44px; font-size: 12px; }
+.root .product button[aria-pressed="true"] { background: var(--moss-soft); border-color: var(--moss); color: var(--moss); }
+.root section.sources { border-color: #b2c5b8; }
+.root .quote { display: flex; flex-wrap: wrap; gap: 24px; background: #edf1ed; padding: 16px 20px; border-radius: 10px; margin: 20px 0; }
+.root .quote div { display: flex; flex-direction: column; gap: 4px; }
+.root .quote span { font-size: 11px; color: var(--ink-soft); }
+.root .quote strong { font-size: 14px; color: var(--moss); }
+.root .suppliers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+.root .suppliers article { border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.root .supplierTag { font-size: 9px; letter-spacing: .05em; color: var(--ink-soft); }
+.root .suppliers h3 { font-size: 15px; }
+.root .suppliers dl { font-size: 11px; display: flex; flex-direction: column; gap: 8px; color: var(--ink-soft); }
+.root .suppliers dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.root .suppliers dd { color: var(--ink); }
+.root .suppliers a { margin-top: auto; font-size: 12px; min-height: 44px; }
+.root .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 1150px) { .root .products { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .root { gap: 20px; }
+  .root .context { padding: 20px; }
+  .root .context h2 { font-size: 19px; }
+  .root .context button { width: 100%; }
+  .root .steps { grid-template-columns: repeat(2, 1fr); gap: 14px 8px; }
+  .root .steps li { font-size: 10px; }
+  .root .metrics, .root .suppliers { grid-template-columns: 1fr; }
+  .root .metrics > div { padding: 16px; }
+  .root section.keywords, .root section.sources { padding: 20px; }
+  .root .sectionHeading h2 { font-size: 16px; }
+}

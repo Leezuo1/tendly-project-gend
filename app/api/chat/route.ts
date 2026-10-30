@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { NextResponse } from 'next/server';
 import { buildAiSystemPrompt, InvalidAiKnowledge, knowledgeSummary, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { AI_RESPONSE_SCHEMA, EMOTION_RESPONSE_PROMPT, parseAiChatOutput, parseSessionContext } from '@/lib/services/aiAnalysis';
@@ -15,7 +16,7 @@ interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
 }
 
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   let body;
   try {
     body = await request.json();
@@ -95,4 +96,4 @@ export async function POST(request: Request) {
   return NextResponse.json({
     error: 'Không thể kết nối đến Gemini API. Vui lòng thử lại sau giây lát.',
   }, { status: 502 });
-}
+});

@@ -1,3 +1,4 @@
+import { businessSecurity } from './business-security-fixture.mjs';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -9,6 +10,7 @@ const require = createRequire(import.meta.url);
 function loadModules(overrides = {}) {
   const cache = new Map();
   const load = (file) => {
+    if (file.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     if (overrides[file]) return overrides[file];
     if (cache.has(file)) return cache.get(file).exports;
     const loadedModule = { exports: {} };

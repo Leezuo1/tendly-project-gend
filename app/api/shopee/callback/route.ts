@@ -1,9 +1,10 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { timingSafeEqual } from 'node:crypto';
 import { shopeeConfig, shopeeErrorResponse, shopeeRedirect } from '@/lib/services/shopee';
 import { authorizeShopee } from '@/lib/services/shopeeStorage';
 
 export const runtime = 'nodejs';
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const url = new URL(request.url);
   const state = url.searchParams.get('state') || '';
   const cookie = request.headers.get('cookie')?.split(';').map((part) => part.trim())
@@ -28,4 +29,4 @@ export async function GET(request: Request) {
     headers.forEach((value, key) => response.headers.set(key, value));
     return response;
   }
-}
+});

@@ -1,9 +1,10 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { MessengerSendError, sendMessengerMessage } from '@/lib/services/messengerSend';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = inboxAccessError(request);
   if (denied) return denied;
   if (!process.env.DATABASE_URL) return Response.json({ error: 'Chưa cấu hình DATABASE_URL.' }, { status: 503 });
@@ -25,4 +26,4 @@ export async function POST(request: Request) {
     if (error instanceof MessengerSendError) return Response.json({ error: error.message }, { status: error.status });
     return Response.json({ error: 'Không xử lý được yêu cầu gửi. Kiểm tra Messenger trước khi thử lại.' }, { status: 503 });
   }
-}
+});

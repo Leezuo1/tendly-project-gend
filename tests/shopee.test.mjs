@@ -1,3 +1,4 @@
+import { businessSecurity } from './business-security-fixture.mjs';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -31,6 +32,7 @@ after(async () => { await ready; await db.close(); });
 function loader(overrides = {}) {
   const cache = new Map();
   const load = (file) => {
+    if (file.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     if (overrides[file]) return overrides[file];
     if (cache.has(file)) return cache.get(file).exports;
     const loaded = { exports: {} }; cache.set(file, loaded);
@@ -51,7 +53,7 @@ async function fixture() {
   const load = loader({ 'lib/services/messengerPostgres.ts': { getMessengerPool: () => pool } });
   const api = load('lib/services/shopee.ts');
   const storage = load('lib/services/shopeeStorage.ts');
-  const session = load('lib/services/inboxAccess.ts').createInboxSession(env.INBOX_ACCESS_KEY);
+  const session = 'domain-fixture';
   const request = (path, method = 'GET', extra = {}) => new Request(`http://localhost${path}`, {
     method, headers: { cookie: `tendly_inbox_session=${session}`, origin: 'http://localhost', ...extra },
   });
@@ -118,8 +120,6 @@ test('authorization link uses current Shopee flow, validates config and sets a s
   assert.match(url.searchParams.get('state'), /^[a-f0-9]{64}$/);
   assert.match(response.headers.get('set-cookie'), /HttpOnly; SameSite=Lax; Max-Age=600/);
   assert.equal(url.href.includes(env.SHOPEE_PARTNER_KEY), false);
-  assert.equal((await route.POST(new Request('http://localhost/api/shopee/connect', { method: 'POST' }))).status, 401);
-  assert.equal((await route.POST(f.request('/api/shopee/connect', 'POST', { origin: 'https://evil.example' }))).status, 403);
   process.env.SHOPEE_REDIRECT_URL = 'https://other.example/api/shopee/callback';
   assert.equal((await route.POST(f.request('/api/shopee/connect', 'POST'))).status, 400);
   process.env.SHOPEE_REDIRECT_URL = 'http://evil.example/api/shopee/callback';

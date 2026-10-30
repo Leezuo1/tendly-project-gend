@@ -7,6 +7,7 @@ import { AI_RESPONSE_SCHEMA, EMOTION_RESPONSE_PROMPT, parseAiChatOutput } from '
 import { generateGeminiJson } from '@/lib/services/gemini';
 import { saveConversationMemory } from '@/lib/services/conversationMemory';
 import { sendMessengerMessage } from '@/lib/services/messengerSend';
+import { AppSecurityError, assertOperationAllowed, canRunAutomation, isInteractiveRequest, runAutomaticAccess } from '@/lib/services/appSecurity';
 
 export async function readMessengerAiSettings(pageId: string, db: Pick<Pool, 'query'> = getMessengerPool()) {
   const row = (await db.query('SELECT auto_reply,updated_at FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
@@ -29,6 +30,8 @@ export async function saveMessengerAiSettings(pageId: string, autoReply: boolean
 
 export async function processMessengerAi(pageId: string, psid: string, knowledge?: AiKnowledge,
   db: Pool = getMessengerPool()) {
+  if (isInteractiveRequest()) await assertOperationAllowed(db);
+  else if (!await canRunAutomation(db)) return {};
   const id = JSON.stringify([pageId, psid]);
   const settings = (await db.query('SELECT * FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
   const source = settings ? parseAiKnowledge(settings.knowledge_json) : knowledge;
@@ -73,13 +76,13 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
       RETURNING j.message_id`, [pageId, latest.message_id, Date.now(), settings.updated_at]);
     if (!send.rowCount) return { reply, messageId: latest.message_id };
     try {
-      const sent = await sendMessengerMessage({ psid, text: reply.reply, requestId: randomUUID() }, db);
+      const sent = await runAutomaticAccess(Number(latest.sent_at), () => sendMessengerMessage({ psid, text: reply.reply, requestId: randomUUID() }, db));
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
         [pageId, latest.message_id, Date.now(), sent.persisted ? 'sent' : 'unknown']);
       return { reply, sent, messageId: latest.message_id };
-    } catch {
-      await db.query(`UPDATE messenger_ai_jobs SET status='unknown',updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
-        [pageId, latest.message_id, Date.now()]);
+    } catch (error) {
+      await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
+        [pageId, latest.message_id, Date.now(), error instanceof AppSecurityError ? 'review' : 'unknown']);
       return { reply, messageId: latest.message_id };
     }
   } catch {

@@ -1,0 +1,24 @@
+.root { display: flex; flex-direction: column; gap: 24px; }
+.root .banner { padding: 22px; border-radius: 14px; border: 1px solid #c6d7cb; background: #edf3ee; color: #344d3c; font-size: 14px; }
+.root .banner p { margin: 8px 0; line-height: 1.7; }
+.root .banner span { font-size: 12px; display: block; }
+.root .banner a, .root .banner button { display: inline-block; margin-top: 12px; text-decoration: underline; color: inherit; border: 0; background: transparent; font-size: 14px; }
+.root .previewGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.root .previewGrid h2 { font-size: 16px; }
+.root .previewGrid p, .root .description { font-size: 13px; color: var(--ink-soft); line-height: 1.7; margin-top: 14px; }
+.root .sample { font-size: 11px; color: #6b5f5a; display: block; margin: 12px 0; }
+.root .placeholder { height: 10px; background: #f1eae3; border-radius: 5px; margin: 12px 0; }
+.root .placeholder:nth-of-type(2) { width: 65%; }
+.root .disabled { display: flex; flex-direction: column; border: 0; gap: 12px; margin-top: 20px; }
+.root .disabled label { font-size: 13px; }
+.root .disabled textarea { padding: 12px; min-height: 90px; border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+.root .disabled > div { display: flex; flex-wrap: wrap; gap: 12px; }
+.root .toggleRow { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.root .toggleRow h2 { font-size: 18px; }
+.root .toggle { width: 64px; height: 36px; flex-shrink: 0; padding: 4px; border: 0; border-radius: 30px; background: #867870; }
+.root .toggle[aria-checked="true"] { background: #4b6358; }
+.root .toggle > span { display: block; width: 28px; height: 28px; border-radius: 50%; background: white; transform: translateX(0); }
+.root .toggle[aria-checked="true"] > span { transform: translateX(28px); }
+.root .metadata { color: var(--ink-soft); font-size: 12px; margin-top: 20px; line-height: 1.8; }
+.root .error { color: #9c2929; font-size: 14px; }
+@media (max-width: 1000px) { .root .previewGrid { grid-template-columns: 1fr; } }

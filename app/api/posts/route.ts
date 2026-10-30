@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { parseNewPost } from '@/lib/services/aiPost';
 import { facebookPublishConfigured } from '@/lib/services/facebookPage';
 import { postsErrorResponse, readJson, requireDashboardKey } from '@/lib/services/postsApi';
@@ -5,7 +6,7 @@ import { createPost, listPosts } from '@/lib/services/postsPostgres';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -13,10 +14,10 @@ export async function GET(request: Request) {
   } catch (error) {
     return postsErrorResponse(error);
   }
-}
+});
 
 /** Lưu một bản nháp (sau khi chủ shop đã xem/sửa nội dung AI viết). */
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -25,4 +26,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return postsErrorResponse(error);
   }
-}
+});

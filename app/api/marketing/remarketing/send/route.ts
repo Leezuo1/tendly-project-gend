@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { InvalidMarketingRequest, marketingErrorResponse, marketingPageId, parsePsid, readMarketingJson } from '@/lib/services/marketingApi';
 import { REMARKETING_PREFIX } from '@/lib/services/marketingInsights';
 import { sendMessengerMessage } from '@/lib/services/messengerSend';
@@ -10,7 +11,7 @@ export const maxDuration = 60;
  * Gửi tin remarketing đã duyệt qua Messenger. Dùng chung luồng gửi của Hộp thoại (kiểm tra 24 giờ,
  * chống gửi trùng theo requestId); request_id có tiền tố rmk- để tab Hiệu suất đếm được.
  */
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -27,4 +28,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return marketingErrorResponse(error);
   }
-}
+});

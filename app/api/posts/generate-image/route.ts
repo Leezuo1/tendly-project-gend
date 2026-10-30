@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { generateFreeImage } from '@/lib/services/postImages';
 import { postsErrorResponse, readJson, requireDashboardKey } from '@/lib/services/postsApi';
 
@@ -5,7 +6,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /** AI vẽ ảnh minh hoạ từ mô tả — chỉ trả ảnh về để xem trước, chưa lưu gì. */
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -17,4 +18,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return postsErrorResponse(error);
   }
-}
+});

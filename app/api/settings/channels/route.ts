@@ -1,7 +1,8 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 
 export const runtime = 'nodejs';
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const denied = inboxAccessError(request);
   if (denied) return denied;
   const pageId = process.env.PAGE_ID?.trim();
@@ -31,4 +32,4 @@ export async function GET(request: Request) {
   }
   return Response.json({ configured, pageAccessible, pageName, pageAvatarUrl, databaseConfigured: Boolean(process.env.DATABASE_URL) },
     { headers: { 'Cache-Control': 'no-store' } });
-}
+});

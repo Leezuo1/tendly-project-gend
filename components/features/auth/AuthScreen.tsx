@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { loginMock } from '@/lib/services/mockOnboarding';
+import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import styles from './auth.module.css';
 
@@ -61,6 +62,8 @@ function Field({ name, label, error, hint, children }: { name: string; label: st
 }
 
 export function AuthScreen({ mode }: { mode: Mode }) {
+  const { refresh } = useAppSecurity();
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
   const register = mode === 'register';
   const [showPassword, setShowPassword] = useState(false);
@@ -87,8 +90,9 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     form.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus();
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const form = event.currentTarget;
     const values = new FormData(form);
     const email = String(values.get('email') || '').trim();
@@ -105,10 +109,16 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     const first = Object.keys(next)[0];
     if (first) { form.querySelector<HTMLInputElement>(`[name="${first}"]`)?.focus(); return; }
     if (register) { setNotice('Đăng ký tài khoản hiện chưa khả dụng. Bạn có thể đăng nhập bằng tài khoản mẫu admin / admin123.'); return; }
+    setBusy(true);
     try {
-      if (!loginMock(email, password)) { setNotice('Tài khoản hoặc mật khẩu chưa đúng. Tài khoản mẫu: admin / admin123.'); return; }
-      router.push('/tao-shop');
-    } catch { setNotice('Không lưu được phiên dùng thử. Hãy cho phép trình duyệt lưu dữ liệu rồi thử lại.'); }
+      const response = await fetch('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: email, password }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Không đăng nhập được.');
+      if (data.role === 'user') loginMock(email, password);
+      await refresh();
+      router.push(data.role === 'admin' ? '/quan-tri' : '/tao-shop');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Không kết nối được máy chủ. Vui lòng thử lại.'); }
+    finally { setBusy(false); }
   }
 
   const inputProps = (name: FieldName) => ({
@@ -134,7 +144,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           {register && <Field name="confirmPassword" label="Nhập lại mật khẩu" error={errors.confirmPassword}><div className={styles.passwordInput}><input {...inputProps('confirmPassword')} type={showConfirm ? 'text' : 'password'} placeholder="Nhập lại mật khẩu vừa tạo" autoComplete="new-password" required /><button type="button" aria-label={showConfirm ? 'Ẩn mật khẩu nhập lại' : 'Hiện mật khẩu nhập lại'} aria-pressed={showConfirm} onClick={() => setShowConfirm(!showConfirm)}><Eye visible={showConfirm} /></button></div></Field>}
           {!register && <div className={styles.formOptions}><button type="button" onClick={() => { setRecoveryNotice(''); recoveryDialog.current?.showModal(); }}>Quên mật khẩu?</button></div>}
           {notice && <p className={styles.notice} role="status">{notice}</p>}
-          <button type="submit" className={styles.submit}>{register ? 'Tạo tài khoản' : 'Đăng nhập'}<Arrow /></button>
+          <button type="submit" disabled={busy} className={styles.submit}>{busy ? 'Đang đăng nhập…' : register ? 'Tạo tài khoản' : 'Đăng nhập'}<Arrow /></button>
         </form>
         {!register && <button type="button" className={styles.demoButton} onClick={fillDemo}><Sparkle /> Dùng tài khoản demo <span aria-hidden="true">↗</span></button>}
         <span className={styles.srOnly} role="status">{demoFilled ? 'Đã điền tài khoản demo. Bấm Đăng nhập để tiếp tục.' : ''}</span>

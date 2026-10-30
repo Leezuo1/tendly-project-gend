@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react';
+import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { useMockOnboarding } from '@/lib/hooks/useMockOnboarding';
-import { completeMockOnboarding, connectMockPlatform, logoutMock, saveMockWorkspace, type MockPlatform, type MockWorkspace, type WorkspaceAvatar, type WorkspaceTone } from '@/lib/services/mockOnboarding';
+import { industries, avatarOptions, toneOptions } from '@/lib/data/workspace';
+import { completeMockOnboarding, connectMockPlatform, saveMockWorkspace, type MockPlatform, type MockWorkspace, type WorkspaceAvatar, type WorkspaceTone } from '@/lib/services/mockOnboarding';
 import styles from './onboarding.module.css';
 
 export const platforms: { id: MockPlatform; name: string; description: string }[] = [
@@ -13,17 +15,7 @@ export const platforms: { id: MockPlatform; name: string; description: string }[
   { id: 'tiktok', name: 'TikTok', description: 'Tiếp nối hội thoại với khách trên TikTok.' },
   { id: 'shopee', name: 'Shopee', description: 'Đưa sản phẩm về làm nguồn tư vấn cho AI.' },
 ];
-const industries = ['Thời trang & phụ kiện', 'Mỹ phẩm & làm đẹp', 'Nhà cửa & đời sống', 'Thực phẩm & đồ uống', 'Điện tử & công nghệ', 'Dịch vụ', 'Khác'];
 const timezones = [{ value: 'Asia/Ho_Chi_Minh', label: '(GMT+07:00) Việt Nam' }, { value: 'Asia/Singapore', label: '(GMT+08:00) Singapore' }];
-const avatarOptions: { value: WorkspaceAvatar; label: string; symbol: string }[] = [
-  { value: 'initial', label: 'Chữ cái tên shop', symbol: 'A' },
-  { value: 'flower', label: 'Bông hoa', symbol: '✳' },
-  { value: 'heart', label: 'Trái tim', symbol: '♡' },
-  { value: 'shop', label: 'Ngôi nhà', symbol: '⌂' },
-];
-const toneOptions: { value: WorkspaceTone; label: string }[] = [
-  { value: 'coral', label: 'San hô nhạt' }, { value: 'sage', label: 'Xanh rêu nhạt' }, { value: 'sand', label: 'Kem cát' },
-];
 
 function browserTimezone(): string | null {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { return null; }
@@ -37,8 +29,9 @@ function timezoneLabel(value: string) {
 }
 
 export function OnboardingHeader() {
+  const { logout } = useAppSecurity();
   const router = useRouter();
-  return <header className={styles.header}><Link href="/" aria-label="Tendly — Trang chủ"><img src="/tendly-logo.png" alt="Tendly" width="126" height="42" /></Link><div className={styles.headerRight}><span className={styles.demoBadge}>BẢN DÙNG THỬ</span><span className={styles.adminAvatar}>A</span><span>Admin</span><button type="button" onClick={() => { logoutMock(); router.replace('/dang-nhap'); }}>Đăng xuất</button></div></header>;
+  return <header className={styles.header}><Link href="/" aria-label="Tendly — Trang chủ"><img src="/tendly-logo.png" alt="Tendly" width="126" height="42" /></Link><div className={styles.headerRight}><span className={styles.demoBadge}>BẢN DÙNG THỬ</span><span className={styles.adminAvatar}>A</span><span>Admin</span><button type="button" onClick={async () => { try { await logout(); router.replace('/dang-nhap'); } catch { window.alert('Chưa đăng xuất được. Vui lòng thử lại.'); } }}>Đăng xuất</button></div></header>;
 }
 
 function Arrow() { return <span aria-hidden="true">↗</span>; }

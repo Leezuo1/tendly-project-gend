@@ -1,29 +1,11 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { legacyAccessError } from '@/lib/services/appSecurity';
 import { InvalidPostRequest } from '@/lib/services/aiPost';
 import { FacebookNotConfigured, FacebookPublishFailed } from '@/lib/services/facebookPage';
 import { ImageGenerationFailed, InvalidPostImage } from '@/lib/services/postImages';
 import { PostLocked, PostNotFound, PostsDatabaseNotConfigured } from '@/lib/services/postsPostgres';
 
-const digest = (value: string) => createHash('sha256').update(value).digest();
-
-/**
- * Dashboard chưa có đăng nhập, nên API bài đăng (đặc biệt là đăng lên Fanpage thật) khoá bằng DASHBOARD_KEY.
- * Chưa đặt key: chỉ cho phép khi chạy local (next dev), production thì từ chối.
- */
 export function requireDashboardKey(request: Request): Response | null {
-  const key = process.env.DASHBOARD_KEY?.trim();
-  if (!key) {
-    if (process.env.NODE_ENV === 'production') {
-      return Response.json({ error: 'Chưa cấu hình DASHBOARD_KEY trên máy chủ.', code: 'NO_DASHBOARD_KEY' }, { status: 503 });
-    }
-    return null;
-  }
-  const header = request.headers.get('authorization') ?? '';
-  const given = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!given || !timingSafeEqual(digest(given), digest(key))) {
-    return Response.json({ error: 'Cần nhập đúng mã quản trị để dùng chức năng này.', code: 'NEED_DASHBOARD_KEY' }, { status: 401 });
-  }
-  return null;
+  return legacyAccessError(request) ?? null;
 }
 
 /** Đổi lỗi thành response, không đưa chi tiết lỗi database (có thể chứa thông tin kết nối) ra ngoài. */

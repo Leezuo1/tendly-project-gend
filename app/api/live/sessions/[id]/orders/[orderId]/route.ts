@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { liveErrorResponse, liveJson, parseSessionId } from '@/lib/services/live/api';
 import { buildSnapshot, updateOrderStatus } from '@/lib/services/live/engine';
 import { InvalidMarketingRequest, marketingPageId, readMarketingJson } from '@/lib/services/marketingApi';
@@ -9,7 +10,7 @@ export const runtime = 'nodejs';
 const STATUSES: LiveOrderStatus[] = ['draft', 'awaiting_info', 'confirmed', 'cancelled'];
 
 /** Đổi trạng thái đơn nháp { status }. Huỷ đơn thì trả lại hàng đang giữ. */
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; orderId: string }> }) {
+export const PATCH = withAppAccess(async function PATCH(request: Request, { params }: { params: Promise<{ id: string; orderId: string }> }) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -25,4 +26,4 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   } catch (error) {
     return liveErrorResponse(error);
   }
-}
+});

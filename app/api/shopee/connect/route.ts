@@ -1,9 +1,10 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { randomBytes } from 'node:crypto';
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { shopeeAuthUrl, shopeeConfig, shopeeErrorResponse, shopeeRedirect } from '@/lib/services/shopee';
 
 export const runtime = 'nodejs';
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = inboxAccessError(request);
   if (denied) return denied;
   try {
@@ -18,4 +19,4 @@ export async function POST(request: Request) {
       'Set-Cookie': `tendly_shopee_state=${state}; Path=/api/shopee/callback; HttpOnly; SameSite=Lax; Max-Age=600${redirect.protocol === 'https:' ? '; Secure' : ''}`,
     } });
   } catch (error) { return shopeeErrorResponse(error); }
-}
+});

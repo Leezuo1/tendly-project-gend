@@ -2,13 +2,15 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { DashboardTab } from '@/lib/types/dashboard';
 import { useFacebookPage } from '@/lib/hooks/useFacebookPage';
 import { useUnrepliedCount } from '@/lib/hooks/useUnrepliedCount';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
+import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 
-interface SidebarProps {
-  currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat';
+export interface SidebarProps {
+  currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing' | 'quan-tri';
   activeTab?: DashboardTab;
   setActiveTab?: (tab: DashboardTab) => void;
   onToast: (msg: string) => void;
@@ -20,6 +22,8 @@ export function Sidebar({
   setActiveTab,
   onToast,
 }: SidebarProps) {
+  const { session, logout } = useAppSecurity();
+  const router = useRouter();
   const page = useFacebookPage();
   const unrepliedCount = useUnrepliedCount();
   const isTongQuan = currentPath === 'tong-quan';
@@ -105,6 +109,14 @@ export function Sidebar({
           <span>Livestream</span>
         </Link>
 
+        <Link href="/smart-sourcing" className={`nav-item ${currentPath === 'smart-sourcing' ? 'active' : ''}`}
+          aria-label="Smart Sourcing" aria-current={currentPath === 'smart-sourcing' ? 'page' : undefined} title="Smart Sourcing">
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="7.5" /><path d="m16 16 5 5M7 12l3-3 3 1 2-3" />
+          </svg>
+          <span>Smart Sourcing</span>
+        </Link>
+
         {/* Cấu hình AI */}
         <Link
           href="/cau-hinh-ai"
@@ -117,6 +129,7 @@ export function Sidebar({
           <span>Cấu hình AI</span>
         </Link>
 
+        {session.role === 'admin' && <Link href="/quan-tri" className={`nav-item ${currentPath === 'quan-tri' ? 'active' : ''}`} aria-label="Quản trị bảo mật" title="Quản trị bảo mật"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 8 4v6c0 5-8 8-8 8s-8-3-8-8V7l8-4Z" /><path d="m8 12 3 3 5-6" /></svg><span>Quản trị bảo mật</span></Link>}
         {/* Cài đặt */}
         <Link
           href="/cai-dat"
@@ -142,7 +155,7 @@ export function Sidebar({
           href="/"
           className="logout-btn"
           title="Đăng xuất"
-          onClick={() => onToast && onToast('Đã đăng xuất')}
+          onClick={async event => { event.preventDefault(); try { await logout(); router.replace('/dang-nhap'); } catch { onToast('Chưa đăng xuất được. Vui lòng thử lại.'); } }}
         >
           <svg
             width="17"

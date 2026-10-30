@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { hideConversation, pendingHistoricalAnalysis, saveConversationMemory } from '@/lib/services/conversationMemory';
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
@@ -28,6 +29,6 @@ async function handle(request: Request) {
     return Response.json({ saved }, { status: saved ? 200 : 404 });
   } catch { return Response.json({ error: 'Không xử lý được hội thoại. Kiểm tra database và chạy migration.' }, { status: 503 }); }
 }
-export const GET = handle;
-export const POST = handle;
-export const DELETE = handle;
+export const GET = withAppAccess(handle);
+export const POST = withAppAccess(handle);
+export const DELETE = withAppAccess(handle);

@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { liveErrorResponse, liveJson, parseSessionId } from '@/lib/services/live/api';
 import { buildSnapshot, setOnAir } from '@/lib/services/live/engine';
 import { InvalidMarketingRequest, marketingPageId, readMarketingJson } from '@/lib/services/marketingApi';
@@ -6,7 +7,7 @@ import { requireDashboardKey } from '@/lib/services/postsApi';
 export const runtime = 'nodejs';
 
 /** Mẫu đang lên sóng { sku } (hoặc { sku: null }). Bình luận ngắn ("1", "chốt M trắng") được gán cho mẫu này. */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withAppAccess(async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -21,4 +22,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     return liveErrorResponse(error);
   }
-}
+});

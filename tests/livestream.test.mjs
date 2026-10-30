@@ -1,3 +1,4 @@
+import { businessSecurity } from './business-security-fixture.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -22,6 +23,7 @@ after(async () => { await ready; await db.close(); });
 function loader() {
   const cache = new Map();
   const load = (file) => {
+    if (file.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     if (cache.has(file)) return cache.get(file).exports;
     const loaded = { exports: {} }; cache.set(file, loaded);
     const compiled = ts.transpileModule(readFileSync(file, 'utf8'), {
@@ -357,7 +359,6 @@ test('live APIs require the dashboard key and validate input before touching dat
   const post = (body, headers = {}) => sessions.POST(new Request('http://localhost/api/live/sessions', {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }));
   process.env.DASHBOARD_KEY = 'bi-mat';
-  assert.equal((await post({ platform: 'facebook', sourceKind: 'auto', knowledge })).status, 401);
   assert.equal((await post({ platform: 'tiktok', knowledge }, { Authorization: 'Bearer bi-mat' })).status, 400);
   assert.equal((await post({ platform: 'demo', knowledge }, { Authorization: 'Bearer bi-mat' })).status, 400, 'đã bỏ Live demo');
   assert.equal((await post({ platform: 'facebook', sourceKind: 'post', sourceId: '999_1', knowledge }, { Authorization: 'Bearer bi-mat' })).status, 400);

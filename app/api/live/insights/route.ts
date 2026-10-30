@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { liveErrorResponse, liveJson } from '@/lib/services/live/api';
 import { readInsights } from '@/lib/services/live/engine';
 import { marketingPageId } from '@/lib/services/marketingApi';
@@ -6,7 +7,7 @@ import { requireDashboardKey } from '@/lib/services/postsApi';
 export const runtime = 'nodejs';
 
 /** Tổng hợp các phiên live theo tháng — cho dashboard tổng quan. */
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -14,4 +15,4 @@ export async function GET(request: Request) {
   } catch (error) {
     return liveErrorResponse(error);
   }
-}
+});

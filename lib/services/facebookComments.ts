@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { assertOperationAllowed, canRunAutomation, runAutomaticAccess } from '@/lib/services/appSecurity';
 import type { AiKnowledge } from '@/lib/types/ai';
 import type { CommentsData, FacebookComment, FacebookCommentEvent } from '@/lib/types/facebookComments';
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
@@ -113,6 +114,7 @@ const COMMENT_SCHEMA = {
 /** Reserve before the non-idempotent request; ambiguous sends must never be retried automatically. */
 export async function sendCommentPrivateReply(pageId: string, commentId: string, text: string, revision: number,
   db: Database = getMessengerPool(), automaticSettingsVersion?: number) {
+  await assertOperationAllowed(db);
   const { token, version } = graphConfig();
   const row = (await db.query('SELECT * FROM facebook_comments WHERE page_id=$1 AND comment_id=$2', [pageId, commentId])).rows[0];
   if (!row) throw new FacebookCommentError('Không tìm thấy bình luận.', 404);
@@ -137,6 +139,11 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
     RETURNING comment_id`, [pageId, commentId, revision, text, automaticSettingsVersion ?? null, allowed]);
   if (!reserved.rowCount) throw new FacebookCommentError('Bình luận hoặc chế độ tự gửi đã thay đổi. Hãy tải lại.');
   let outcome: 'sent' | 'unknown' | 'failed' = 'unknown';
+  try { await assertOperationAllowed(db); }
+  catch (error) {
+    await db.query(`UPDATE facebook_comments SET status=$3,reason='App đang được bảo vệ; chưa gửi tới Meta.' WHERE page_id=$1 AND comment_id=$2 AND status='sending'`, [pageId, commentId, row.status]);
+    throw error;
+  }
   let messageId: string | null = null;
   let recipientId: string | null = null;
   try {
@@ -237,7 +244,7 @@ Bạn đang xử lý một BÌNH LUẬN trên Fanpage để soạn MỘT tin nh�
     [pageId, row.comment_id, row.revision, now, status, postText, draft.message, draft.reason]);
     if (saved.rowCount && !commentId && settings.auto_reply && Number(row.created_at) >= Number(settings.enabled_at) &&
         draft.productQuestion && !draft.needsHuman && draft.message) {
-      await sendCommentPrivateReply(pageId, row.comment_id, draft.message, row.revision, db, Number(settings.updated_at));
+      await runAutomaticAccess(Number(row.created_at), () => sendCommentPrivateReply(pageId, row.comment_id, draft.message, row.revision, db, Number(settings.updated_at)));
     }
   } catch (error) {
     await db.query(`UPDATE facebook_comments SET status='review',reason=$5 WHERE page_id=$1 AND comment_id=$2
@@ -254,9 +261,11 @@ export async function draftCommentReply(pageId: string, commentId: string, db: D
 }
 
 export async function processPendingComments(pageId: string, db: Database = getMessengerPool()) {
+  if (!await canRunAutomation(db)) return;
   const signal = AbortSignal.timeout(30_000);
   // shortcut: bounded work per webhook, use a scheduled authenticated process call for sustained comment traffic.
   for (let i = 0; i < 3 && !signal.aborted; i++) {
+    if (!await canRunAutomation(db)) break;
     if (!await analyzeComment(pageId, db, signal)) break;
   }
 }

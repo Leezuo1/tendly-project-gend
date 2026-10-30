@@ -1,3 +1,4 @@
+import { businessSecurity } from './business-security-fixture.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -21,6 +22,7 @@ const structuredReply = (reply = 'Phản hồi kiểm thử.', analysis = defaul
 function loadModules() {
   const cache = new Map();
   const load = (relative) => {
+    if (relative.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     const filename = path.join(root, relative);
     if (cache.has(filename)) return cache.get(filename).exports;
     const loadedModule = { exports: {} };
@@ -135,6 +137,54 @@ test('settings employee CRUD persists entered records, validates duplicate email
   assert.equal(JSON.parse(f.storage.get('tendly.mockdb')).settingsMessengerEnabled, false);
   settings.setMessengerSyncEnabled(true);
   assert.equal(settings.messengerSyncEnabled(), true);
+});
+
+test('setup identity is shared with settings without replacing contacts, products or platform connections', async () => {
+  const f = fixture();
+  const load = loadModules();
+  const settings = load('lib/services/settingsData.ts');
+  const onboarding = load('lib/services/mockOnboarding.ts');
+  const db = load('lib/services/mockDb.ts');
+  await settings.settingsShopApi.update({ ownerName: 'Chủ shop', email: 'shop@example.test', phone: '0901234567' });
+  const products = structuredClone(db.readDb().products);
+  const channels = structuredClone(db.readDb().channels);
+  onboarding.saveMockWorkspace({ name: 'Shop setup', industry: 'Thời trang & phụ kiện', timezone: 'Europe/Paris', avatar: 'flower', avatarTone: 'sage' });
+  onboarding.connectMockPlatform('messenger', 'Kết nối mẫu giữ nguyên');
+  const shop = await settings.settingsShopApi.get();
+  assert.equal(shop.name, 'Shop setup');
+  assert.equal(shop.industry, 'Thời trang & phụ kiện');
+  assert.equal(shop.timezone, 'Europe/Paris');
+  assert.equal(shop.avatar, 'flower');
+  assert.equal(shop.avatarTone, 'sage');
+  assert.equal(shop.ownerName, 'Chủ shop');
+  assert.equal(shop.email, 'shop@example.test');
+  await settings.settingsShopApi.update({ name: 'Shop đổi tên', industry: 'Mỹ phẩm & làm đẹp', timezone: 'Asia/Singapore', avatar: 'heart', avatarTone: 'sand' });
+  const updated = onboarding.readMockOnboarding();
+  assert.deepEqual(updated.workspace, { name: 'Shop đổi tên', industry: 'Mỹ phẩm & làm đẹp', timezone: 'Asia/Singapore', avatar: 'heart', avatarTone: 'sand' });
+  assert.deepEqual(updated.connections, { messenger: 'Kết nối mẫu giữ nguyên' });
+  assert.deepEqual(db.readDb().channels, channels);
+  assert.deepEqual(db.readDb().products, products);
+  assert.equal((await settings.settingsShopApi.get()).phone, '0901234567');
+  const reloaded = loadModules()('lib/services/settingsData.ts');
+  assert.equal((await reloaded.settingsShopApi.get()).industry, 'Mỹ phẩm & làm đẹp');
+  assert.ok(f.storage.has('tendly.onboarding.mock.v1'));
+});
+
+test('settings can establish an industry without setup and rejects invalid edits before changing either store', async () => {
+  fixture();
+  const load = loadModules();
+  const settings = load('lib/services/settingsData.ts');
+  const onboarding = load('lib/services/mockOnboarding.ts');
+  await settings.settingsShopApi.update({ name: 'Shop mới', industry: 'Nhà cửa & đời sống' });
+  assert.equal(onboarding.readMockOnboarding().workspace.industry, 'Nhà cửa & đời sống');
+  const before = onboarding.readMockOnboarding();
+  await assert.rejects(settings.settingsShopApi.update({ name: '' }), /shop/);
+  await assert.rejects(settings.settingsShopApi.update({ email: 'invalid', industry: 'Dịch vụ' }), /Email/);
+  assert.deepEqual(onboarding.readMockOnboarding(), before);
+  assert.equal((await settings.settingsShopApi.get()).name, 'Shop mới');
+  globalThis.localStorage.setItem = () => { throw new Error('Storage disabled'); };
+  await assert.rejects(settings.settingsShopApi.update({ industry: 'Dịch vụ' }), /Storage disabled/);
+  assert.equal((await settings.settingsShopApi.get()).industry, 'Nhà cửa & đời sống');
 });
 
 test('saved owner name updates dashboard identity and can be cleared', async () => {

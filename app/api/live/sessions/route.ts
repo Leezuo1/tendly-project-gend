@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { liveErrorResponse, liveJson } from '@/lib/services/live/api';
 import { createSession, listSessions } from '@/lib/services/live/engine';
@@ -8,7 +9,7 @@ import type { LiveSourceKind } from '@/lib/types/live';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -16,13 +17,13 @@ export async function GET(request: Request) {
   } catch (error) {
     return liveErrorResponse(error);
   }
-}
+});
 
 /**
  * Bắt đầu phiên: { platform: 'facebook', sourceKind: 'auto'|'live_video'|'post', sourceId?, title, knowledge } (knowledge = Cấu hình AI).
  * sourceKind 'auto': tạo phiên trước, Tendly tự nhận video Live khi người bán bật stream trên Facebook.
  */
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -54,4 +55,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return liveErrorResponse(error);
   }
-}
+});
