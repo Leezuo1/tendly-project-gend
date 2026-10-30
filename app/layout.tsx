@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AppSecurityProvider } from '@/components/shared/AppSecurityProvider';
 
 export const metadata: Metadata = {
   title: "Tendly — Nền tảng chăm sóc khách hàng AI cho shop online",
@@ -20,7 +21,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body><AppSecurityProvider>{children}</AppSecurityProvider></body>
     </html>
   );
 }

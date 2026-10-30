@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { liveErrorResponse, liveJson, parseSessionId } from '@/lib/services/live/api';
 import { syncSession } from '@/lib/services/live/engine';
 import { marketingPageId } from '@/lib/services/marketingApi';
@@ -7,7 +8,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /** Kéo bình luận mới → phân loại → gom nhóm/đơn → trả snapshot. Dashboard gọi khoảng 3 giây/lần khi đang live. */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withAppAccess(async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -15,4 +16,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     return liveErrorResponse(error);
   }
-}
+});

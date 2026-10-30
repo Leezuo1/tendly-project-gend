@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { composePostMessage, InvalidPostRequest } from '@/lib/services/aiPost';
 import { publishToFacebookPage } from '@/lib/services/facebookPage';
 import { postsErrorResponse, readJson, requireDashboardKey } from '@/lib/services/postsApi';
@@ -10,7 +11,7 @@ export const maxDuration = 60;
  * mode "page": đăng thật lên Fanpage (chỉ bài Facebook).
  * mode "manual": chủ shop tự đăng (TikTok/email hoặc copy tay) — chỉ đánh dấu đã đăng.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withAppAccess(async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -32,4 +33,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     return postsErrorResponse(error);
   }
-}
+});

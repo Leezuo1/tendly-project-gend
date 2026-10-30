@@ -1,3 +1,4 @@
+import { businessSecurity } from './business-security-fixture.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -21,6 +22,7 @@ const structuredReply = (reply = 'Phản hồi kiểm thử.', analysis = defaul
 function loadModules() {
   const cache = new Map();
   const load = (relative) => {
+    if (relative.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     const filename = path.join(root, relative);
     if (cache.has(filename)) return cache.get(filename).exports;
     const loadedModule = { exports: {} };

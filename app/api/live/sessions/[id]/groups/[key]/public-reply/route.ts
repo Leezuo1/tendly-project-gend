@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { liveErrorResponse, liveJson, parseGroupKey, parseSessionId } from '@/lib/services/live/api';
 import { buildSnapshot } from '@/lib/services/live/engine';
 import { replyPublicly } from '@/lib/services/live/reply';
@@ -11,7 +12,7 @@ export const maxDuration = 30;
  * "Trả lời bằng comment" { text, revision }: Trang trả lời công khai 1 lần dưới bình luận mới nhất của nhóm.
  * Cần quyền pages_manage_engagement — thiếu thì trả 403 NEED_PERMISSION.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string; key: string }> }) {
+export const POST = withAppAccess(async function POST(request: Request, { params }: { params: Promise<{ id: string; key: string }> }) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -27,4 +28,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     return liveErrorResponse(error);
   }
-}
+});

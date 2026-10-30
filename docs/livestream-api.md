@@ -7,7 +7,7 @@ Lõi Livestream đã chạy xong. Dashboard trong lúc live và dashboard tổng
 
 Kiểu dữ liệu nằm trong `lib/types/live.ts`. Trang chạy thử `app/livestream` (`components/features/livestream/LivestreamShell.tsx`) là ví dụ dùng đầy đủ, nên **thay bằng dashboard thật**.
 
-Mọi API cần mã quản trị `DASHBOARD_KEY` (header `Authorization: Bearer …`). `dashboardRequest` đã tự gắn mã này. Khi thiếu mã, API trả `401 NEED_DASHBOARD_KEY`. Có thể dùng `MarketingDataNotice` để hiện ô nhập mã.
+Mọi API cần phiên đăng nhập app qua cookie HttpOnly. `dashboardRequest` dùng cookie cùng origin; chưa đăng nhập trả `401 LOGIN_REQUIRED`, user bị khóa trả `403 APP_PROTECTED`. Admin vẫn sử dụng được khi khóa. `DASHBOARD_KEY` cũ không vượt qua lớp bảo vệ. API ghi yêu cầu Origin cùng website.
 
 ## Dùng nhanh
 

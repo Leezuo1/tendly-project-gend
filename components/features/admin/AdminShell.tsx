@@ -1,11 +1,11 @@
 'use client';
 
 import React, { type ReactNode } from 'react';
-import { Sidebar } from '@/components/features/dashboard/Sidebar';
+import { Sidebar, type SidebarProps } from '@/components/features/dashboard/Sidebar';
 import { ShopProvider } from '@/components/shared/ShopProvider';
 import { ToastProvider, useToast } from '@/components/shared/ToastProvider';
 
-type AdminPath = 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing';
+type AdminPath = NonNullable<SidebarProps['currentPath']>;
 
 function ShellLayout({ currentPath, children }: { currentPath: AdminPath; children: ReactNode }) {
   const toast = useToast();

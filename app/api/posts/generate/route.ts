@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { buildPostPrompt, parsePostOutput, parsePostRequest, POST_RESPONSE_SCHEMA } from '@/lib/services/aiPost';
 import { InvalidAiKnowledge, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { GeminiNotConfigured, GeminiUnavailable, generateGeminiJson } from '@/lib/services/gemini';
@@ -7,7 +8,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /** AI viết bản nháp — không lưu gì, chủ shop xem/sửa rồi mới lưu hoặc đăng. */
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
 
@@ -38,4 +39,4 @@ export async function POST(request: Request) {
     if (error instanceof GeminiUnavailable) return Response.json({ error: error.message }, { status: 502 });
     throw error;
   }
-}
+});

@@ -4,6 +4,7 @@
  * kết quả mơ hồ thì để "unknown" và không bao giờ tự gửi lại.
  */
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
+import { assertOperationAllowed } from '@/lib/services/appSecurity';
 import { graphRead, saveFacebookComments } from '@/lib/services/facebookComments';
 import type { LiveOrderItem, LiveSendResult } from '@/lib/types/live';
 import { type Database, LiveError, loadSession, markGroupHandled } from '@/lib/services/live/engine';
@@ -28,7 +29,7 @@ interface MemberRow {
 
 type Outcome = 'sent' | 'failed' | 'unknown' | 'not_allowed';
 
-async function sendFacebook(pageId: string, commentId: string, text: string): Promise<{ outcome: Outcome; messageId: string | null; recipientId: string | null }> {
+async function sendFacebook(pageId: string, commentId: string, text: string, db: Database): Promise<{ outcome: Outcome; messageId: string | null; recipientId: string | null }> {
   const { token, version } = metaConfig();
   try {
     const live = await graphRead(commentId, 'can_reply_privately');
@@ -37,6 +38,8 @@ async function sendFacebook(pageId: string, commentId: string, text: string): Pr
     // Không đọc được bình luận (đã xoá, thiếu quyền...) → chưa gửi gì, đánh dấu lỗi để shop xem
     return { outcome: 'failed', messageId: null, recipientId: null };
   }
+  try { await assertOperationAllowed(db); }
+  catch { return { outcome: 'not_allowed', messageId: null, recipientId: null }; }
   try {
     const response = await fetch(`https://graph.facebook.com/${version}/${pageId}/messages`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -63,6 +66,7 @@ async function sendFacebook(pageId: string, commentId: string, text: string): Pr
  */
 export async function approveGroup(pageId: string, sessionId: string, groupKey: string, text: string, revision: number,
   db: Database = getMessengerPool(), now = Date.now()): Promise<LiveSendResult & { revision: number }> {
+  await assertOperationAllowed(db);
   const { products, session, row: sessionRow } = await loadSession(pageId, sessionId, db);
   const group = (await db.query('SELECT * FROM live_groups WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey])).rows[0];
   if (!group) throw new LiveError('Không tìm thấy nhóm bình luận.', 404);
@@ -126,7 +130,7 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
     if (now - Number(m.created_at) >= WEEK) {
       outcome = 'not_allowed'; // Meta chỉ cho nhắn riêng trong 7 ngày
     } else {
-      ({ outcome, messageId, recipientId } = await sendFacebook(pageId, m.comment_id, message));
+      ({ outcome, messageId, recipientId } = await sendFacebook(pageId, m.comment_id, message, db));
     }
     const sentAt = Date.now();
     await db.query(`UPDATE live_comments SET reply_status=$3, message_id=$4, sent_at=$5 WHERE session_id=$1 AND comment_id=$2`,
@@ -164,6 +168,7 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
  */
 export async function replyPublicly(pageId: string, sessionId: string, groupKey: string, text: string, revision: number,
   db: Database = getMessengerPool(), now = Date.now()): Promise<{ commentId: string; repliedTo: string }> {
+  await assertOperationAllowed(db);
   const { token, version } = metaConfig();
   const { products } = await loadSession(pageId, sessionId, db);
   const group = (await db.query('SELECT * FROM live_groups WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey])).rows[0];
@@ -183,6 +188,11 @@ export async function replyPublicly(pageId: string, sessionId: string, groupKey:
   const message = fillTemplate(template, { customerName: 'mọi người', product, color: null, size: null, qty: null,
     remaining: null, suggestion: null });
   let response: Response;
+  try { await assertOperationAllowed(db); }
+  catch (error) {
+    await db.query(`UPDATE live_groups SET public_reply_id=NULL WHERE session_id=$1 AND group_key=$2 AND public_reply_id=$3`, [sessionId, groupKey, `pending:${now}`]);
+    throw error;
+  }
   try {
     response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(target.comment_id)}/comments`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

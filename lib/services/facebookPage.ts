@@ -3,6 +3,7 @@
  * không ảnh → POST /{page-id}/feed · có ảnh → POST /{page-id}/photos (ảnh + caption thành một bài trên tường).
  */
 import type { PostImageMime } from '@/lib/types/posts';
+import { assertOperationAllowed } from '@/lib/services/appSecurity';
 
 const GRAPH_API_VERSION = 'v26.0';
 
@@ -34,6 +35,7 @@ export async function publishToFacebookPage(
   }
 
   let res: Response;
+  await assertOperationAllowed();
   try {
     res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/${image ? 'photos' : 'feed'}`, {
       method: 'POST',

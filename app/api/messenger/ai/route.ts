@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { InvalidAiKnowledge, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { processMessengerAi, readMessengerAiSettings, saveMessengerAiSettings } from '@/lib/services/messengerAi';
@@ -29,6 +30,6 @@ async function handle(request: Request) {
       { status: error instanceof InvalidAiKnowledge ? 400 : 503 });
   }
 }
-export const GET = handle;
-export const PUT = handle;
-export const POST = handle;
+export const GET = withAppAccess(handle);
+export const PUT = withAppAccess(handle);
+export const POST = withAppAccess(handle);

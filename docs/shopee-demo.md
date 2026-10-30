@@ -24,7 +24,7 @@ SHOPEE_REDIRECT_URL=https://<domain-tendly>/api/shopee/callback
 SHOPEE_SANDBOX=false
 ```
 
-Không gửi Partner Key/token trong chat, không dùng `NEXT_PUBLIC_`, không commit `.env.local`. Code dùng lại `DATABASE_URL`, `INBOX_ACCESS_KEY` và phiên truy cập Facebook; endpoint mở phiên hiện tại cũng yêu cầu `PAGE_ID`. Giữ cấu hình Facebook đang hoạt động.
+Không gửi Partner Key/token trong chat, không dùng `NEXT_PUBLIC_`, không commit `.env.local`. Code dùng `DATABASE_URL` và phiên đăng nhập app; user phải được mở quyền hoặc đăng nhập admin. `INBOX_ACCESS_KEY` cũ không cấp quyền. Giữ cấu hình Facebook đang hoạt động.
 
 Trong PowerShell, chạy `npm.cmd run db:migrate` rồi `npm.cmd run dev`. Migration thêm bảng `shopee_connection`, giữ nguyên dữ liệu Facebook. Bảng lưu token server-side và danh mục đồng bộ thành công gần nhất. Tài khoản database và backup có quyền đọc bảng này cũng đọc được token.
 

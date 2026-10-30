@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { buildRemarketingPrompt, parseRemarketingOutput, REMARKETING_RESPONSE_SCHEMA } from '@/lib/services/aiRemarketing';
 import { generateGeminiJson } from '@/lib/services/gemini';
@@ -9,7 +10,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /** AI soạn tin nhắn lại cho một khách — chỉ trả bản nháp, chủ shop duyệt rồi mới gửi. */
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -28,4 +29,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return marketingErrorResponse(error);
   }
-}
+});

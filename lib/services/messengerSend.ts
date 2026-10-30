@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import type { MessengerMessage } from '@/lib/types/messenger';
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
+import { assertOperationAllowed } from '@/lib/services/appSecurity';
 
 export class MessengerSendError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -9,6 +10,7 @@ export interface SendMessengerInput { psid: string; text: string; requestId: str
 
 export async function sendMessengerMessage(input: SendMessengerInput,
   db: Pool = getMessengerPool(), transport: typeof fetch = fetch) {
+  await assertOperationAllowed(db);
   const pageId = process.env.PAGE_ID;
   const token = process.env.PAGE_ACCESS_TOKEN;
   const version = process.env.META_GRAPH_VERSION;
@@ -43,6 +45,11 @@ export async function sendMessengerMessage(input: SendMessengerInput,
       : 'Chưa xác định được kết quả gửi. Kiểm tra Messenger trước khi gửi lại để tránh trùng.', 409);
   }
   let response: Response;
+  try { await assertOperationAllowed(db); }
+  catch (error) {
+    await db.query(`UPDATE messenger_outbound_requests SET status='failed' WHERE page_id=$1 AND request_id=$2`, [pageId, input.requestId]);
+    throw error;
+  }
   try {
     response = await transport(`https://graph.facebook.com/${version}/${encodeURIComponent(pageId)}/messages`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

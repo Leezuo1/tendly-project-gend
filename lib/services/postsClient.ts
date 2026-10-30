@@ -13,7 +13,7 @@ export class PostsApiError extends Error {
   }
 }
 
-/** Mã quản trị (DASHBOARD_KEY) chỉ lưu trên trình duyệt của chủ shop. */
+/** Legacy UI compatibility; stored codes do not grant server access. */
 export function getDashboardKey(): string {
   try {
     return localStorage.getItem(KEY_STORAGE) ?? '';
@@ -31,16 +31,14 @@ export function setDashboardKey(key: string) {
   }
 }
 
-/** fetch kèm mã quản trị; lỗi HTTP thành PostsApiError (dùng chung cho các API Marketing). */
+/** Cookie phiên app được gửi cùng origin; lỗi HTTP thành PostsApiError. */
 export async function dashboardRequest(url: string, init: RequestInit = {}): Promise<Response> {
-  const key = getDashboardKey();
   let res: Response;
   try {
     res = await fetch(url, {
       ...init,
       headers: {
         ...(typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
-        ...(key ? { Authorization: `Bearer ${key}` } : {}),
         ...init.headers,
       },
     });

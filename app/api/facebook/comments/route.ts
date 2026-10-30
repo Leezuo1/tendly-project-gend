@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { after } from 'next/server';
 import { requireDashboardKey } from '@/lib/services/postsApi';
 import { syncFacebookComments } from '@/lib/services/facebookCommentSync';
@@ -15,15 +16,15 @@ function errorResponse(error: unknown) {
     ? Response.json({ error: error.message }, { status: error.status }) : marketingErrorResponse(error);
 }
 
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
     return Response.json(await readFacebookComments(marketingPageId()), { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return errorResponse(error); }
-}
+});
 
-export async function PUT(request: Request) {
+export const PUT = withAppAccess(async function PUT(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -37,9 +38,9 @@ export async function PUT(request: Request) {
     await saveCommentSettings(pageId, body.autoReply, parseAiKnowledge(body.knowledge));
     return Response.json({ saved: true });
   } catch (error) { return errorResponse(error); }
-}
+});
 
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -72,4 +73,4 @@ export async function POST(request: Request) {
     }
     return Response.json(await sendCommentPrivateReply(pageId, body.commentId, body.text.trim(), body.revision));
   } catch (error) { return errorResponse(error); }
-}
+});

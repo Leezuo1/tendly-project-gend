@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react';
+import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { useMockOnboarding } from '@/lib/hooks/useMockOnboarding';
 import { industries, avatarOptions, toneOptions } from '@/lib/data/workspace';
-import { completeMockOnboarding, connectMockPlatform, logoutMock, saveMockWorkspace, type MockPlatform, type MockWorkspace, type WorkspaceAvatar, type WorkspaceTone } from '@/lib/services/mockOnboarding';
+import { completeMockOnboarding, connectMockPlatform, saveMockWorkspace, type MockPlatform, type MockWorkspace, type WorkspaceAvatar, type WorkspaceTone } from '@/lib/services/mockOnboarding';
 import styles from './onboarding.module.css';
 
 export const platforms: { id: MockPlatform; name: string; description: string }[] = [
@@ -28,8 +29,9 @@ function timezoneLabel(value: string) {
 }
 
 export function OnboardingHeader() {
+  const { logout } = useAppSecurity();
   const router = useRouter();
-  return <header className={styles.header}><Link href="/" aria-label="Tendly — Trang chủ"><img src="/tendly-logo.png" alt="Tendly" width="126" height="42" /></Link><div className={styles.headerRight}><span className={styles.demoBadge}>BẢN DÙNG THỬ</span><span className={styles.adminAvatar}>A</span><span>Admin</span><button type="button" onClick={() => { logoutMock(); router.replace('/dang-nhap'); }}>Đăng xuất</button></div></header>;
+  return <header className={styles.header}><Link href="/" aria-label="Tendly — Trang chủ"><img src="/tendly-logo.png" alt="Tendly" width="126" height="42" /></Link><div className={styles.headerRight}><span className={styles.demoBadge}>BẢN DÙNG THỬ</span><span className={styles.adminAvatar}>A</span><span>Admin</span><button type="button" onClick={async () => { try { await logout(); router.replace('/dang-nhap'); } catch { window.alert('Chưa đăng xuất được. Vui lòng thử lại.'); } }}>Đăng xuất</button></div></header>;
 }
 
 function Arrow() { return <span aria-hidden="true">↗</span>; }

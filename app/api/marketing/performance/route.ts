@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { facebookPublishConfigured, fetchPostEngagement } from '@/lib/services/facebookPage';
 import { marketingErrorResponse, marketingPageId } from '@/lib/services/marketingApi';
 import { readRemarketingSends } from '@/lib/services/marketingInsights';
@@ -11,7 +12,7 @@ export const maxDuration = 30;
 const STATS_LIMIT = 25;
 
 /** Số liệu thật: tương tác của bài đã đăng Fanpage + tỉ lệ khách nhắn lại sau tin remarketing. */
-export async function GET(request: Request) {
+export const GET = withAppAccess(async function GET(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -53,4 +54,4 @@ export async function GET(request: Request) {
   } catch (error) {
     return marketingErrorResponse(error);
   }
-}
+});

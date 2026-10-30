@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { marketingErrorResponse, marketingPageId, readMarketingJson } from '@/lib/services/marketingApi';
 import { productMatchers, readMarketingCustomers } from '@/lib/services/marketingInsights';
@@ -9,7 +10,7 @@ export const runtime = 'nodejs';
  * Khách Messenger thật kèm nhóm hoạt động. POST vì cần danh sách sản phẩm trong Cấu hình AI
  * (đang lưu trên trình duyệt) để dò khách đã hỏi sản phẩm nào.
  */
-export async function POST(request: Request) {
+export const POST = withAppAccess(async function POST(request: Request) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -21,4 +22,4 @@ export async function POST(request: Request) {
   } catch (error) {
     return marketingErrorResponse(error);
   }
-}
+});

@@ -1,3 +1,4 @@
+import { withAppAccess } from '@/lib/services/appSecurity';
 import { checkPostImage, InvalidPostImage, MAX_IMAGE_BYTES } from '@/lib/services/postImages';
 import { postsErrorResponse, requireDashboardKey } from '@/lib/services/postsApi';
 import { deletePostImage, getPostImage, PostNotFound, setPostImage } from '@/lib/services/postsPostgres';
@@ -8,7 +9,7 @@ export const runtime = 'nodejs';
 type Context = { params: Promise<{ id: string }> };
 
 /** Ảnh nháp chưa công khai nên cũng khoá bằng mã quản trị (trình duyệt tải bằng fetch có header). */
-export async function GET(request: Request, { params }: Context) {
+export const GET = withAppAccess(async function GET(request: Request, { params }: Context) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -20,10 +21,10 @@ export async function GET(request: Request, { params }: Context) {
   } catch (error) {
     return postsErrorResponse(error);
   }
-}
+});
 
 /** Body là bytes ảnh; header X-Image-Source cho biết ảnh do AI tạo hay chủ shop tải lên. */
-export async function PUT(request: Request, { params }: Context) {
+export const PUT = withAppAccess(async function PUT(request: Request, { params }: Context) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -37,9 +38,9 @@ export async function PUT(request: Request, { params }: Context) {
   } catch (error) {
     return postsErrorResponse(error);
   }
-}
+});
 
-export async function DELETE(request: Request, { params }: Context) {
+export const DELETE = withAppAccess(async function DELETE(request: Request, { params }: Context) {
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
@@ -47,4 +48,4 @@ export async function DELETE(request: Request, { params }: Context) {
   } catch (error) {
     return postsErrorResponse(error);
   }
-}
+});

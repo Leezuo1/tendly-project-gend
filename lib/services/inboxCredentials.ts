@@ -1,5 +1,5 @@
 ﻿'use client';
-import { useEffect, useState } from 'react';
+import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 
 interface InboxSession { ready: boolean; error: string }
 let pending: Promise<InboxSession> | undefined;
@@ -20,16 +20,6 @@ export function openInboxSession(): Promise<InboxSession> {
   return pending;
 }
 export function useInboxSession(): InboxSession {
-  const [session, setSession] = useState<InboxSession>({ ready: false, error: '' });
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const renew = async () => {
-      const result = await openInboxSession();
-      if (!cancelled) { setSession(result); timer = setTimeout(renew, result.ready ? 15 * 60000 : 15000); }
-    };
-    void renew();
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, []);
-  return session;
+  const { session } = useAppSecurity();
+  return { ready: session.canUse, error: session.error || (session.canUse ? '' : 'Bạn đang ở chế độ chỉ xem.') };
 }
