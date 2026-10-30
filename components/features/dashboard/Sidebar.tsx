@@ -8,7 +8,7 @@ import { useUnrepliedCount } from '@/lib/hooks/useUnrepliedCount';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
 
 interface SidebarProps {
-  currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat';
+  currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing';
   activeTab?: DashboardTab;
   setActiveTab?: (tab: DashboardTab) => void;
   onToast: (msg: string) => void;
@@ -103,6 +103,14 @@ export function Sidebar({
             <path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path>
           </svg>
           <span>Livestream</span>
+        </Link>
+
+        <Link href="/smart-sourcing" className={`nav-item ${currentPath === 'smart-sourcing' ? 'active' : ''}`}
+          aria-label="Smart Sourcing" aria-current={currentPath === 'smart-sourcing' ? 'page' : undefined} title="Smart Sourcing">
+          <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="7.5" /><path d="m16 16 5 5M7 12l3-3 3 1 2-3" />
+          </svg>
+          <span>Smart Sourcing</span>
         </Link>
 
         {/* Cấu hình AI */}

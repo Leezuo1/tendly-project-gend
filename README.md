@@ -12,6 +12,16 @@ Phiên đăng nhập mẫu lưu trong `sessionStorage`; thông tin shop và lự
 
 Chạy `node --test tests/mock-onboarding.test.mjs` để kiểm tra tài khoản mẫu, lưu/khôi phục tiến độ, kết nối/ngắt kết nối và bỏ qua thiết lập.
 
+### Smart Sourcing demo & thông tin setup
+
+Tên shop, ngành hàng, múi giờ, biểu tượng và màu nền ở `/tao-shop` dùng chung dữ liệu với **Cài đặt → Tài khoản & nhân viên**. Sửa trong Cài đặt sẽ cập nhật lại setup, giữ nguyên liên hệ, sản phẩm và dữ liệu kết nối. Bước 2 kết nối nền tảng vẫn mô phỏng và chưa đồng bộ sang Cài đặt.
+
+Mở **Smart Sourcing** (`/smart-sourcing`) từ sidebar → **Phân tích xu hướng mẫu** → chọn từ khóa → **Tìm nguồn hàng** trên sản phẩm. Demo có bộ mẫu riêng cho cả 7 ngành setup, mô phỏng tín hiệu Facebook/TikTok/sàn TMĐT, sản phẩm liên quan và nguồn cung. Đổi ngành trong Cài đặt sẽ đổi bộ mẫu và xóa kết quả phân tích cũ trên màn hình. Chưa setup thì trang hướng dẫn vào Cài đặt để bổ sung.
+
+Từ khóa, mức tăng, lượt thảo luận, giá, số lượng tối thiểu và nhà cung cấp đều là dữ liệu minh họa, không phải khảo sát hay báo giá thật. **Tra cứu nguồn tương tự** mở tìm kiếm Google, chưa xác minh/liên hệ nhà cung cấp hoặc đặt hàng. Không thêm API, crawler, đồng bộ nền tảng hay phụ thuộc mới; dữ liệu setup vẫn chỉ lưu trên trình duyệt.
+
+Kiểm tra: `node --test tests/mock-onboarding.test.mjs tests/ai-chat.test.mjs tests/smart-sourcing.test.mjs`.
+
 First, run the development server:
 
 ```bash

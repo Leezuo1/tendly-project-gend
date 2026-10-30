@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ShopProvider } from '@/components/shared/ShopProvider';
 import { ToastProvider, useToast } from '@/components/shared/ToastProvider';
 
-type AdminPath = 'cau-hinh-ai' | 'cai-dat';
+type AdminPath = 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing';
 
 function ShellLayout({ currentPath, children }: { currentPath: AdminPath; children: ReactNode }) {
   const toast = useToast();

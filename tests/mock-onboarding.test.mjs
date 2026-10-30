@@ -13,7 +13,7 @@ function fixture() {
   const source = ts.transpileModule(readFileSync('lib/services/mockOnboarding.ts', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  const load = () => { const module = { exports: {} }; new Function('module', 'exports', source)(module, module.exports); return module.exports; };
+  const load = () => { const loadedModule = { exports: {} }; new Function('module', 'exports', source)(loadedModule, loadedModule.exports); return loadedModule.exports; };
   return { api: load(), local, session, load };
 }
 

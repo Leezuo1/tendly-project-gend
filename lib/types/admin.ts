@@ -1,9 +1,14 @@
+import type { MockWorkspace } from '@/lib/services/mockOnboarding';
+
 export interface Shop {
   ownerName?: string;
   name: string;
   email: string;
   phone: string;
   timezone: string;
+  industry?: string;
+  avatar?: MockWorkspace['avatar'];
+  avatarTone?: MockWorkspace['avatarTone'];
   logo: string | null; // data URL khi người dùng tự đổi ảnh, null = logo mặc định
 }
 

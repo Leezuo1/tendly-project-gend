@@ -2,17 +2,18 @@
 
 import { createSeed } from '@/lib/data/admin';
 import { readDb, writeDb } from '@/lib/services/mockDb';
+import { readMockOnboarding, saveMockWorkspace } from '@/lib/services/mockOnboarding';
 import type { Member, Shop } from '@/lib/types/admin';
 import { isEmail, isPhone, uid } from '@/lib/utils/format';
 
 export function savedShopInfo(): Shop {
   const db = readDb();
   const shop = db.shop;
-  if (db.settingsShopSaved) return { ...shop };
   const seed = createSeed().shop;
-  return { ...shop, name: shop.name === seed.name ? '' : shop.name,
+  const saved = db.settingsShopSaved ? shop : { ...shop, name: shop.name === seed.name ? '' : shop.name,
     email: shop.email === seed.email ? '' : shop.email,
     phone: shop.phone === seed.phone ? '' : shop.phone };
+  return { ...saved, ...readMockOnboarding().workspace };
 }
 
 export const settingsShopApi = {
@@ -23,6 +24,10 @@ export const settingsShopApi = {
     if (shop.ownerName !== undefined) shop.ownerName = shop.ownerName.trim();
     if (shop.email && !isEmail(shop.email)) throw new Error('Email liên hệ không hợp lệ');
     if (shop.phone && !isPhone(shop.phone)) throw new Error('Số điện thoại không hợp lệ');
+    if (readMockOnboarding().workspace || shop.industry) {
+      saveMockWorkspace({ name: shop.name, industry: shop.industry || '', timezone: shop.timezone,
+        avatar: shop.avatar, avatarTone: shop.avatarTone });
+    }
     writeDb((db) => { db.shop = shop; db.settingsShopSaved = true; });
     return structuredClone(shop);
   },
