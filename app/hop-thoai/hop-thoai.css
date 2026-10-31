@@ -1387,14 +1387,37 @@
 }
 
 @media (max-width: 880px) {
-  .inbox-root .conv-search { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 4px 12px 8px; }
+  .inbox-root .conv-search { grid-template-columns: minmax(0, 1fr) 44px; gap: 4px 8px; padding: 4px 12px 8px; }
   .inbox-root .messenger-toolbar { grid-column: 1; grid-row: 1; }
   .inbox-root .inbox-ai-toggle { justify-content: flex-start; gap: 12px; min-height: 36px; font-size: 12px; }
-  .inbox-root .conv-queue-title { grid-column: 1; grid-row: 2; }
-  .inbox-root .conv-search input { grid-column: 1; grid-row: 3; width: 100%; min-height: 36px; height: 36px; padding: 4px 10px; }
+  .inbox-root .conv-queue-title { grid-column: 2; grid-row: 1; }
+  .inbox-root .conv-queue-label { display: none; }
+  .inbox-root .conv-search input { grid-column: 1 / -1; grid-row: 2; width: 100%; min-height: 36px; height: 36px; padding: 4px 10px; }
   .inbox-root .conv-filter-row { grid-template-columns: repeat(3, max-content); justify-content: start; gap: 5px; padding: 0 12px; }
   .inbox-root .conv-filter { position: relative; isolation: isolate; min-height: 44px; padding: 0 8px; background: transparent; font-size: 10.5px; line-height: 1.2; }
   .inbox-root .conv-filter::before { content: ''; position: absolute; z-index: -1; inset: 8px 0; border-radius: 20px; background: var(--sand); }
   .inbox-root .conv-filter.selected, .inbox-root .conv-filter:hover { background: transparent; }
   .inbox-root .conv-filter.selected::before { background: var(--ink); }
+}
+
+.inbox-root .conv-select { display: flex; align-items: flex-start; flex: 1; min-width: 0; width: 100%; gap: 10px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.inbox-root .conv-delete { display: grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink-soft); cursor: pointer; }
+.inbox-root .conv-delete:disabled { opacity: .5; cursor: not-allowed; }
+.inbox-root .conv-select:focus-visible, .inbox-root .conv-delete:focus-visible { outline: 2px solid var(--coral-deep); outline-offset: 2px; }
+@media (min-width: 881px) {
+  .inbox-root .conv-queue-title { display: none; }
+}
+@media (max-width: 880px) {
+  .inbox-root .thread-header { display: flex; flex-wrap: nowrap; padding: 6px 8px; gap: 6px; }
+  .inbox-root .thread-header .thread-who { display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; }
+  .inbox-root .thread-header .conv-avatar { width: 26px; height: 26px; font-size: 10px; }
+  .inbox-root .thread-header .name { font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .inbox-root .thread-header .sub { font-size: 10px; line-height: 13px; margin: 0; }
+  .inbox-root .thread-header .thread-context, .inbox-root .thread-header .channel-dot, .inbox-root .thread-header-actions { display: none; }
+  .inbox-root .thread-header .thread-platform { display: inline; }
+  .inbox-root .conv-delete { width: 44px; height: 44px; align-self: flex-end; }
+}
+.inbox-root .thread-platform { display: none; }
+@media (max-width: 600px) {
+  .inbox-root .conv-select { flex-direction: column; gap: 6px; }
 }

@@ -11,7 +11,6 @@ interface ThreadPaneProps {
   onUseAiSuggestion: (text: string) => Promise<boolean> | void;
   isSending?: boolean;
   onLoadOlder?: () => Promise<void>;
-  onDeleteConversation?: () => Promise<void>;
   draftText: string;
   onDraftChange: (text: string) => void;
   onToast: (msg: string) => void;
@@ -39,7 +38,6 @@ export function ThreadPane({
   onGenerateAiSuggestion,
   isSending = false,
   onLoadOlder,
-  onDeleteConversation,
 }: ThreadPaneProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const previousConversationRef = useRef<string | null>(null);
@@ -137,13 +135,12 @@ export function ThreadPane({
             </div>
           </div>
           <div>
-            <div className="name">{conversation.threadWho.name}</div>
-            <div className="sub">{conversation.threadWho.sub}</div>
+            <div className="name" title={conversation.threadWho.name}>{conversation.threadWho.name}</div>
+            <div className="sub"><span className="thread-context">{conversation.threadWho.sub}</span><span className="thread-platform">{isFb ? 'Messenger' : 'Zalo OA'}</span></div>
           </div>
         </div>
 
         <div className="thread-header-actions">
-          {onDeleteConversation && <button type="button" className="btn btn-outline btn-sm" onClick={() => void onDeleteConversation()} disabled={isSending}>Xóa hội thoại</button>}
         {conversation.threadWho.badgeTag && (
           <span className={`tag tag-${conversation.threadWho.badgeTag.type}`}>
             {conversation.threadWho.badgeTag.label}

@@ -324,6 +324,8 @@ export function InboxShell() {
               conversations={filteredConversations}
               selectedId={selectedConv?.id || ''}
               onSelectConv={handleSelectConv}
+              onDeleteConv={setDeleteTarget}
+              sendingIds={sendingIds}
               filter={filter}
               onFilterChange={setFilter}
               searchQuery={searchQuery}
@@ -343,7 +345,6 @@ export function InboxShell() {
                   onToast={showToast}
                   onGenerateAiSuggestion={handleGenerateAiSuggestion}
                   isSending={sendingIds.has(selectedConv.id)}
-                  onDeleteConversation={async () => { setDeleteTarget(selectedConv); }}
                   onLoadOlder={async () => {
                     const target = selectedConv;
                     const oldest = target.messages[0];
@@ -381,7 +382,7 @@ export function InboxShell() {
 
       <Toast message={toastMessage} />
       <ConfirmDialog open={Boolean(deleteTarget)} title="Xóa hội thoại khỏi inbox?"
-        message="Hội thoại sẽ được ẩn phía shop, không xóa tin trên Facebook. Lịch sử vẫn lưu trong database và hội thoại hiện lại khi khách nhắn tin mới."
+        message={<>Hội thoại với <b>{deleteTarget?.name}</b> sẽ được ẩn phía shop, không xóa tin trên Facebook. Lịch sử vẫn lưu trong database và hội thoại hiện lại khi khách nhắn tin mới.</>}
         confirmLabel="Xóa hội thoại" busy={deleting} onClose={() => { if (!deleting) setDeleteTarget(null); }}
         onConfirm={() => { void (async () => {
           if (!deleteTarget?.messenger) return;
@@ -393,7 +394,7 @@ export function InboxShell() {
             const result = await response.json();
             hiddenConversations.current.set(deleteTarget.id, result.hiddenAt || Date.now());
             setConversations((previous) => previous.filter((c) => c.id !== deleteTarget.id));
-            setDeleteTarget(null); setDraftText(''); showToast('Đã xóa hội thoại khỏi inbox.');
+            setDeleteTarget(null); if (deleteTarget.id === selectedConv?.id) setDraftText(''); showToast('Đã xóa hội thoại khỏi inbox.');
           } catch (error) { showToast(error instanceof Error ? error.message : 'Không xóa được hội thoại.'); }
           finally { setDeleting(false); }
         })(); }} />

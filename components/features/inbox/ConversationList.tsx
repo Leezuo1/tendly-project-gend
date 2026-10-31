@@ -3,6 +3,7 @@
 import React from 'react';
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
 import { CustomerAvatar } from './CustomerAvatar';
+import { IconTrash } from '@/components/ui/Icons';
 
 interface ConversationListProps {
   toolbar?: React.ReactNode;
@@ -10,6 +11,8 @@ interface ConversationListProps {
   conversations: Conversation[];
   selectedId: string;
   onSelectConv: (id: string) => void;
+  onDeleteConv: (conversation: Conversation) => void;
+  sendingIds: ReadonlySet<string>;
   filter: InboxFilter;
   onFilterChange: (filter: InboxFilter) => void;
   searchQuery: string;
@@ -25,6 +28,8 @@ export function ConversationList({
   conversations,
   selectedId,
   onSelectConv,
+  onDeleteConv,
+  sendingIds,
   filter,
   onFilterChange,
   searchQuery,
@@ -36,7 +41,7 @@ export function ConversationList({
   return (
     <div className="conv-pane">
       <div className="conv-search">
-        <div className="conv-queue-title">Hàng chờ trả lời {listToggle}</div>
+        <div className="conv-queue-title">{listToggle}</div>
         <input
           type="text"
           value={searchQuery}
@@ -87,16 +92,11 @@ export function ConversationList({
               <div
                 key={conv.id}
                 className={`conv-item ${isActive ? 'active' : ''} ${conv.hasNewMessage ? 'has-new-message' : ''}`}
-                onClick={() => onSelectConv(conv.id)}
                 data-conv={conv.id}
-                role="button"
+              >
+                <button type="button" className="conv-select" onClick={() => onSelectConv(conv.id)}
                 aria-label={`${conv.name}${conv.hasNewMessage ? ' · Có tin nhắn mới' : ''}`}
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    onSelectConv(conv.id);
-                  }
-                }}
+                aria-pressed={isActive}
               >
                 <div className="conv-avatar-wrap">
                   <CustomerAvatar className="conv-avatar" name={conv.name} initials={conv.avatar} url={conv.avatarUrl} />
@@ -125,6 +125,8 @@ export function ConversationList({
                     </div>
                   )}
                 </div>
+                </button>
+                {conv.messenger && <button type="button" className="conv-delete" aria-label={`Xóa hội thoại với ${conv.name}`} title="Xóa hội thoại" disabled={sendingIds.has(conv.id)} onClick={() => onDeleteConv(conv)}><IconTrash width="16" height="16" aria-hidden="true" /></button>}
               </div>
             );
           })
