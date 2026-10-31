@@ -266,3 +266,12 @@
   .layout .railNote p { font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { .root *, .root *::before, .root *::after { transition: none !important; animation: none !important; } }
+
+.mobileBackBar { display: none; }
+@media (max-width: 760px) {
+  .connectionsRoot { padding-top: calc(68px + env(safe-area-inset-top, 0px)); }
+  .mobileBackBar { display: flex; align-items: center; position: fixed; z-index: 50; inset: 0 0 auto; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; background: var(--paper); border-bottom: 1px solid var(--line); }
+  .mobileBackBar .back { min-height: 48px; }
+  .connectionsPanel .actions .back { display: none; }
+  .connectionsPanel .actions .skip { grid-column: 1 / -1; }
+}

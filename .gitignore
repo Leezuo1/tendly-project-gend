@@ -192,3 +192,9 @@ vite.config.ts.timestamp-*
 
 # Local npm cache
 /.npm-cache/
+
+# Local AI tooling and browser review artifacts
+/.codex/
+/.gemini/
+/.impeccable/
+/.playwright-mcp/
