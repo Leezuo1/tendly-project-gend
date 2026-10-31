@@ -23,6 +23,40 @@ function Eye({ visible }: { visible: boolean }) {
   return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" stroke="currentColor" strokeWidth="1.5" /><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />{visible && <path d="m4 3 16 18" stroke="currentColor" strokeWidth="1.5" />}</svg>;
 }
 
+function FeatureIcon({ kind }: { kind: 'care' | 'sales' | 'shop' }) {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {kind === 'care' ? <><path d="M5 17 3 21l5-2a9 9 0 1 0-3-2Z" /><path d="M8 10h8m-8 4h5" /></> : kind === 'sales' ? <><path d="m3 5 2 1 2 11h11l3-9H6M10 3v5m-2-2 2 2 2-2" /><circle cx="9" cy="21" r="1" /><circle cx="18" cy="21" r="1" /></> : <><path d="M4 10v11h16V10M3 10l2-7h14l2 7M3 10c0 3 4 3 4 0 0 3 5 3 5 0 0 3 5 3 5 0 0 3 4 3 4 0" /><path d="M9 21v-6h6v6" /></>}
+  </svg>;
+}
+
+function BrandStory() {
+  return <aside className={styles.story} aria-label="Cùng Tendly chăm sóc khách hàng">
+    <Link href="/" className={styles.logo} aria-label="Tendly — về trang chủ"><img src="/tendly-logo.png" alt="Tendly" width="144" height="48" /></Link>
+    <div className={styles.storyBody}>
+      <p className={styles.eyebrow}><span /> MỖI CUỘC TRÒ CHUYỆN ĐỀU QUAN TRỌNG</p>
+      <h2 lang="en">Your AI teammate<br /> for every <em>customer.</em></h2>
+      <p className={styles.storyDescription}>Hiểu sản phẩm. Gợi ý đúng lúc.<br /> Cùng bạn chăm sóc khách và phát triển shop.</p>
+
+      <div className={styles.scene} role="img" aria-label="Minh họa hội thoại: khách hỏi về áo linen, Tendly gợi ý phản hồi để shop xem lại trước khi gửi.">
+        <div className={styles.orbit} />
+        <div className={styles.orbitInner} />
+        <div className={styles.channelNote}><span className={styles.channelIcon}>m</span><span>Một tin nhắn mới<span className={styles.noteLine} /></span><span className={styles.notificationDot} /></div>
+        <div className={styles.inboxCard}>
+          <div className={styles.inboxHeader}><span className={styles.inboxTitle}>Cuộc trò chuyện nhỏ</span><span className={styles.sampleTag}>MINH HỌA</span></div>
+          <div className={styles.customer}><span className={styles.avatar}>L</span><div><strong>Linh Nguyễn</strong><span>Khách hàng của bạn</span></div><span className={styles.customerTime}>Vừa xong</span></div>
+          <div className={styles.bubble}>Shop ơi, áo linen này có màu kem không ạ?</div>
+          <div className={styles.aiReply}><div className={styles.aiLabel}><Sparkle /> TENDLY GỢI Ý</div><p>Dạ có ạ! Áo linen có màu kem. Bạn muốn shop tư vấn thêm về size không ạ?</p><div className={styles.replyFoot}><span>Dựa trên sản phẩm của shop</span><span className={styles.review}>Xem lại & gửi <Arrow /></span></div></div>
+        </div>
+        <div className={styles.floatingNote}><span className={styles.checkmark}>✓</span> Bạn hiểu khách. Tendly phụ bạn.</div>
+        <span className={styles.sceneStar} aria-hidden="true">✳</span>
+      </div>
+
+      <div className={styles.benefits}><div><FeatureIcon kind="care" /><p>Hỗ trợ chăm sóc khách hàng</p></div><div><FeatureIcon kind="sales" /><p>Hỗ trợ bán hàng</p></div><div><FeatureIcon kind="shop" /><p>Quản lý shop</p></div></div>
+    </div>
+    <div className={styles.storyFooter}><span>Ít việc lặp lại. Nhiều thời gian cho khách.</span><span className={styles.footerFlower} aria-hidden="true">✳</span></div>
+  </aside>;
+}
+
 function Field({ name, label, error, hint, children }: { name: string; label: string; error?: string; hint?: string; children: ReactNode }) {
   return <div className={styles.field}><label htmlFor={name}>{label}</label>{children}{error ? <p className={styles.fieldError} id={`${name}-hint`}>{error}</p> : hint ? <p className={styles.fieldHint} id={`${name}-hint`}>{hint}</p> : null}</div>;
 }
@@ -94,6 +128,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
   });
 
   return <main className={styles.root}>
+    <BrandStory />
 
     <section className={styles.formPanel} aria-labelledby="auth-title">
       <header className={styles.panelHeader}><Link href="/" className={styles.backLink}><Arrow back /> Về trang chủ</Link><span className={styles.language} aria-label="Ngôn ngữ hiện tại: Tiếng Việt">Tiếng Việt</span></header>

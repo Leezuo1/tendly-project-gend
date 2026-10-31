@@ -156,3 +156,35 @@
   .admin-root .ai-subnav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 12px; min-width: 0; }
   .admin-root .ai-subnav > .tabs { position: static; }
 }
+
+.admin-root .product-sort { display: none; }
+@media (max-width: 880px) {
+  .admin-root .products-card [data-configuration-error='true'],
+  .admin-root .products-card .product-sync-note { display: none; }
+  .admin-root .products-card { padding: 16px 12px; }
+  .admin-root .products-card .card-head { gap: 12px; }
+  .admin-root .products-card .toolbar-left { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .admin-root .products-card .source-left > div { min-width: 0; overflow-wrap: anywhere; }
+  .admin-root .products-card .source-icon { flex-shrink: 0; }
+  .admin-root .products-card .source-row { padding: 12px; }
+  .admin-root .products-card .source-right .btn { max-width: 100%; white-space: normal; }
+  .admin-root .products-card .pagination { flex-wrap: wrap; justify-content: flex-start; }
+  .admin-root .products-card .product-sort { display: block; min-height: 44px; white-space: normal; }
+  .admin-root .products-table-wrap { overflow: visible; }
+  .admin-root .products-table { display: block; min-width: 0; }
+  .admin-root .products-table thead { display: none; }
+  .admin-root .products-table tbody { display: block; }
+  .admin-root .products-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 12px; border-bottom: 1px solid var(--line); }
+  .admin-root .products-table tr:last-child { border-bottom: 0; }
+  .admin-root .products-table td { display: block; min-width: 0; padding: 0; border: 0; }
+  .admin-root .products-table td:first-child,
+  .admin-root .products-table td:nth-child(2),
+  .admin-root .products-table td:last-child { grid-column: 1 / -1; }
+  .admin-root .products-table td[data-label]::before { content: attr(data-label); display: block; color: var(--ink-soft); font-size: 11px; margin-bottom: 3px; }
+  .admin-root .products-table .prod-cell > div { min-width: 0; }
+  .admin-root .products-table .prod-title, .admin-root .products-table .prod-sku { overflow-wrap: anywhere; }
+  .admin-root .products-table .prod-avatar { width: 32px; height: 32px; }
+  .admin-root .faq-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .admin-root .faq-row .faq-a, .admin-root .faq-row .faq-kw { display: none; }
+  .admin-root .faq-actions { justify-content: flex-end; }
+}

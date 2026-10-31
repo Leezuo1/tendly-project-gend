@@ -471,9 +471,14 @@
 .customer-root .order-step.done .bar { background: var(--moss); }
 .customer-root .order-step.done { color: var(--moss); font-weight: 700; }
 @media (max-width: 760px) {
-  .customer-root .mail-shell { grid-template-columns: 1fr; height: auto; }
+  .customer-root .mail-list-pane, .customer-root .mail-detail { min-width: 0; }
+  .customer-root .mail-detail { overflow-wrap: anywhere; }
+  .customer-root .mail-shell { grid-template-columns: minmax(0, 1fr); height: auto; }
   .customer-root .mail-list-pane { max-height: 260px; border-right: none; border-bottom: 1px solid var(--line); }
   .customer-root .mail-detail-head, .customer-root .mail-body { padding-left: 18px; padding-right: 18px; }
+  .customer-root .mail-meta-row, .customer-root .coupon-box { flex-wrap: wrap; }
+  .customer-root .mail-meta-time { flex-basis: 100%; }
+  .customer-root .btn-cta { max-width: 100%; white-space: normal; }
 }
 @media (max-width: 460px) {
   .customer-root .preview-page { padding: 0; align-items: stretch; }

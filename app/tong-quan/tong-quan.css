@@ -29,7 +29,7 @@
 /* Shell */
 .shell {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 248px 1fr;
   min-height: 100vh;
 }
 
@@ -207,7 +207,6 @@
 
 /* Main Content */
 .main {
-  min-width: 0;
   padding: 36px 48px 80px;
   max-width: 1400px;
   margin: 0 auto;
@@ -1032,6 +1031,7 @@
 }
 
 @media (max-width: 880px) {
+  .dashboard-root .main { min-width: 0; }
   .dashboard-root .main > *,
   .dashboard-root .grid-2 > * { min-width: 0; }
   .dashboard-root .page-head > div { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }

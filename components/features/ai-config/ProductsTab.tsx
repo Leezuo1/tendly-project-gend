@@ -81,6 +81,7 @@ export function ProductsTab() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, totalPages);
   const pageItems = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const cycleSort = () => { setSort(sort === 'qty-desc' ? 'qty-asc' : sort === 'qty-asc' ? 'default' : 'qty-desc'); setPage(1); };
 
 
   const flash = (before: Product[], after: Product[]) => {
@@ -138,7 +139,7 @@ export function ProductsTab() {
   };
 
   return (
-    <div className="card">
+    <div className="card products-card">
       <div className="card-head">
         <div>
           <h2>Nguồn dữ liệu sản phẩm</h2>
@@ -178,8 +179,8 @@ export function ProductsTab() {
           </button>
         </div>
       </div>
-      {sourceError && <p role="alert" className="source-meta">{sourceError}</p>}
-      <p className="source-meta">Mỗi phân loại Shopee là một dòng có giá và tồn kho riêng. Sản phẩm nhập thủ công được giữ lại khi đồng bộ.</p>
+      {sourceError && <p role="alert" className="source-meta" data-configuration-error={sourceError.includes('SHOPEE_PARTNER_ID')}>{sourceError}</p>}
+      <p className="source-meta product-sync-note">Mỗi phân loại Shopee là một dòng có giá và tồn kho riêng. Sản phẩm nhập thủ công được giữ lại khi đồng bộ.</p>
 
       <div className="table-toolbar">
         <div className="toolbar-left">
@@ -199,10 +200,11 @@ export function ProductsTab() {
           </select>
         </div>
         <div className="table-summary">Hiển thị <b>{pageItems.length}</b> / {filtered.length} sản phẩm</div>
+        <button type="button" className="btn btn-outline btn-sm product-sort" onClick={cycleSort}>Tồn kho: {sort === 'qty-desc' ? 'Cao → thấp' : sort === 'qty-asc' ? 'Thấp → cao' : 'Mặc định'}</button>
       </div>
 
-      <div className="table-wrap">
-        <table className="data-table">
+      <div className="table-wrap products-table-wrap">
+        <table className="data-table products-table">
           <thead>
             <tr>
               <th>Tên sản phẩm</th>
@@ -211,7 +213,7 @@ export function ProductsTab() {
               <th
                 className="sortable"
                 style={{ textAlign: 'right' }}
-                onClick={() => { setSort(sort === 'qty-desc' ? 'qty-asc' : sort === 'qty-asc' ? 'default' : 'qty-desc'); setPage(1); }}
+                onClick={cycleSort}
                 title="Sắp xếp theo số lượng"
               >
                 Số lượng {sort === 'qty-desc' ? '↓' : sort === 'qty-asc' ? '↑' : '↕'}
@@ -239,8 +241,8 @@ export function ProductsTab() {
                   <span className="cat-pill">{p.category}</span>
                   <div className="variant-desc">{[p.colors.join(', '), p.sizes.length ? sizeLabel(p.sizes) : ''].filter(Boolean).join(' • ') || '—'}</div>
                 </td>
-                <td style={{ textAlign: 'right' }}><span className="price-val">{formatMoney(p.price)}</span></td>
-                <td style={{ textAlign: 'right' }}><span className="qty-val">{p.qty}</span></td>
+                <td data-label="Giá" style={{ textAlign: 'right' }}><span className="price-val">{formatMoney(p.price)}</span></td>
+                <td data-label="Số lượng" style={{ textAlign: 'right' }}><span className="qty-val">{p.qty}</span></td>
                 <td style={{ textAlign: 'center' }}><StockBadge qty={p.qty} /></td>
               </tr>
             ))}

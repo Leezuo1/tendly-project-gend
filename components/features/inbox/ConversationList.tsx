@@ -36,7 +36,6 @@ export function ConversationList({
   return (
     <div className="conv-pane">
       <div className="conv-search">
-        {toolbar}
         <div className="conv-queue-title">Hàng chờ trả lời {listToggle}</div>
         <input
           type="text"
@@ -45,6 +44,7 @@ export function ConversationList({
           placeholder="Tìm khách hàng, mã đơn..."
           aria-label="Tìm kiếm hội thoại"
         />
+        {toolbar}
       </div>
 
       <div className="conv-filter-row">
