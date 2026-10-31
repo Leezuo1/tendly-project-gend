@@ -1331,3 +1331,35 @@
 }
 
 
+
+@media (max-width: 600px) {
+  .inbox-root .inbox-shell { grid-template-columns: clamp(108px, 31vw, 170px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .inbox-root .conv-pane { min-width: 0; max-height: none; border-right: 1px solid var(--line); border-bottom: 0; }
+  .inbox-root .conv-search { padding: 10px 8px; }
+  .inbox-root .conv-search input { padding: 8px; min-height: 44px; font-size: 16px; }
+  .inbox-root .inbox-ai-toggle { flex-wrap: wrap; gap: 6px; }
+  .inbox-root .conv-filter-row { grid-template-columns: minmax(0, 1fr); padding: 6px; }
+  .inbox-root .conv-filter { min-height: 44px; font-size: 11px; }
+  .inbox-root .conv-item { flex-direction: column; gap: 6px; padding: 10px 8px; min-height: 44px; }
+  .inbox-root .conv-info { width: 100%; }
+  .inbox-root .conv-top-row { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .inbox-root .conv-name { max-width: 100%; white-space: normal; overflow-wrap: anywhere; font-size: 12px; }
+  .inbox-root .conv-time { font-size: 10px; }
+  .inbox-root .conv-preview { font-size: 11px; }
+  .inbox-root .conv-tags { flex-wrap: wrap; }
+  .inbox-root .conv-tags .tag { white-space: normal; overflow-wrap: anywhere; }
+  .inbox-root .thread-header { flex-wrap: wrap; padding: 10px 8px; gap: 8px; }
+  .inbox-root .thread-who { min-width: 0; max-width: 100%; align-items: flex-start; }
+  .inbox-root .thread-who > div { min-width: 0; overflow-wrap: anywhere; }
+  .inbox-root .thread-header-actions { justify-content: flex-start; }
+  .inbox-root .thread-messages { padding: 12px 8px; }
+  .inbox-root .thread-compose { padding: 10px 8px; }
+  .inbox-root .compose-row { gap: 6px; }
+  .inbox-root .compose-row input { padding: 10px 8px; font-size: 16px; }
+  .inbox-root .compose-send { width: 44px; height: 44px; }
+  .inbox-root .messenger-empty { grid-column: 2; padding: 16px 8px; overflow-wrap: anywhere; }
+}
+@media (min-width: 601px) and (max-width: 880px) {
+  .inbox-root .inbox-shell { grid-template-rows: minmax(0, 1fr); }
+  .inbox-root .conv-pane { max-height: none; }
+}

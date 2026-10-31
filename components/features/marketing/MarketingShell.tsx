@@ -36,7 +36,8 @@ export function MarketingShell() {
             <p>Nhắn lại khách bằng tin AI soạn theo đúng hội thoại, xem nhóm khách và hiệu quả bài đăng — từ dữ liệu Messenger &amp; Fanpage thật.</p>
           </div>
 
-          <div className="tabs">
+          <div className="marketing-workspace">
+          <div className="tabs" aria-label="Các mục Marketing">
             <button type="button" className={`tab-btn ${activeTab === 'facebook-posts' ? 'active' : ''}`} onClick={() => setActiveTab('facebook-posts')}>
               Bài đăng Facebook
             </button>
@@ -73,12 +74,15 @@ export function MarketingShell() {
             </button>
           </div>
 
+          <div className="marketing-tab-content">
           <div hidden={activeTab !== 'queue'}><ApprovalQueueTab onToast={showToast} onCountChange={setQueueCount} /></div>
           {activeTab === 'segments' && <CustomerSegmentsTab />}
           {activeTab === 'performance' && <CampaignPerformanceTab />}
           {activeTab === 'composer' && <PostComposerTab onToast={showToast} sourcePost={sourcePost} />}
           {activeTab === 'comments' && <FacebookCommentsTab onToast={showToast} />}
           {activeTab === 'facebook-posts' && <FacebookPostsTab onCompose={(post) => { setSourcePost(post); setActiveTab('composer'); }} />}
+          </div>
+          </div>
         </main>
       </div>
 

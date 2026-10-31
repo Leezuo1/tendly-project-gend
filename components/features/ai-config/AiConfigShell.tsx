@@ -25,12 +25,14 @@ export function AiConfigShell() {
         </div>
       </div>
 
+      <div className="ai-config-workspace">
       <Tabs tabs={[...TABS]} active={tab} onChange={setTab} />
 
       <div className="tab-panel" key={tab}>
         {tab === 'products' && <ProductsTab />}
         {tab === 'faq' && <FaqTab />}
         {tab === 'email' && <EmailTab />}
+      </div>
       </div>
     </>
   );
