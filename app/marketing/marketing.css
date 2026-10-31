@@ -265,8 +265,6 @@
 }
 .marketing-root .marketing-ai-tab::after { display: none; }
 .marketing-root .marketing-ai-tab.active { border-color: var(--coral); }
-.marketing-root .pc-source-note { margin-bottom: 18px; padding: 12px 16px; border-radius: 9px; background: var(--moss-soft); color: var(--moss); font-size: 13px; line-height: 1.6; }
-.marketing-root .pc-source-note a { color: inherit; font-weight: 700; }
 
 .marketing-root .tab-panel {
   display: none;

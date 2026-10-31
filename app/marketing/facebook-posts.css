@@ -19,7 +19,6 @@
 .marketing-root .fp-root .btn, .marketing-root .fp-external { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; }
 .marketing-root .fp-external { width: 44px; border: 1px solid var(--line); border-radius: 9px; }
 .marketing-root .fp-external:hover { background: var(--moss-soft); }
-.marketing-root .fp-compose { color: var(--moss); background: var(--paper); }
 .marketing-root .fp-chevron { flex-shrink: 0; color: var(--ink-soft); }
 .marketing-root .fp-details[open] > summary .fp-chevron { transform: rotate(180deg); }
 .marketing-root .fp-post-list { display: grid; gap: 10px; min-width: 0; }
@@ -67,8 +66,6 @@
 .marketing-root .fp-root button:disabled { opacity: .55; cursor: not-allowed; }
 .marketing-root .fp-root :is(summary, button, a):focus-visible { outline: 2px solid var(--moss); outline-offset: -3px; }
 @media (max-width: 1100px) {
-  .marketing-root .fp-compose > span { display: none; }
-  .marketing-root .fp-compose { width: 44px; padding: 0; }
   .marketing-root .fp-overview { padding-right: 104px; }
   .marketing-root .fp-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .marketing-root .fp-search { grid-column: 1 / -1; }
@@ -77,8 +74,6 @@
   .marketing-root .fp-summary { padding: 14px 12px 66px; gap: 10px; }
   .marketing-root .fp-overview { padding-right: 0; }
   .marketing-root .fp-quick-actions { top: 88px; right: 12px; }
-  .marketing-root .fp-compose { width: auto; padding: 0 12px; }
-  .marketing-root .fp-compose > span { display: inline; }
   .marketing-root .fp-thumbnail { width: 44px; height: 44px; border-radius: 8px; }
   .marketing-root .fp-title { font-size: 14px; }
   .marketing-root .fp-post-content, .marketing-root .fp-comments { padding: 18px 14px; }

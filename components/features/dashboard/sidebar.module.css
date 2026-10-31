@@ -33,7 +33,7 @@
   aside.sidebar.sidebar :global(.brand) { padding: 0; min-width: 0; }
   aside.sidebar.sidebar :global(.brand a) { display: flex; align-items: center; min-height: 44px; }
   aside.sidebar.sidebar :global(.brand img) { display: block; width: 78px; height: 26px; flex: none; object-fit: contain; transform: none; }
-  aside.sidebar.sidebar :global(.nav-group) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 60px repeat(3, minmax(0, 1fr)); gap: 0; min-width: 0; position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 100; isolation: isolate; margin: 0; padding: 6px 2px; }
+  aside.sidebar.sidebar :global(.nav-group) { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.3fr) minmax(0, .85fr) 60px repeat(3, minmax(0, 1fr)); gap: 0; min-width: 0; position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 100; isolation: isolate; margin: 0; padding: 6px 2px; }
   aside.sidebar.sidebar :global(.nav-group)::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--sand); border-radius: 16px; mask-image: radial-gradient(circle 36px at 50% 0, transparent 35px, black 36px); }
   aside.sidebar.sidebar :global(.nav-item) { display: flex; flex-direction: column; justify-content: center; gap: 4px; width: 100%; min-width: 0; min-height: 60px; padding: 5px 1px; font-size: 10px; line-height: 1.3; text-align: center; border-radius: 10px; }
   aside.sidebar.sidebar :global(.nav-item[data-nav='overview']) { grid-column: 4; grid-row: 1; position: relative; background: transparent; color: var(--ink-soft); }
@@ -44,6 +44,7 @@
   aside.sidebar.sidebar :global(.nav-item[data-nav='overview'] span) { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); white-space: nowrap; }
   aside.sidebar.sidebar :global(.nav-item[href='/hop-thoai']) { grid-column: 1; grid-row: 1; }
   aside.sidebar.sidebar :global(.nav-item[href='/marketing']) { grid-column: 2; grid-row: 1; }
+  aside.sidebar.sidebar :global(.nav-item[href='/marketing'] span) { white-space: nowrap; }
   aside.sidebar.sidebar :global(.nav-item[href='/livestream']) { grid-column: 3; grid-row: 1; }
   aside.sidebar.sidebar :global(.nav-item[href='/smart-sourcing']) { grid-column: 5; grid-row: 1; }
   aside.sidebar.sidebar :global(.nav-item[href='/cau-hinh-ai']) { grid-column: 6; grid-row: 1; }

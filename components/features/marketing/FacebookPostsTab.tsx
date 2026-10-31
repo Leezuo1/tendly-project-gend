@@ -24,7 +24,6 @@ const iconPaths = {
   external: 'M14 3h7v7m0-7L10 14M10 3H3v18h18v-7',
   refresh: 'M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 2M5 16a8 8 0 0 0 13 2',
   search: 'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z',
-  sparkles: 'm12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z',
 };
 function PostIcon({ name }: { name: keyof typeof iconPaths }) {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={iconPaths[name]} /></svg>;
@@ -43,7 +42,7 @@ function CommentThread({ comment, postUrl }: { comment: FacebookPostComment; pos
   </li>;
 }
 
-function FacebookPostCard({ post, onCompose }: { post: FacebookFeedPost; onCompose: (post: FacebookFeedPost) => void }) {
+function FacebookPostCard({ post }: { post: FacebookFeedPost }) {
   const [comments, setComments] = useState<FacebookPostCommentsPage>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -95,13 +94,11 @@ function FacebookPostCard({ post, onCompose }: { post: FacebookFeedPost; onCompo
       </section>
     </div>
   </details><div className="fp-quick-actions">
-    <button type="button" className="btn btn-outline btn-sm fp-compose" onClick={() => onCompose(post)} title={`Soạn bài AI từ: ${title}`}>
-      <PostIcon name="sparkles" /><span>Soạn từ bài này</span></button>
     <a className="fp-external" href={post.url} target="_blank" rel="noreferrer" aria-label={`Mở trên Facebook: ${title}`} title="Mở trên Facebook"><PostIcon name="external" /></a>
   </div></article>;
 }
 
-export function FacebookPostsTab({ onCompose }: { onCompose: (post: FacebookFeedPost) => void }) {
+export function FacebookPostsTab() {
   const { data, loading, error, reload } = useMarketingData(client.list);
   const [more, setMore] = useState<FacebookFeedPage>();
   const [loadingMore, setLoadingMore] = useState(false);
@@ -147,7 +144,7 @@ export function FacebookPostsTab({ onCompose }: { onCompose: (post: FacebookFeed
     {!loading && data && !posts.length && <div className="card pc-empty">Chưa có bài đăng Facebook để hiển thị.</div>}
     {!loading && posts.length > 0 && !shown.length && !invalidRange && <div className="card pc-empty">Không có bài phù hợp trong các bài đã tải. Hãy đổi bộ lọc{after ? ' hoặc tải thêm bài viết' : ''}.</div>}
     <div className="fp-post-list" aria-busy={loading || loadingMore}>
-      {shown.map((post) => <FacebookPostCard key={post.id} post={post} onCompose={onCompose} />)}
+      {shown.map((post) => <FacebookPostCard key={post.id} post={post} />)}
       {(loading || loadingMore) && <div className="fp-skeletons" aria-hidden="true">{[1, 2, 3].map((n) => <div className="fp-skeleton" key={n}><span /><div><i /><i /></div></div>)}</div>}
     </div>
     {moreError && <p role="alert" className="fp-error">{moreError}</p>}

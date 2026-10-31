@@ -8,11 +8,9 @@ import { getDashboardKey, postsClient, PostsApiError, prepareUploadImage, setDas
 import type { GeneratedPostDraft, MarketingPost, PostChannel, PostDraft, PostGoal, PostImageSource, PostTone } from '@/lib/types/posts';
 import { formatMoney, normalize } from '@/lib/utils/format';
 import { PostImageField, SavedPostImage, type ImageBusy } from './PostImageField';
-import type { FacebookFeedPost } from '@/lib/types/facebookFeed';
 
 interface PostComposerTabProps {
   onToast: (msg: string) => void;
-  sourcePost?: FacebookFeedPost;
 }
 
 const BRAND_STORAGE = 'tendly.brandVoice';
@@ -41,14 +39,14 @@ function readBrandVoice() {
   }
 }
 
-export function PostComposerTab({ onToast, sourcePost }: PostComposerTabProps) {
+export function PostComposerTab({ onToast }: PostComposerTabProps) {
   // ---- form ----
   const [channel, setChannel] = useState<PostChannel>('facebook');
-  const [goal, setGoal] = useState<PostGoal>(sourcePost ? 'engagement' : 'new-product');
+  const [goal, setGoal] = useState<PostGoal>('new-product');
   const [tone, setTone] = useState<PostTone>('friendly');
   const [productIds, setProductIds] = useState<string[]>([]);
   const [productQuery, setProductQuery] = useState('');
-  const [notes, setNotes] = useState(sourcePost ? `Viết một bài mới lấy cảm hứng từ nội dung sau, chỉ dùng giá và thông tin sản phẩm đã được xác nhận trong Cấu hình AI:\n\n${sourcePost.message}`.slice(0, 1000) : '');
+  const [notes, setNotes] = useState('');
   const [brandVoice, setBrandVoice] = useState('');
   const [variants, setVariants] = useState(2);
   const [generating, setGenerating] = useState(false);
@@ -278,7 +276,6 @@ export function PostComposerTab({ onToast, sourcePost }: PostComposerTabProps) {
           <span className="hint">AI viết dựa trên sản phẩm &amp; FAQ trong Cấu hình AI</span>
         </div>
 
-        {sourcePost && <p className="pc-source-note">Đang soạn từ bài Facebook đã chọn. <a href={sourcePost.url} target="_blank" rel="noreferrer">Xem bài gốc ↗</a> · Xem và sửa ghi chú trước khi tạo bài.</p>}
 
         <div className="pc-grid">
           <div className="pc-field">
