@@ -8,6 +8,7 @@ import { useFacebookPage } from '@/lib/hooks/useFacebookPage';
 import { useUnrepliedCount } from '@/lib/hooks/useUnrepliedCount';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
+import styles from './sidebar.module.css';
 
 export interface SidebarProps {
   currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing' | 'quan-tri';
@@ -34,7 +35,7 @@ export function Sidebar({
   const isCaiDat = currentPath === 'cai-dat';
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${styles.sidebar}`} aria-label="Điều hướng Tendly">
       <div className="brand">
         <Link href="/" title="Trang chủ Tendly">
           <img src="/tendly-logo.png" alt="Tendly" />
