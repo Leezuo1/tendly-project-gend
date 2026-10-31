@@ -1,0 +1,9 @@
+.root { min-width: 0; }
+.menu { display: grid; grid-auto-rows: minmax(64px, 1fr); gap: 12px; min-height: min(60dvh, 480px); margin-top: 20px; }
+.menu button { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; }
+.menu button svg { flex: none; }
+.menu button:hover { background: var(--sand); }
+.menu button:focus-visible, .header button:focus-visible { outline: 2px solid var(--coral-deep); outline-offset: 2px; }
+.header { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+.header button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.header h2 { font-size: 16px; overflow-wrap: anywhere; }

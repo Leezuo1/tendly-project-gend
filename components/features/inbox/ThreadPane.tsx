@@ -4,9 +4,11 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Conversation } from '@/lib/types/inbox';
 import { EMOTION_LABELS } from '@/lib/services/inboxAi';
 import { CustomerAvatar } from './CustomerAvatar';
+import { IconChevrons } from '@/components/ui/Icons';
 
 interface ThreadPaneProps {
   conversation: Conversation;
+  onBack?: () => void;
   onSendMessage: (text: string) => Promise<boolean> | void;
   onUseAiSuggestion: (text: string) => Promise<boolean> | void;
   isSending?: boolean;
@@ -29,6 +31,7 @@ const CUSTOMER_PROMPT_CHIPS = [
 
 export function ThreadPane({
   conversation,
+  onBack,
   onSendMessage,
   onUseAiSuggestion,
   draftText,
@@ -127,6 +130,7 @@ export function ThreadPane({
     <div className="thread-pane">
       {/* Header */}
       <div className="thread-header">
+        {onBack && <button type="button" className="thread-back" aria-label="Quay lại danh sách hội thoại" onClick={onBack}><IconChevrons aria-hidden="true" width="20" height="20" style={{ transform: 'rotate(180deg)' }} /></button>}
         <div className="thread-who">
           <div className="conv-avatar-wrap">
             <CustomerAvatar className="conv-avatar" name={conversation.name} initials={conversation.avatar} url={conversation.avatarUrl} />

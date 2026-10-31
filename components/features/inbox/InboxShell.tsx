@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ConversationList } from './ConversationList';
-import { useSwipeCollapse } from '@/lib/hooks/useSwipeCollapse';
+import { useMobileViewport } from '@/lib/hooks/useMobileViewport';
 import { ThreadPane } from './ThreadPane';
 import { CustomerProfilePane } from './CustomerProfilePane';
 import { Toast } from '@/components/shared/Toast';
@@ -23,7 +23,10 @@ export function InboxShell() {
   const selectedIdRef = useRef('');
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const { collapsed: listCollapsed, setCollapsed: setListCollapsed, handlers: listSwipe } = useSwipeCollapse('x');
+  const mobile = useMobileViewport();
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
+  const viewingThread = useRef(false);
+  useEffect(() => { viewingThread.current = mobile === false || mobileThreadOpen; }, [mobile, mobileThreadOpen]);
   const [draftText, setDraftText] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const pendingRequests = useRef(new Set<string>());
@@ -87,7 +90,7 @@ export function InboxShell() {
         setConversations((previous) => snapshot.conversations.map((thread) => {
           const merged = mergeMessengerThread(thread, previous.find((c) => c.id === thread.id));
           // The visible open thread is already being read; other rows keep their unread marker.
-          return thread.id === selectedIdRef.current && document.visibilityState === 'visible'
+          return thread.id === selectedIdRef.current && viewingThread.current && document.visibilityState === 'visible'
             ? { ...merged, hasNewMessage: false, unreadMessageIds: [] } : merged;
         }));
         setHasMore(snapshot.hasMore);
@@ -143,10 +146,12 @@ export function InboxShell() {
   }, [conversations, selectedId]);
 
   const handleSelectConv = (id: string) => {
+    const changed = id !== selectedIdRef.current;
     selectedIdRef.current = id;
     setSelectedId(id);
     setConversations((previous) => previous.map((c) => c.id === id ? { ...c, hasNewMessage: false, unreadMessageIds: [] } : c));
-    setDraftText('');
+    if (changed) setDraftText('');
+    setMobileThreadOpen(true);
   };
 
   const sendLiveMessage = async (text: string): Promise<boolean> => {
@@ -237,7 +242,7 @@ export function InboxShell() {
 
   // Backfill persisted messages for the open conversation, without replacing its latest reply suggestion.
   useEffect(() => {
-    if (!ready || !selectedId) return;
+    if (!ready || !selectedId || (mobile !== false && !mobileThreadOpen)) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const backfill = async () => {
@@ -269,7 +274,7 @@ export function InboxShell() {
     };
     timer = setTimeout(backfill, 3000);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [ready, selectedId, showToast]);
+  }, [ready, selectedId, showToast, mobile, mobileThreadOpen]);
 
   const handleGenerateAiSuggestion = async () => {
     if (!selectedConv || pendingRequests.current.has(selectedConv.id)) return;
@@ -296,9 +301,8 @@ export function InboxShell() {
         <Sidebar currentPath="hop-thoai" onToast={showToast} />
 
         <main className="main" aria-label="Hộp thoại">
-          <div className="inbox-shell" data-list-collapsed={listCollapsed}>
+          <div className="inbox-shell" data-mobile-thread-open={mobileThreadOpen}>
             <ConversationList
-              listToggle={<button {...listSwipe} data-swipe-collapse type="button" className="conv-list-toggle" aria-label={listCollapsed ? 'Hiện danh sách' : 'Ẩn danh sách'} title={listCollapsed ? 'Hiện danh sách' : 'Ẩn danh sách'} aria-expanded={!listCollapsed} aria-controls="conversation-list" onClick={() => setListCollapsed(value => !value)}><span className="swipe-grip" aria-hidden="true" /></button>}
               toolbar={<div className="messenger-toolbar">
                   <button type="button" className="inbox-ai-toggle" role="switch" aria-checked={autoReply}
                     aria-label="AI tự động trả lời"
@@ -333,11 +337,12 @@ export function InboxShell() {
               counts={counts}
             />
 
-            {selectedConv && (
+            {selectedConv && (mobile === false || mobileThreadOpen) && (
               <>
                 <ThreadPane
                   key={selectedConv.id}
                   conversation={selectedConv}
+                  onBack={() => setMobileThreadOpen(false)}
                   onSendMessage={sendLiveMessage}
                   onUseAiSuggestion={sendLiveMessage}
                   draftText={draftText}
@@ -394,7 +399,7 @@ export function InboxShell() {
             const result = await response.json();
             hiddenConversations.current.set(deleteTarget.id, result.hiddenAt || Date.now());
             setConversations((previous) => previous.filter((c) => c.id !== deleteTarget.id));
-            setDeleteTarget(null); if (deleteTarget.id === selectedConv?.id) setDraftText(''); showToast('Đã xóa hội thoại khỏi inbox.');
+            setDeleteTarget(null); if (deleteTarget.id === selectedConv?.id) { setDraftText(''); setMobileThreadOpen(false); } showToast('Đã xóa hội thoại khỏi inbox.');
           } catch (error) { showToast(error instanceof Error ? error.message : 'Không xóa được hội thoại.'); }
           finally { setDeleting(false); }
         })(); }} />

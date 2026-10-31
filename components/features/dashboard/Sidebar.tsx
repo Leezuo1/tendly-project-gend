@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardTab } from '@/lib/types/dashboard';
@@ -9,7 +9,7 @@ import { useUnrepliedCount } from '@/lib/hooks/useUnrepliedCount';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import styles from './sidebar.module.css';
-import { useSwipeCollapse } from '@/lib/hooks/useSwipeCollapse';
+import { IconChevrons } from '@/components/ui/Icons';
 
 export interface SidebarProps {
   currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing' | 'quan-tri';
@@ -25,7 +25,7 @@ export function Sidebar({
   onToast,
 }: SidebarProps) {
   const { session, logout } = useAppSecurity();
-  const { collapsed, setCollapsed, handlers: menuSwipe } = useSwipeCollapse();
+  const [collapsed, setCollapsed] = useState(false);
   const navigationId = useId();
   const router = useRouter();
   const page = useFacebookPage();
@@ -38,7 +38,7 @@ export function Sidebar({
   const isCaiDat = currentPath === 'cai-dat';
 
   return (
-    <aside className={`sidebar ${styles.sidebar}`} aria-label="Điều hướng Tendly" data-collapsed={collapsed} data-swipe-collapse {...menuSwipe}>
+    <aside className={`sidebar ${styles.sidebar}`} aria-label="Điều hướng Tendly" data-collapsed={collapsed}>
       <div className="brand">
         <Link href="/" title="Trang chủ Tendly">
           <img src="/tendly-logo.png" alt="Tendly" />
@@ -50,6 +50,7 @@ export function Sidebar({
         {isTongQuan ? (
           <button
             type="button"
+            data-nav="overview"
             className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab && setActiveTab('overview')}
           >
@@ -62,7 +63,7 @@ export function Sidebar({
             <span>Tổng quan</span>
           </button>
         ) : (
-          <Link href="/tong-quan" className="nav-item">
+          <Link href="/tong-quan" className="nav-item" data-nav="overview">
             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="9" rx="1.5"></rect>
               <rect x="14" y="3" width="7" height="5" rx="1.5"></rect>
@@ -110,7 +111,7 @@ export function Sidebar({
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
             <path d="M4.93 19.07a10 10 0 0 1 0-14.14"></path>
           </svg>
-          <span>Livestream</span>
+          <span>Live<wbr />stream</span>
         </Link>
 
         <Link href="/smart-sourcing" className={`nav-item ${currentPath === 'smart-sourcing' ? 'active' : ''}`}
@@ -145,8 +146,8 @@ export function Sidebar({
           </svg>
           <span>Cài đặt</span>
         </Link>
-      <button type="button" className={styles.toggle} aria-label={collapsed ? 'Hiện menu' : 'Ẩn menu'} title={collapsed ? 'Hiện menu' : 'Ẩn menu'} aria-expanded={!collapsed} aria-controls={navigationId} onClick={() => setCollapsed(value => !value)}><span className="swipe-grip" aria-hidden="true" /></button>
       </div>
+      <button type="button" className={styles.toggle} aria-label={collapsed ? 'Hiện menu' : 'Ẩn menu'} title={collapsed ? 'Hiện menu' : 'Ẩn menu'} aria-expanded={!collapsed} aria-controls={navigationId} onClick={() => setCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${collapsed ? 90 : -90}deg)` }} /></button>
 
       <div className="sidebar-foot">
         <CustomerAvatar className="avatar-sm" name={page.name} url={page.avatarUrl}

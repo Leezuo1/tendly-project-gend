@@ -7,7 +7,6 @@ import { IconTrash } from '@/components/ui/Icons';
 
 interface ConversationListProps {
   toolbar?: React.ReactNode;
-  listToggle?: React.ReactNode;
   conversations: Conversation[];
   selectedId: string;
   onSelectConv: (id: string) => void;
@@ -36,12 +35,10 @@ export function ConversationList({
   onSearchChange,
   counts,
   toolbar,
-  listToggle,
 }: ConversationListProps) {
   return (
     <div className="conv-pane">
       <div className="conv-search">
-        <div className="conv-queue-title">{listToggle}</div>
         <input
           type="text"
           value={searchQuery}

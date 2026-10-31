@@ -236,12 +236,3 @@ footer p { font-size: 13.5px; color: var(--ink-soft); }
   transition: color 0.3s ease;
 }
 .footer-links a:hover { color: var(--coral); }
-
-@media (max-width: 880px) {
-  [data-swipe-collapse] { touch-action: pan-x pinch-zoom; transform: translateY(var(--swipe-offset, 0px)); transition: transform 160ms ease-out; }
-  [data-swipe-collapse][data-swipe-axis='x'] { touch-action: pan-y pinch-zoom; transform: translateX(var(--swipe-offset, 0px)); }
-  [data-swipe-collapse][data-dragging='true'] { transition: none; }
-  .swipe-grip { display: block; width: 24px; height: 4px; border-radius: 2px; background: currentColor; pointer-events: none; }
-  [data-swipe-axis='x'] .swipe-grip { width: 4px; height: 24px; }
-  @media (prefers-reduced-motion: reduce) { [data-swipe-collapse] { transition: none; } }
-}

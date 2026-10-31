@@ -1421,3 +1421,24 @@
 @media (max-width: 600px) {
   .inbox-root .conv-select { flex-direction: column; gap: 6px; }
 }
+
+.thread-back { display: none; }
+@media (max-width: 880px) {
+  .inbox-root .inbox-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+  .inbox-root .conv-search { grid-template-columns: minmax(0, 1fr); }
+  .inbox-root .conv-select { flex-direction: row; align-items: center; gap: 10px; }
+  .inbox-root .conv-item { flex-direction: row; align-items: center; }
+  .inbox-root .conv-info { min-width: 0; width: auto; flex: 1; }
+  .inbox-root .conv-top-row { flex-direction: row; align-items: center; }
+  .inbox-root .conv-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .inbox-root .conv-delete { align-self: center; }
+  .inbox-root .conv-list { grid-column: 1; grid-row: 3; border-right: 0; }
+  .inbox-root .messenger-empty { display: none; }
+  .inbox-root .inbox-shell[data-mobile-thread-open='true'] { grid-template-rows: minmax(0, 1fr); }
+  .inbox-root .inbox-shell[data-mobile-thread-open='true'] .conv-search,
+  .inbox-root .inbox-shell[data-mobile-thread-open='true'] .conv-filter-row,
+  .inbox-root .inbox-shell[data-mobile-thread-open='true'] .conv-list { display: none; }
+  .inbox-root .inbox-shell[data-mobile-thread-open='true'] .thread-pane { grid-column: 1; grid-row: 1; }
+  .inbox-root .thread-back { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 8px; border: 0; border-radius: 8px; background: var(--sand); color: var(--ink); cursor: pointer; }
+  .inbox-root .thread-back:focus-visible { outline: 2px solid var(--coral-deep); outline-offset: 2px; }
+}

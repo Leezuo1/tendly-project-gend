@@ -1,8 +1,9 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { MarketingTab } from '@/lib/types/marketing';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
+import { MobileSections } from '@/components/ui/MobileSections';
 import { ApprovalQueueTab } from './ApprovalQueueTab';
 import { CustomerSegmentsTab } from './CustomerSegmentsTab';
 import { CampaignPerformanceTab } from './CampaignPerformanceTab';
@@ -11,87 +12,42 @@ import { FacebookCommentsTab } from './FacebookCommentsTab';
 import { FacebookPostsTab } from './FacebookPostsTab';
 import { Toast } from '@/components/shared/Toast';
 import type { FacebookFeedPost } from '@/lib/types/facebookFeed';
-import { useSwipeCollapse } from '@/lib/hooks/useSwipeCollapse';
+
+const TABS: { key: MarketingTab; label: string }[] = [
+  { key: 'facebook-posts', label: 'Bài đăng Facebook' },
+  { key: 'comments', label: 'Bình luận Facebook' },
+  { key: 'queue', label: 'Hàng chờ duyệt' },
+  { key: 'segments', label: 'Khách hàng theo nhóm' },
+  { key: 'performance', label: 'Hiệu suất chiến dịch' },
+  { key: 'composer', label: 'Soạn bài AI' },
+];
 
 export function MarketingShell() {
   const [activeTab, setActiveTab] = useState<MarketingTab>('queue');
+  const [sectionOpen, setSectionOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState<number | null>(null);
   const [sourcePost, setSourcePost] = useState<FacebookFeedPost>();
-  const { collapsed: tabsCollapsed, setCollapsed: setTabsCollapsed, handlers: tabSwipe } = useSwipeCollapse('x');
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3200);
+  const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 3200); };
+  const openTab = (key: MarketingTab) => { setActiveTab(key); setSectionOpen(true); };
+  const content = {
+    queue: <ApprovalQueueTab onToast={showToast} onCountChange={setQueueCount} />,
+    segments: <CustomerSegmentsTab />,
+    performance: <CampaignPerformanceTab />,
+    composer: <PostComposerTab onToast={showToast} sourcePost={sourcePost} />,
+    comments: <FacebookCommentsTab onToast={showToast} />,
+    'facebook-posts': <FacebookPostsTab onCompose={post => { setSourcePost(post); openTab('composer'); }} />,
   };
-
-  return (
-    <div className="marketing-root">
-      <div className="shell">
-        <Sidebar currentPath="marketing" onToast={showToast} />
-
-        <main className="main">
-          <div className="page-head">
-            <h1>Marketing</h1>
-            <p>Nhắn lại khách bằng tin AI soạn theo đúng hội thoại, xem nhóm khách và hiệu quả bài đăng — từ dữ liệu Messenger &amp; Fanpage thật.</p>
-          </div>
-
-          <div className="marketing-workspace" data-tabs-collapsed={tabsCollapsed}>
-          <div className="marketing-subnav" data-swipe-collapse {...tabSwipe}>
-          <button type="button" className="marketing-subnav-toggle" aria-label={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} title={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} aria-expanded={!tabsCollapsed} aria-controls="marketing-subnav" onClick={() => setTabsCollapsed(value => !value)}><span className="swipe-grip" aria-hidden="true" /></button>
-          <div className="tabs" id="marketing-subnav" aria-label="Các mục Marketing">
-            <button type="button" className={`tab-btn ${activeTab === 'facebook-posts' ? 'active' : ''}`} onClick={() => setActiveTab('facebook-posts')}>
-              Bài đăng Facebook
-            </button>
-            <button type="button" className={`tab-btn ${activeTab === 'comments' ? 'active' : ''}`} onClick={() => setActiveTab('comments')}>
-              Bình luận Facebook
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'queue' ? 'active' : ''}`}
-              onClick={() => setActiveTab('queue')}
-            >
-              Hàng chờ duyệt {queueCount !== null && <span className="marketing-tab-badge" aria-label={`${queueCount} khách chờ duyệt`}>{queueCount}</span>}
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'segments' ? 'active' : ''}`}
-              onClick={() => setActiveTab('segments')}
-            >
-              Khách hàng theo nhóm
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${activeTab === 'performance' ? 'active' : ''}`}
-              onClick={() => setActiveTab('performance')}
-            >
-              Hiệu suất chiến dịch
-            </button>
-            <button
-              type="button"
-              className={`tab-btn marketing-ai-tab ${activeTab === 'composer' ? 'active' : ''}`}
-              onClick={() => { setSourcePost(undefined); setActiveTab('composer'); }}
-            >
-              ✨ Soạn bài AI
-            </button>
-          </div>
-
-          </div>
-          <div className="marketing-tab-content">
-          <div hidden={activeTab !== 'queue'}><ApprovalQueueTab onToast={showToast} onCountChange={setQueueCount} /></div>
-          {activeTab === 'segments' && <CustomerSegmentsTab />}
-          {activeTab === 'performance' && <CampaignPerformanceTab />}
-          {activeTab === 'composer' && <PostComposerTab onToast={showToast} sourcePost={sourcePost} />}
-          {activeTab === 'comments' && <FacebookCommentsTab onToast={showToast} />}
-          {activeTab === 'facebook-posts' && <FacebookPostsTab onCompose={(post) => { setSourcePost(post); setActiveTab('composer'); }} />}
-          </div>
-          </div>
-        </main>
-      </div>
-
-      <Toast message={toastMessage} />
-    </div>
-  );
+  return <div className="marketing-root"><div className="shell">
+    <Sidebar currentPath="marketing" onToast={showToast} />
+    <main className="main">
+      <div className="page-head"><h1>Marketing</h1><p>Nhắn lại khách bằng tin AI soạn theo đúng hội thoại, xem nhóm khách và hiệu quả bài đăng — từ dữ liệu Messenger &amp; Fanpage thật.</p></div>
+      <MobileSections title="Marketing" activeKey={sectionOpen ? activeTab : null} onBack={() => setSectionOpen(false)} onSelect={key => { if (key === 'composer') setSourcePost(undefined); openTab(key as MarketingTab); }} items={TABS.map(item => ({ ...item, content: <div className="marketing-tab-content">{content[item.key]}</div> }))}>
+        <div className="tabs" id="marketing-subnav" aria-label="Các mục Marketing">
+          {TABS.map(item => <button key={item.key} type="button" className={`tab-btn ${activeTab === item.key ? 'active' : ''} ${item.key === 'composer' ? 'marketing-ai-tab' : ''}`} onClick={() => { if (item.key === 'composer') setSourcePost(undefined); openTab(item.key); }}>{item.key === 'composer' ? '✨ ' : ''}{item.label}{item.key === 'queue' && queueCount !== null && <span className="marketing-tab-badge" aria-label={`${queueCount} khách chờ duyệt`}>{queueCount}</span>}</button>)}
+        </div>
+        <div className="marketing-tab-content"><div hidden={activeTab !== 'queue'}>{content.queue}</div>{activeTab !== 'queue' && content[activeTab]}</div>
+      </MobileSections>
+    </main>
+  </div><Toast message={toastMessage} /></div>;
 }
