@@ -45,8 +45,7 @@ export function Sidebar({
         </Link>
       </div>
 
-      <button type="button" className={styles.toggle} aria-label={collapsed ? 'Hiện menu' : 'Ẩn menu'} title={collapsed ? 'Hiện menu' : 'Ẩn menu'} aria-expanded={!collapsed} aria-controls={navigationId} onClick={() => setCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${collapsed ? 90 : -90}deg)` }} /></button>
-      <div className="nav-group" id={navigationId}>
+      <div className="nav-group" id={navigationId} data-admin={session.role === 'admin'}>
         {/* Tổng quan */}
         {isTongQuan ? (
           <button
@@ -146,6 +145,7 @@ export function Sidebar({
           </svg>
           <span>Cài đặt</span>
         </Link>
+      <button type="button" className={styles.toggle} aria-label={collapsed ? 'Hiện menu' : 'Ẩn menu'} title={collapsed ? 'Hiện menu' : 'Ẩn menu'} aria-expanded={!collapsed} aria-controls={navigationId} onClick={() => setCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${collapsed ? 90 : -90}deg)` }} /></button>
       </div>
 
       <div className="sidebar-foot">

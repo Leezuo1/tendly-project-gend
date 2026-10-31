@@ -1385,3 +1385,16 @@
   .inbox-root .inbox-shell[data-list-collapsed='true'] .messenger-empty { grid-column: 1; }
   .inbox-root .conv-list-toggle:focus-visible { outline: 2px solid var(--coral-deep); outline-offset: 2px; }
 }
+
+@media (max-width: 880px) {
+  .inbox-root .conv-search { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 4px 12px 8px; }
+  .inbox-root .messenger-toolbar { grid-column: 1; grid-row: 1; }
+  .inbox-root .inbox-ai-toggle { justify-content: flex-start; gap: 12px; min-height: 36px; font-size: 12px; }
+  .inbox-root .conv-queue-title { grid-column: 1; grid-row: 2; }
+  .inbox-root .conv-search input { grid-column: 1; grid-row: 3; width: 100%; min-height: 36px; height: 36px; padding: 4px 10px; }
+  .inbox-root .conv-filter-row { grid-template-columns: repeat(3, max-content); justify-content: start; gap: 5px; padding: 0 12px; }
+  .inbox-root .conv-filter { position: relative; isolation: isolate; min-height: 44px; padding: 0 8px; background: transparent; font-size: 10.5px; line-height: 1.2; }
+  .inbox-root .conv-filter::before { content: ''; position: absolute; z-index: -1; inset: 8px 0; border-radius: 20px; background: var(--sand); }
+  .inbox-root .conv-filter.selected, .inbox-root .conv-filter:hover { background: transparent; }
+  .inbox-root .conv-filter.selected::before { background: var(--ink); }
+}

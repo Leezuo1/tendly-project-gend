@@ -130,3 +130,8 @@
 @media (max-width: 1100px) { .story, .formPanel { padding: 28px 30px 22px; } .story h2 { font-size: 36px; letter-spacing: -1.5px; } .eyebrow { font-size: 9px; letter-spacing: .7px; } .scene { padding-left: 10px; padding-right: 10px; } .channelNote { right: 0; } .sceneStar { left: -10px; } .benefits { gap: 7px; } .benefits > div { padding: 12px 9px; } .benefits p { font-size: 10px; } .customerTime { display: none; } }
 @media (max-width: 760px) { .root { grid-template-columns: 1fr; } .story { padding: 22px 24px; border-right: 0; border-bottom: 1px solid #ded0c3; } .logo img { width: 112px; } .storyBody { max-width: none; margin: 0; padding: 22px 0 0; } .eyebrow { font-size: 9px; } .story h2 { font-size: 30px; letter-spacing: -1.3px; margin-top: 12px; } .story h2 br { display: none; } .storyDescription { font-size: 12px; margin-top: 10px; } .storyDescription br { display: none; } .scene, .benefits, .storyFooter { display: none; } .formPanel { min-height: 0; padding: 20px 24px; } .panelHeader { min-height: 30px; font-size: 10px; } .formBody { padding: 28px 0 32px; max-width: 440px; } .intro { display: none; } .formBody h1 { font-size: 30px; margin-top: 0; } .tabs { margin-top: 24px; } .field input { font-size: 16px; } .panelFooter { font-size: 9px; } }
 @media (prefers-reduced-motion: reduce) { .root *, .root *::before, .root *::after { animation: none !important; transition: none !important; } }
+
+.root { grid-template-columns: minmax(0, 1fr); }
+.formPanel { width: 100%; max-width: 640px; margin: 0 auto; }
+.formLogo { display: inline-flex; margin-bottom: 20px; }
+.formLogo img { display: block; width: 126px; height: auto; }
