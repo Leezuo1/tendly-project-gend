@@ -6,6 +6,7 @@ import { CustomerAvatar } from './CustomerAvatar';
 
 interface ConversationListProps {
   toolbar?: React.ReactNode;
+  listToggle?: React.ReactNode;
   conversations: Conversation[];
   selectedId: string;
   onSelectConv: (id: string) => void;
@@ -30,11 +31,12 @@ export function ConversationList({
   onSearchChange,
   counts,
   toolbar,
+  listToggle,
 }: ConversationListProps) {
   return (
     <div className="conv-pane">
       <div className="conv-search">
-        <div className="conv-queue-title">Hàng chờ trả lời</div>
+        <div className="conv-queue-title">Hàng chờ trả lời {listToggle}</div>
         <input
           type="text"
           value={searchQuery}
@@ -69,7 +71,7 @@ export function ConversationList({
         </button>
       </div>
 
-      <div className="conv-list">
+      <div className="conv-list" id="conversation-list">
         {conversations.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--ink-soft)' }}>
             <div style={{ fontSize: 24, marginBottom: 6 }}>🔍</div>

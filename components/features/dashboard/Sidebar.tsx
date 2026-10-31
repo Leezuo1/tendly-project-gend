@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useId, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardTab } from '@/lib/types/dashboard';
@@ -9,6 +9,7 @@ import { useUnrepliedCount } from '@/lib/hooks/useUnrepliedCount';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import styles from './sidebar.module.css';
+import { IconChevrons } from '@/components/ui/Icons';
 
 export interface SidebarProps {
   currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing' | 'quan-tri';
@@ -24,6 +25,8 @@ export function Sidebar({
   onToast,
 }: SidebarProps) {
   const { session, logout } = useAppSecurity();
+  const [collapsed, setCollapsed] = useState(false);
+  const navigationId = useId();
   const router = useRouter();
   const page = useFacebookPage();
   const unrepliedCount = useUnrepliedCount();
@@ -35,14 +38,15 @@ export function Sidebar({
   const isCaiDat = currentPath === 'cai-dat';
 
   return (
-    <aside className={`sidebar ${styles.sidebar}`} aria-label="Điều hướng Tendly">
+    <aside className={`sidebar ${styles.sidebar}`} aria-label="Điều hướng Tendly" data-collapsed={collapsed}>
       <div className="brand">
         <Link href="/" title="Trang chủ Tendly">
           <img src="/tendly-logo.png" alt="Tendly" />
         </Link>
       </div>
 
-      <div className="nav-group">
+      <button type="button" className={styles.toggle} aria-label={collapsed ? 'Hiện menu' : 'Ẩn menu'} title={collapsed ? 'Hiện menu' : 'Ẩn menu'} aria-expanded={!collapsed} aria-controls={navigationId} onClick={() => setCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${collapsed ? 90 : -90}deg)` }} /></button>
+      <div className="nav-group" id={navigationId}>
         {/* Tổng quan */}
         {isTongQuan ? (
           <button

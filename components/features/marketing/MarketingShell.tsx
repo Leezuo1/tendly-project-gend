@@ -11,12 +11,14 @@ import { FacebookCommentsTab } from './FacebookCommentsTab';
 import { FacebookPostsTab } from './FacebookPostsTab';
 import { Toast } from '@/components/shared/Toast';
 import type { FacebookFeedPost } from '@/lib/types/facebookFeed';
+import { IconChevrons } from '@/components/ui/Icons';
 
 export function MarketingShell() {
   const [activeTab, setActiveTab] = useState<MarketingTab>('queue');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState<number | null>(null);
   const [sourcePost, setSourcePost] = useState<FacebookFeedPost>();
+  const [tabsCollapsed, setTabsCollapsed] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -36,8 +38,10 @@ export function MarketingShell() {
             <p>Nhắn lại khách bằng tin AI soạn theo đúng hội thoại, xem nhóm khách và hiệu quả bài đăng — từ dữ liệu Messenger &amp; Fanpage thật.</p>
           </div>
 
-          <div className="marketing-workspace">
-          <div className="tabs" aria-label="Các mục Marketing">
+          <div className="marketing-workspace" data-tabs-collapsed={tabsCollapsed}>
+          <div className="marketing-subnav">
+          <button type="button" className="marketing-subnav-toggle" aria-label={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} title={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} aria-expanded={!tabsCollapsed} aria-controls="marketing-subnav" onClick={() => setTabsCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${tabsCollapsed ? 0 : 180}deg)` }} /></button>
+          <div className="tabs" id="marketing-subnav" aria-label="Các mục Marketing">
             <button type="button" className={`tab-btn ${activeTab === 'facebook-posts' ? 'active' : ''}`} onClick={() => setActiveTab('facebook-posts')}>
               Bài đăng Facebook
             </button>
@@ -74,6 +78,7 @@ export function MarketingShell() {
             </button>
           </div>
 
+          </div>
           <div className="marketing-tab-content">
           <div hidden={activeTab !== 'queue'}><ApprovalQueueTab onToast={showToast} onCountChange={setQueueCount} /></div>
           {activeTab === 'segments' && <CustomerSegmentsTab />}

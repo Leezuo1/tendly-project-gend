@@ -1,14 +1,15 @@
 'use client';
 
 interface TabsProps<T extends string> {
+  id?: string;
   tabs: { key: T; label: string }[];
   active: T;
   onChange: (key: T) => void;
 }
 
-export function Tabs<T extends string>({ tabs, active, onChange }: TabsProps<T>) {
+export function Tabs<T extends string>({ id, tabs, active, onChange }: TabsProps<T>) {
   return (
-    <div className="tabs" role="tablist">
+    <div className="tabs" role="tablist" id={id}>
       {tabs.map((t) => (
         <button
           key={t.key}

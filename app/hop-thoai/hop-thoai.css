@@ -1363,3 +1363,25 @@
   .inbox-root .inbox-shell { grid-template-rows: minmax(0, 1fr); }
   .inbox-root .conv-pane { max-height: none; }
 }
+
+.conv-list-toggle { display: none; }
+@media (max-width: 880px) {
+  .inbox-root .inbox-shell { grid-template-columns: clamp(108px, 28vw, 200px) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+  .inbox-root .conv-pane { display: contents; }
+  .inbox-root .conv-search { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 12px; padding: 8px 12px; }
+  .inbox-root .conv-queue-title { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; }
+  .inbox-root .conv-list-toggle { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+  .inbox-root .conv-search input { align-self: center; min-height: 44px; font-size: 16px; }
+  .inbox-root .messenger-toolbar { margin: 0; min-width: 0; }
+  .inbox-root .inbox-ai-toggle { flex-wrap: nowrap; gap: 6px; font-size: 11px; padding: 0; }
+  .inbox-root .conv-filter-row { grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 6px 12px; }
+  .inbox-root .conv-filter { min-height: 44px; }
+  .inbox-root .conv-list { grid-column: 1; grid-row: 3; border-right: 1px solid var(--line); }
+  .inbox-root .thread-pane { grid-column: 2; grid-row: 3; }
+  .inbox-root .messenger-empty { grid-column: 2; grid-row: 3; }
+  .inbox-root .inbox-shell[data-list-collapsed='true'] { grid-template-columns: minmax(0, 1fr); }
+  .inbox-root .inbox-shell[data-list-collapsed='true'] .conv-list { display: none; }
+  .inbox-root .inbox-shell[data-list-collapsed='true'] .thread-pane,
+  .inbox-root .inbox-shell[data-list-collapsed='true'] .messenger-empty { grid-column: 1; }
+  .inbox-root .conv-list-toggle:focus-visible { outline: 2px solid var(--coral-deep); outline-offset: 2px; }
+}
