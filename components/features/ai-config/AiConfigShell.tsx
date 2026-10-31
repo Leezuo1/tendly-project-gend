@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { IconChevrons } from '@/components/ui/Icons';
+import { useSwipeCollapse } from '@/lib/hooks/useSwipeCollapse';
 import { Tabs } from '@/components/ui/Tabs';
 import { useTabParam } from '@/lib/hooks/useTabParam';
 import { EmailTab } from './EmailTab';
@@ -17,7 +16,7 @@ type TabKey = (typeof TABS)[number]['key'];
 
 export function AiConfigShell() {
   const [tab, setTab] = useTabParam<TabKey>(TABS.map((t) => t.key), 'products');
-  const [tabsCollapsed, setTabsCollapsed] = useState(false);
+  const { collapsed: tabsCollapsed, setCollapsed: setTabsCollapsed, handlers: tabSwipe } = useSwipeCollapse('x');
 
   return (
     <>
@@ -29,8 +28,8 @@ export function AiConfigShell() {
       </div>
 
       <div className="ai-config-workspace" data-tabs-collapsed={tabsCollapsed}>
-      <div className="ai-subnav">
-      <button type="button" className="ai-subnav-toggle" aria-label={tabsCollapsed ? 'Hiện mục cấu hình AI' : 'Ẩn mục cấu hình AI'} title={tabsCollapsed ? 'Hiện mục cấu hình AI' : 'Ẩn mục cấu hình AI'} aria-expanded={!tabsCollapsed} aria-controls="ai-subnav" onClick={() => setTabsCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${tabsCollapsed ? 0 : 180}deg)` }} /></button>
+      <div className="ai-subnav" data-swipe-collapse {...tabSwipe}>
+      <button type="button" className="ai-subnav-toggle" aria-label={tabsCollapsed ? 'Hiện mục cấu hình AI' : 'Ẩn mục cấu hình AI'} title={tabsCollapsed ? 'Hiện mục cấu hình AI' : 'Ẩn mục cấu hình AI'} aria-expanded={!tabsCollapsed} aria-controls="ai-subnav" onClick={() => setTabsCollapsed(value => !value)}><span className="swipe-grip" aria-hidden="true" /></button>
       <Tabs id="ai-subnav" tabs={[...TABS]} active={tab} onChange={setTab} />
       </div>
 

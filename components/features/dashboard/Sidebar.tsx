@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useState } from 'react';
+import React, { useId } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardTab } from '@/lib/types/dashboard';
@@ -9,7 +9,7 @@ import { useUnrepliedCount } from '@/lib/hooks/useUnrepliedCount';
 import { CustomerAvatar } from '@/components/features/inbox/CustomerAvatar';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import styles from './sidebar.module.css';
-import { IconChevrons } from '@/components/ui/Icons';
+import { useSwipeCollapse } from '@/lib/hooks/useSwipeCollapse';
 
 export interface SidebarProps {
   currentPath?: 'tong-quan' | 'marketing' | 'livestream' | 'hop-thoai' | 'cau-hinh-ai' | 'cai-dat' | 'smart-sourcing' | 'quan-tri';
@@ -25,7 +25,7 @@ export function Sidebar({
   onToast,
 }: SidebarProps) {
   const { session, logout } = useAppSecurity();
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed, handlers: menuSwipe } = useSwipeCollapse();
   const navigationId = useId();
   const router = useRouter();
   const page = useFacebookPage();
@@ -38,7 +38,7 @@ export function Sidebar({
   const isCaiDat = currentPath === 'cai-dat';
 
   return (
-    <aside className={`sidebar ${styles.sidebar}`} aria-label="Điều hướng Tendly" data-collapsed={collapsed}>
+    <aside className={`sidebar ${styles.sidebar}`} aria-label="Điều hướng Tendly" data-collapsed={collapsed} data-swipe-collapse {...menuSwipe}>
       <div className="brand">
         <Link href="/" title="Trang chủ Tendly">
           <img src="/tendly-logo.png" alt="Tendly" />
@@ -145,7 +145,7 @@ export function Sidebar({
           </svg>
           <span>Cài đặt</span>
         </Link>
-      <button type="button" className={styles.toggle} aria-label={collapsed ? 'Hiện menu' : 'Ẩn menu'} title={collapsed ? 'Hiện menu' : 'Ẩn menu'} aria-expanded={!collapsed} aria-controls={navigationId} onClick={() => setCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${collapsed ? 90 : -90}deg)` }} /></button>
+      <button type="button" className={styles.toggle} aria-label={collapsed ? 'Hiện menu' : 'Ẩn menu'} title={collapsed ? 'Hiện menu' : 'Ẩn menu'} aria-expanded={!collapsed} aria-controls={navigationId} onClick={() => setCollapsed(value => !value)}><span className="swipe-grip" aria-hidden="true" /></button>
       </div>
 
       <div className="sidebar-foot">

@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ConversationList } from './ConversationList';
-import { IconChevrons } from '@/components/ui/Icons';
+import { useSwipeCollapse } from '@/lib/hooks/useSwipeCollapse';
 import { ThreadPane } from './ThreadPane';
 import { CustomerProfilePane } from './CustomerProfilePane';
 import { Toast } from '@/components/shared/Toast';
@@ -23,7 +23,7 @@ export function InboxShell() {
   const selectedIdRef = useRef('');
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [listCollapsed, setListCollapsed] = useState(false);
+  const { collapsed: listCollapsed, setCollapsed: setListCollapsed, handlers: listSwipe } = useSwipeCollapse('x');
   const [draftText, setDraftText] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const pendingRequests = useRef(new Set<string>());
@@ -298,7 +298,7 @@ export function InboxShell() {
         <main className="main" aria-label="Hộp thoại">
           <div className="inbox-shell" data-list-collapsed={listCollapsed}>
             <ConversationList
-              listToggle={<button type="button" className="conv-list-toggle" aria-label={listCollapsed ? 'Hiện danh sách' : 'Ẩn danh sách'} title={listCollapsed ? 'Hiện danh sách' : 'Ẩn danh sách'} aria-expanded={!listCollapsed} aria-controls="conversation-list" onClick={() => setListCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${listCollapsed ? 0 : 180}deg)` }} /></button>}
+              listToggle={<button {...listSwipe} data-swipe-collapse type="button" className="conv-list-toggle" aria-label={listCollapsed ? 'Hiện danh sách' : 'Ẩn danh sách'} title={listCollapsed ? 'Hiện danh sách' : 'Ẩn danh sách'} aria-expanded={!listCollapsed} aria-controls="conversation-list" onClick={() => setListCollapsed(value => !value)}><span className="swipe-grip" aria-hidden="true" /></button>}
               toolbar={<div className="messenger-toolbar">
                   <button type="button" className="inbox-ai-toggle" role="switch" aria-checked={autoReply}
                     aria-label="AI tự động trả lời"

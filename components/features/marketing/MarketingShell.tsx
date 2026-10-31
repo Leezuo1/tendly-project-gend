@@ -11,14 +11,14 @@ import { FacebookCommentsTab } from './FacebookCommentsTab';
 import { FacebookPostsTab } from './FacebookPostsTab';
 import { Toast } from '@/components/shared/Toast';
 import type { FacebookFeedPost } from '@/lib/types/facebookFeed';
-import { IconChevrons } from '@/components/ui/Icons';
+import { useSwipeCollapse } from '@/lib/hooks/useSwipeCollapse';
 
 export function MarketingShell() {
   const [activeTab, setActiveTab] = useState<MarketingTab>('queue');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState<number | null>(null);
   const [sourcePost, setSourcePost] = useState<FacebookFeedPost>();
-  const [tabsCollapsed, setTabsCollapsed] = useState(false);
+  const { collapsed: tabsCollapsed, setCollapsed: setTabsCollapsed, handlers: tabSwipe } = useSwipeCollapse('x');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -39,8 +39,8 @@ export function MarketingShell() {
           </div>
 
           <div className="marketing-workspace" data-tabs-collapsed={tabsCollapsed}>
-          <div className="marketing-subnav">
-          <button type="button" className="marketing-subnav-toggle" aria-label={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} title={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} aria-expanded={!tabsCollapsed} aria-controls="marketing-subnav" onClick={() => setTabsCollapsed(value => !value)}><IconChevrons style={{ transform: `rotate(${tabsCollapsed ? 0 : 180}deg)` }} /></button>
+          <div className="marketing-subnav" data-swipe-collapse {...tabSwipe}>
+          <button type="button" className="marketing-subnav-toggle" aria-label={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} title={tabsCollapsed ? 'Hiện mục Marketing' : 'Ẩn mục Marketing'} aria-expanded={!tabsCollapsed} aria-controls="marketing-subnav" onClick={() => setTabsCollapsed(value => !value)}><span className="swipe-grip" aria-hidden="true" /></button>
           <div className="tabs" id="marketing-subnav" aria-label="Các mục Marketing">
             <button type="button" className={`tab-btn ${activeTab === 'facebook-posts' ? 'active' : ''}`} onClick={() => setActiveTab('facebook-posts')}>
               Bài đăng Facebook
