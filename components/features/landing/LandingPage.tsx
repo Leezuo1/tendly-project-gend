@@ -23,7 +23,7 @@ export function LandingPage() {
                 Một người đồng đội AI, đồng hành cùng shop trên các nền tảng mạng xã hội. Hiểu cảm xúc khách hàng, gợi ý trả lời từ sản phẩm và FAQ, rồi cùng bạn soạn nội dung bán hàng — ngay trong Tendly.
               </p>
               <div className="tl-hero-actions">
-                <Link className="tl-button tl-coral" href="/dang-ky">
+                <Link className="tl-button tl-coral" href="/dang-nhap">
                   Bắt đầu với Tendly <span className="tl-arrow" aria-hidden="true">↗</span>
                 </Link>
                 <a className="tl-text-link" href="#inbox-demo">Thử hộp thư mẫu</a>

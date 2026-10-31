@@ -27,6 +27,7 @@
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
   isolation: isolate;
+  overflow-wrap: anywhere;
 }
 
 .root :global(button),
@@ -103,7 +104,7 @@
   color: white;
   font-size: 14px;
   font-weight: 600;
-  transition: background .2s, transform .2s;
+  transition: background .2s ease-out, border-color .2s ease-out, transform .2s ease-out;
 }
 
 .root :global(.tl-button:hover) {
@@ -119,8 +120,11 @@
 }
 
 .root :global(.tl-button.tl-coral:hover) {
-  background: #f38888;
+  background: color-mix(in srgb, var(--coral) 80%, var(--paper));
+  border-color: var(--coral);
 }
+
+.root :global(.tl-button:active) { transform: translateY(0); }
 
 .root :global(.tl-text-link) {
   font-size: 14px;
@@ -216,6 +220,8 @@
   padding: 0;
 }
 
+.root :global(.tl-nav-links .tl-menu-account) { display: none; }
+
 .root :global(.tl-nav-links a::after) {
   display: none;
 }
@@ -270,10 +276,12 @@
 
 .root :global(.tl-hero-grid) {
   display: grid;
-  grid-template-columns: 1.03fr 1fr;
+  grid-template-columns: minmax(0, 1.03fr) minmax(0, 1fr);
   gap: 58px;
   align-items: center;
 }
+
+.root :global(.tl-hero-grid > *) { min-width: 0; }
 
 .root :global(.tl-hero h1) {
   font-size: clamp(44px, 4.65vw, 66px);
@@ -351,6 +359,8 @@
 
 .root :global(.tl-scene-label) {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   justify-content: space-between;
   margin: 0 4px 12px;
   font-size: 12px;
@@ -374,6 +384,8 @@
 
 .root :global(.tl-app-top) {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
   padding: 20px 22px;
@@ -398,7 +410,8 @@
 }
 
 .root :global(.tl-app-tabs) {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 17px;
   padding: 0 20px;
   border-bottom: 1px solid var(--line);
@@ -411,7 +424,9 @@
   padding: 15px 0 12px;
   font-size: 12px;
   color: var(--soft);
-  white-space: nowrap;
+  white-space: normal;
+  min-width: 0;
+  min-height: 44px;
   transition: color .25s ease, border-color .25s ease;
 }
 
@@ -543,6 +558,8 @@
 
 .root :global(.tl-reply-label) {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   justify-content: space-between;
   font-size: 12px;
   color: var(--moss);
@@ -550,6 +567,8 @@
   text-transform: uppercase;
   letter-spacing: .5px;
 }
+
+.root :global(.tl-reply-label > span) { flex: 1 1 150px; }
 
 .root :global(.tl-reply p) {
   font-size: 14px;
@@ -577,6 +596,7 @@
   position: absolute;
   bottom: 0;
   right: 13px;
+  max-width: calc(100% - 26px);
   background: var(--sand);
   color: var(--moss);
   font: italic 18px Georgia, serif;
@@ -946,6 +966,7 @@
 
 .root :global(.tl-composer-tabs) {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 20px;
 }
@@ -956,6 +977,7 @@
   border-radius: 4px;
   color: var(--soft);
   padding: 7px 12px;
+  min-height: 44px;
   font-size: 12px;
   transition: background .2s, border-color .2s;
 }
@@ -1052,7 +1074,8 @@
   right: 4px;
   font-size: 20px;
   font-weight: 400;
-  top: 13px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--soft);
 }
 
@@ -1158,6 +1181,7 @@
 }
 
 .root :global(.tl-app-tab:focus-visible),
+.root :global(.tl-thread:focus-visible),
 .root :global(.tl-composer-tab:focus-visible) {
   outline-offset: -3px;
 }
@@ -1194,10 +1218,13 @@
   transform: translateY(16px) scale(.96);
 }
 
-.root:global(.tl-motion-ready) :global([data-reveal].tl-visible) {
+.root:global(.tl-motion-ready) :global([data-reveal].tl-visible),
+.root:global(.tl-motion-ready) :global([data-reveal]:focus-within) {
   opacity: 1;
   transform: none;
 }
+
+.root:global(.tl-motion-ready) :global([data-reveal]:focus-within) { transition: none; }
 
 @keyframes status-pulse {
   0%, 100% {
@@ -1279,7 +1306,9 @@
     width: calc(100% - 40px);
   }
   .root :global(.tl-nav) {
-    height: 70px;
+    height: auto;
+    min-height: 70px;
+    padding-block: 10px;
     gap: 18px;
     position: relative;
   }
@@ -1292,15 +1321,22 @@
   .root :global(.tl-nav-action) {
     margin-left: auto;
     font-size: 12px;
+    min-width: 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
   }
   .root :global(.tl-menu-toggle) {
     display: block;
     font-size: 12px;
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
   }
   .root :global(.tl-nav-links) {
     display: none;
     position: absolute;
-    top: 70px;
+    top: 100%;
     left: -20px;
     right: -20px;
     background: var(--canvas);
@@ -1309,7 +1345,12 @@
     flex-direction: column;
     gap: 16px;
     font-size: 14px;
+    max-height: calc(100dvh - 90px);
+    overflow-y: auto;
   }
+  .root :global(.tl-nav-links a) { display: flex; align-items: center; min-height: 44px; }
+  .root :global(.tl-brand) { min-height: 44px; }
+  .root :global(.tl-text-link), .root :global(.tl-root-link) { display: inline-flex; align-items: center; min-height: 44px; }
   .root :global(.tl-nav-links.tl-open) {
     display: flex;
     animation: content-in .25s ease both;
@@ -1323,7 +1364,7 @@
     margin-bottom: 24px;
   }
   .root :global(.tl-hero-grid) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 35px;
   }
   .root :global(.tl-hero h1) {
@@ -1446,6 +1487,8 @@
   .root :global(.tl-footer-brand) {
     gap: 15px;
   }
+  .root :global(.tl-footer-links) { flex-wrap: wrap; gap: 8px 20px; }
+  .root :global(.tl-footer-links a) { display: inline-flex; align-items: center; min-height: 44px; }
   .root :global(.tl-footer-inner > small) {
     width: 100%;
   }
@@ -1475,6 +1518,7 @@
 }
 
 @media (max-width: 360px) {
+  .root :global(.tl-nav-links .tl-menu-account) { display: flex; }
   .root :global(.tl-nav-action) {
     display: none;
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 /** Roving focus keeps both demo tab lists usable without a mouse. */
 function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number, total: number, select: (index: number) => void) {
@@ -18,10 +18,11 @@ function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number, total: 
 
 export function LandingNavigation() {
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const close = () => setOpen(false);
   return (
     <header>
-      <nav className="tl-nav tl-wrap" aria-label="Điều hướng chính">
+      <nav className="tl-nav tl-wrap" aria-label="Điều hướng chính" onKeyDown={event => { if (event.key === 'Escape' && open) { close(); menuButton.current?.focus(); } }}>
         <Link className="tl-brand" href="/" onClick={close} aria-label="Tendly — Trang chủ">
           <img src="/tendly-logo.png" width="950" height="371" alt="Tendly" />
         </Link>
@@ -31,9 +32,10 @@ export function LandingNavigation() {
           <a href="#marketing" onClick={close}>Soạn bài AI</a>
           <a href="#how" onClick={close}>Cách hoạt động</a>
           <Link href="/pricing" onClick={close}>Bảng giá</Link>
+          <Link href="/dang-nhap" className="tl-menu-account" onClick={close}>Đăng ký / Đăng nhập ↗</Link>
         </div>
         <Link href="/dang-nhap" className="tl-nav-action">Đăng ký / Đăng nhập <span aria-hidden="true">↗</span></Link>
-        <button type="button" className="tl-menu-toggle" aria-label={open ? 'Đóng menu' : 'Mở menu'} aria-controls="landing-nav-links" aria-expanded={open} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'Escape') close(); }}>
+        <button ref={menuButton} type="button" className="tl-menu-toggle" aria-label={open ? 'Đóng menu' : 'Mở menu'} aria-controls="landing-nav-links" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? 'Đóng' : 'Menu'}
         </button>
       </nav>
