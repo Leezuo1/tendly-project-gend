@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { InboxDemo, LandingNavigation, LandingMotion, PostDemo } from './LandingExperience';
+import { LandingNavigation, LandingMotion } from './LandingExperience';
 import styles from './landing.module.css';
 
 export function LandingPage() {
@@ -7,248 +7,201 @@ export function LandingPage() {
     <div className={styles.root} id="landing-root">
       <a className="tl-skip-link" href="#home">Đến nội dung chính</a>
       <LandingNavigation />
+      
       <main id="home">
+        {/* HERO SECTION: Tập trung vào e-commerce và livestream */}
         <section className="tl-hero tl-wrap" aria-labelledby="hero-title">
           <div className="tl-hero-top tl-eyebrow">
-            <span className="tl-dot" aria-hidden="true"></span> Hộp thư · Trợ lý AI · Marketing
+            <span className="tl-dot" aria-hidden="true"></span> Trợ lý AI cho E-Commerce & Livestream
           </div>
           <div className="tl-hero-grid">
             <div>
-              <h1 id="hero-title" lang="en">
-                Your AI teammate <br />
-                for every <br />
-                <em className="tl-serif">customer.</em>
+              <h1 id="hero-title">
+                Chốt đơn mỏi tay, <br />
+                Livestream rối trí? <br />
+                <em className="tl-serif">Đã có AI lo.</em>
               </h1>
               <p className="tl-hero-copy">
-                Một người đồng đội AI, đồng hành cùng shop trên các nền tảng mạng xã hội. Hiểu cảm xúc khách hàng, gợi ý trả lời từ sản phẩm và FAQ, rồi cùng bạn soạn nội dung bán hàng — ngay trong Tendly.
+                Nền tảng AI toàn diện giúp các shop vừa và nhỏ tổng hợp thông tin sản phẩm, tự động soạn nội dung marketing đa kênh (Facebook, TikTok) và đặc biệt là <strong>Trợ lý Livestream</strong> tự động gom đơn, tổng kết phiên stream khúc cuối giờ không sót một khách.
               </p>
               <div className="tl-hero-actions">
-                <Link className="tl-button tl-coral" href="/dang-nhap">
-                  Bắt đầu với Tendly <span className="tl-arrow" aria-hidden="true">↗</span>
+                <Link className="tl-button tl-coral" href="/dang-ky">
+                  Dùng thử miễn phí <span className="tl-arrow" aria-hidden="true">↗</span>
                 </Link>
-                <a className="tl-text-link" href="#inbox-demo">Thử hộp thư mẫu</a>
+                <a className="tl-text-link" href="#features">Khám phá tính năng</a>
               </div>
-              <p className="tl-hero-note">Bạn xem lại, chỉnh sửa và quyết định nội dung gửi cho khách.</p>
               <div className="tl-hero-foot">
-                <span>Một nơi để làm việc.</span>
-                <span className="tl-channel-word">Đa kênh</span>
-                <span className="tl-channel-word">Cấu hình AI</span>
-                <span className="tl-channel-word">Marketing</span>
+                <span>Tích hợp sẵn:</span>
+                <span className="tl-channel-word">Live Summary</span>
+                <span className="tl-channel-word">Auto Marketing</span>
+                <span className="tl-channel-word">Smart Inbox</span>
               </div>
             </div>
-            <InboxDemo />
-          </div>
-          <div className="tl-promise">
-            <div className="tl-promise-item">
-              <span className="tl-num">01</span>
-              <div>
-                <strong>Chăm sóc khách hàng đa kênh</strong>
-                <p>Đọc hội thoại, xem lịch sử và trả lời khách.</p>
+
+            {/* MOCKUP LIVE DASHBOARD BÊN CẠNH */}
+            <div className="tl-live-preview-card">
+              <div className="tl-preview-header">
+                <span className="tl-live-badge"><span className="tl-dot-pulse"></span> LIVE STREAMING SESSIONS</span>
+                <span className="tl-preview-time">Phiên tối nay: 2.400.000đ</span>
               </div>
-            </div>
-            <div className="tl-promise-item">
-              <span className="tl-num">02</span>
-              <div>
-                <strong>AI hiểu thông tin shop</strong>
-                <p>Gợi ý từ sản phẩm, tồn kho và FAQ đã lưu.</p>
+              <div className="tl-preview-body">
+                <div className="tl-preview-metric-row">
+                  <div>
+                    <small>Tổng đơn chốt qua chat</small>
+                    <strong>48 đơn</strong>
+                  </div>
+                  <div>
+                    <small>Khách cần hỗ trợ gấp</small>
+                    <strong className="tl-text-coral">2 ca</strong>
+                  </div>
+                </div>
+                <div className="tl-stream-summary-box">
+                  <div className="tl-box-tag">Tóm tắt AI phiên stream cuối giờ</div>
+                  <p>• Áo polo cotton xám size L là sản phẩm bán chạy nhất (18 chiếc).</p>
+                  <p>• Còn 3 bình luận hỏi ship hỏa tốc chưa được chốt đơn.</p>
+                </div>
               </div>
-            </div>
-            <div className="tl-promise-item">
-              <span className="tl-num">03</span>
-              <div>
-                <strong>Soạn bài & đăng Fanpage</strong>
-                <p>Tạo nội dung, sửa bản nháp rồi đăng bài.</p>
+              <div className="tl-preview-footer">
+                <span>Trợ lý AI đang hoạt động 24/7 cho shop của bạn</span>
               </div>
             </div>
           </div>
         </section>
 
+        {/* BENTO GRID FEATURES: Chia khối hiện đại */}
         <section className="tl-section tl-wrap" id="features" aria-labelledby="features-title">
           <div className="tl-section-heading">
             <div>
               <h2 id="features-title">
-                Đọc tin, hiểu câu hỏi. <br />
-                Có sẵn gợi ý để trả lời.
+                Mọi công việc của shop <br />
+                được thu gọn trong 1 hệ sinh thái.
               </h2>
             </div>
-            <p>Hộp thư để xử lý hội thoại. Sản phẩm và FAQ để AI có thông tin. Mỗi tính năng giải quyết một việc cụ thể của shop.</p>
+            <p>Không cần mở hàng chục tab hay thuê nhiều nhân sự vận hành. AI tự động hóa từ khâu chuẩn bị đến khi tổng kết doanh thu.</p>
           </div>
-          <div className="tl-feature-layout">
-            <div className="tl-note-board">
-              <div className="tl-board-heading">NGUỒN THÔNG TIN CỦA AI / VÍ DỤ</div>
-              <div className="tl-paper-note">
-                <h3>Trả lời có căn cứ từ cấu hình AI của shop.</h3>
-                <div className="tl-list-row">
-                  <span>01</span> Giá, size, màu, tổng tồn kho <span className="tl-tag">Sản phẩm</span>
-                </div>
-                <div className="tl-list-row">
-                  <span>02</span> Giao hàng, đổi trả <span className="tl-tag">FAQ</span>
-                </div>
-                <div className="tl-list-row">
-                  <span>03</span> Câu hỏi thử của chủ shop <span className="tl-tag">Thử hỏi AI</span>
-                </div>
-              </div>
-              <div className="tl-board-footer">
-                <span className="tl-dot" aria-hidden="true"></span> Thông tin đã lưu được dùng từ câu hỏi tiếp theo.
+
+          <div className="tl-bento-grid">
+            {/* Ô Bento 1: Trợ lý Livestream */}
+            <div className="tl-bento-card tl-bento-span-2">
+              <div className="tl-bento-tag">TÍNH NĂNG ĐẶC BIỆT</div>
+              <h3>Trợ lý Livestream & Tổng hợp đơn khúc cuối</h3>
+              <p>Phiên live kết thúc là lúc AI bắt đầu làm việc: tự động quét toàn bộ bình luận, lọc ra các từ khóa chốt đơn, tổng hợp số lượng từng mặt hàng và lập báo cáo doanh thu chi tiết chỉ trong 1 phút.</p>
+              <div className="tl-bento-mini-mockup">
+                <span>⚡ Tự động gom đơn từ cmt</span>
+                <span>📊 Thống kê sản phẩm hot nhất</span>
+                <span>🎯 Báo cáo nhanh doanh thu livestream</span>
               </div>
             </div>
-            <div className="tl-feature-list">
-              <article>
-                <h3><span>01</span>Một hộp thư cho các kênh của shop</h3>
-                <p>Quản lý hội thoại từ các nền tảng mạng xã hội trong một không gian làm việc. Xem lịch sử, theo dõi tin cần trả lời và phản hồi khách ngay trong Tendly.</p>
-              </article>
-              <article>
-                <h3><span>02</span>Phân tích AI ngay trong hội thoại</h3>
-                <p>Bấm Phân tích AI để xem cảm xúc, mức ưu tiên, lý do và gợi ý phản hồi. Bạn có thể gửi gợi ý với tư cách Shop hoặc chỉnh sửa trước khi gửi.</p>
-              </article>
-              <article>
-                <h3><span>03</span>Sản phẩm & FAQ làm nguồn trả lời</h3>
-                <p>Nhập danh mục bằng CSV, cập nhật giá, chất liệu, size, màu và tổng tồn kho. Thêm hoặc bật/tắt FAQ về chính sách shop; dùng Thử hỏi AI để kiểm tra câu trả lời.</p>
-              </article>
-              <Link className="tl-root-link" href="/cau-hinh-ai">Thiết lập sản phẩm & FAQ ↗</Link>
+
+            {/* Ô Bento 2: AI Marketing */}
+            <div className="tl-bento-card">
+              <div className="tl-bento-tag">MARKETING ĐA KÊNH</div>
+              <h3>Tự tạo bài viết Facebook, TikTok</h3>
+              <p>Chọn sản phẩm từ kho, chọn phong cách, AI sẽ viết sẵn nội dung kèm hashtag chuẩn chỉnh để bạn đăng ngay.</p>
+            </div>
+
+            {/* Ô Bento 3: Knowledge Base & FAQ */}
+            <div className="tl-bento-card">
+              <div className="tl-bento-tag">DỮ LIỆU THÔNG MINH</div>
+              <h3>Tổng hợp thông tin & FAQ</h3>
+              <p>Upload danh mục, giá, tồn kho. AI nắm rõ như lòng bàn tay để tư vấn khách chuẩn xác không lệch nhịp.</p>
+            </div>
+
+            {/* Ô Bento 4: Smart Inbox */}
+            <div className="tl-bento-card tl-bento-span-2">
+              <div className="tl-bento-tag">HỘP THƯ ĐA KÊNH</div>
+              <h3>Phân tích cảm xúc khách hàng & Ưu tiên xử lý</h3>
+              <p>Nhận diện ngay khách đang phàn nàn, lo lắng để đẩy lên hàng đầu. Kèm theo gợi ý trả lời thông minh giúp nhân viên bấm gửi trong 1 giây.</p>
             </div>
           </div>
         </section>
 
+        {/* HOW IT WORKS */}
         <section className="tl-section tl-how" id="how" aria-labelledby="how-title">
           <div className="tl-wrap">
             <div className="tl-section-heading">
               <div>
                 <h2 id="how-title">
-                  Thêm thông tin shop. <br />
-                  Dùng AI đúng việc bạn cần.
+                  Vận hành đơn giản <br />
+                  Chỉ với 3 bước cơ bản.
                 </h2>
               </div>
-              <p>Từ dữ liệu đến công việc mỗi ngày: cùng nguồn sản phẩm và FAQ cho việc tư vấn khách lẫn soạn nội dung bán hàng.</p>
+              <p>Quy trình tối ưu hóa giúp chủ shop e-commerce bắt đầu ứng dụng AI ngay lập tức mà không cần rành công nghệ.</p>
             </div>
             <div className="tl-steps">
               <article className="tl-step">
                 <span className="tl-step-number">01</span>
-                <h3>Chuẩn bị sản phẩm & FAQ</h3>
-                <p>Nhập danh mục CSV, lưu giá và tồn kho, bổ sung chính sách. Kiểm tra nguồn thông tin bằng ô Thử hỏi AI.</p>
+                <h3>Kết nối kênh bán & Livestream</h3>
+                <p>Liên kết Fanpage, TikTok Shop và các nguồn dữ liệu sản phẩm, giá bán, chính sách đổi trả vào hệ thống.</p>
               </article>
               <article className="tl-step">
                 <span className="tl-step-number">02</span>
-                <h3>Xử lý tin nhắn của khách</h3>
-                <p>Chọn hội thoại từ kênh đã kết nối và phân tích AI. Đọc lý do ưu tiên, sửa gợi ý nếu cần rồi gửi trả lời.</p>
+                <h3>AI học dữ liệu & Trợ giúp</h3>
+                <p>Hệ thống tự động đồng bộ tồn kho, chuẩn bị sẵn các mẫu câu trả lời và kịch bản marketing theo ý muốn.</p>
               </article>
               <article className="tl-step">
                 <span className="tl-step-number">03</span>
-                <h3>Soạn nội dung marketing</h3>
-                <p>Chọn sản phẩm, kênh, mục tiêu và giọng văn. Nhận phương án AI, sửa nội dung, lưu nháp hoặc đăng Fanpage đã kết nối.</p>
+                <h3>Thảnh thơi chốt đơn & Nhận báo cáo</h3>
+                <p>Tập trung livestream và phát triển sản phẩm, mọi khâu chăm sóc khách, viết bài và tổng kết stream đã có AI lo.</p>
               </article>
             </div>
-            <div className="tl-how-bottom">
-              <span>Bạn có thể cập nhật thông tin và cách trả lời bất cứ lúc nào.</span>
-              <a href="#inbox-demo">Xem hộp thư mẫu <span aria-hidden="true">↗</span></a>
-            </div>
           </div>
         </section>
 
-        <section className="tl-section tl-wrap tl-care" id="care" aria-labelledby="care-title">
-          <div>
-            <h2 id="care-title">
-              Biết khách đang lo. <br />
-              Biết ai cần <em className="tl-serif">trả lời trước.</em>
-            </h2>
-            <p>Phân tích cảm xúc & mức ưu tiên tự động: AI phân biệt cảm xúc tích cực, trung lập, lo lắng, thất vọng và tức giận. Mỗi phân tích có mức ưu tiên, lý do và đề xuất nhân viên hỗ trợ — để bạn chọn cách phản hồi phù hợp.</p>
-            <Link className="tl-text-link" href="/hop-thoai">Mở hộp thoại của shop <span aria-hidden="true">↗</span></Link>
-          </div>
-          <div className="tl-conversation">
-            <div className="tl-conversation-head">
-              <span className="tl-avatar tl-pink">T</span>
-              <div>
-                <strong>Trang Nguyễn</strong>
-                <p>Tin nhắn khách · Tình huống minh họa</p>
-              </div>
-            </div>
-            <div className="tl-bubble">Mình đặt áo để đi du lịch mà giờ vẫn chưa nhận được. Shop kiểm tra giúp mình với nhé.</div>
-            <div className="tl-message-time">Tin khách · 14:32</div>
-            <div className="tl-bubble tl-answer">Dạ shop hiểu bạn đang cần áo cho chuyến đi. Bạn cho shop mã đơn để mình kiểm tra tình trạng giao hàng và hỗ trợ nhé.</div>
-            <div className="tl-message-time tl-right">Gợi ý AI · Bạn xem lại trước khi gửi</div>
-            <div className="tl-handoff">
-              <span className="tl-dot" aria-hidden="true"></span>
-              <span>Lo lắng · Ưu tiên cao · Nên để nhân viên hỗ trợ</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="tl-section tl-wrap tl-care tl-marketing" id="marketing" aria-labelledby="marketing-title">
-          <div>
-            <h2 id="marketing-title">
-              Từ sản phẩm của shop <br />
-              đến một bài viết <em className="tl-serif">sẵn để sửa.</em>
-            </h2>
-            <p>Chọn Facebook, TikTok hoặc Email; thêm mục tiêu, giọng văn và tối đa 5 sản phẩm. AI tạo 1–3 phương án với tiêu đề, nội dung, hashtag và gợi ý hình ảnh hoặc video.</p>
-            <p style={{ marginTop: 16 }}>Sửa trực tiếp, lưu bản nháp hoặc sao chép nội dung. Với Facebook Page đã kết nối, bạn có thể lưu và đăng bài ngay từ Tendly.</p>
-            <Link className="tl-text-link" href="/marketing">Mở công cụ soạn bài <span aria-hidden="true">↗</span></Link>
-          </div>
-          <PostDemo />
-        </section>
-
+        {/* FAQ SECTION */}
         <section className="tl-wrap tl-faq" aria-labelledby="faq-title">
           <div>
-            <h2 id="faq-title">Tendly làm được gì?</h2>
-            <p className="tl-faq-lead">Hiểu rõ cách hoạt động trước khi bắt đầu cùng shop của bạn.</p>
+            <h2 id="faq-title">Câu hỏi thường gặp</h2>
+            <p className="tl-faq-lead">Mọi thắc mắc về cách AI hỗ trợ cho shop e-commerce và livestream.</p>
           </div>
           <div>
             <details>
-              <summary>AI dựa vào đâu để tư vấn sản phẩm?</summary>
-              <p>Từ danh mục sản phẩm, giá, chất liệu, size, màu, tổng tồn kho và FAQ đang bật mà bạn đã lưu trong Cấu hình AI. Bạn có thể thử câu hỏi ngay tại ô Thử hỏi AI để xem cảm xúc, mức ưu tiên và phản hồi.</p>
+              <summary>Trợ lý Livestream hoạt động như thế nào?</summary>
+              <p>Trợ lý AI sẽ kết nối vào phiên live, tự động đọc các bình luận chứa cú pháp chốt đơn, phân loại sản phẩm khách chọn và xuất ra bảng tổng kết số lượng đơn hàng ngay sau khi tắt máy.</p>
             </details>
             <details>
-              <summary>Tendly hỗ trợ những kênh nào?</summary>
-              <p>Tendly hướng đến một không gian chăm sóc khách hàng đa kênh trên các nền tảng mạng xã hội. Hiện tính năng nhận và gửi tin nhắn hỗ trợ Messenger khi Facebook Page được kết nối và cấu hình đầy đủ. Zalo và TikTok nằm trong kế hoạch tích hợp tiếp theo.</p>
+              <summary>AI soạn bài đăng mạng xã hội có chuẩn không?</summary>
+              <p>AI sử dụng đúng dữ liệu sản phẩm thực tế của shop (giá, size, màu, chất liệu) kết hợp với các xu hướng ngôn ngữ mạng xã hội để tạo ra các bài viết tự nhiên, thu hút tương tác cao trên Facebook và TikTok.</p>
             </details>
             <details>
-              <summary>AI có thể soạn và đăng bài lên kênh nào?</summary>
-              <p>AI soạn nội dung cho Facebook, TikTok và Email. Bạn sửa, lưu nháp hoặc sao chép; đăng trực tiếp hiện hỗ trợ Facebook Fanpage đã kết nối. Nội dung TikTok và Email được sao chép để sử dụng trên kênh tương ứng.</p>
-            </details>
-            <details>
-              <summary>Tendly đã tự gửi email chăm sóc khách chưa?</summary>
-              <p>Bạn có thể cấu hình các kịch bản email làm thông tin tham khảo cho AI. Việc tự gửi email thực tế chưa được tích hợp. Phần soạn bài Email giúp tạo nội dung để bạn xem lại và sao chép.</p>
-            </details>
-            <details>
-              <summary>Mình có thể thử gì trên trang này?</summary>
-              <p>Lọc hộp thư, chọn hội thoại để xem phân tích hoặc gợi ý trả lời và chuyển giữa các phương án bài viết mẫu. Dữ liệu ở phần minh họa là ví dụ. Chọn Bắt đầu với Tendly để mở không gian làm việc của shop.</p>
+              <summary>Shop nhỏ mới bắt đầu có dễ sử dụng không?</summary>
+              <p>Cực kỳ dễ dàng! Bạn chỉ mất chưa đầy 5 phút để nhập thông tin sản phẩm và kết nối các kênh là hệ thống có thể bắt đầu hỗ trợ vận hành ngay lập tức.</p>
             </details>
           </div>
         </section>
 
+        {/* CTA CLOSING */}
         <section className="tl-closing" id="start">
           <div className="tl-wrap tl-closing-inner">
             <div>
               <h2>
-                Trả lời khách có căn cứ. <br />
-                Soạn nội dung <em className="tl-serif">có người phụ.</em>
+                Tối ưu hóa vận hành shop. <br />
+                Bán hàng thảnh thơi cùng <em className="tl-serif">Tendly.</em>
               </h2>
-              <p>Bắt đầu với sản phẩm, FAQ và những cuộc trò chuyện của shop.</p>
+              <p>Bắt đầu tự động hóa khâu marketing và tổng hợp đơn livestream ngay hôm nay.</p>
             </div>
             <div className="tl-closing-action">
               <Link className="tl-button" href="/dang-nhap">
-                Đăng ký / Đăng nhập <span className="tl-arrow" aria-hidden="true">↗</span>
+                Trải nghiệm miễn phí <span className="tl-arrow" aria-hidden="true">↗</span>
               </Link>
-              <p>Hộp thư đa kênh · Gợi ý AI · Soạn bài bán hàng</p>
+              <p>Livestream Assistant · AI Marketing · Smart Inbox</p>
             </div>
           </div>
         </section>
       </main>
+
       <footer>
         <div className="tl-wrap tl-footer-inner">
           <div className="tl-footer-brand">
             <Link className="tl-brand" href="/">
               <img src="/tendly-logo.png" width="950" height="371" alt="Tendly" />
             </Link>
-            <p>
-              Chăm khách chu đáo. <br />
-              Bán hàng thảnh thơi.
-            </p>
+            <p>Chăm khách chu đáo.<br />Bán hàng thảnh thơi.</p>
           </div>
           <div className="tl-footer-links">
-            <a href="#features">Sản phẩm</a>
+            <a href="#features">Tính năng</a>
             <a href="#how">Cách hoạt động</a>
             <Link href="/pricing">Bảng giá</Link>
-            <Link href="/cai-dat">Cài đặt shop</Link>
           </div>
           <small>© 2026 Tendly</small>
         </div>
