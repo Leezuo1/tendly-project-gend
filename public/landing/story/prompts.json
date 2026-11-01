@@ -1,0 +1,30 @@
+{
+  "generator": "built-in image_gen",
+  "usage": "Synthetic brand imagery for Tendly landing composition; not photos of real customers or endorsements.",
+  "assets": [
+    {
+      "name": "shop-rack",
+      "prompt": "Create one premium editorial photograph for the Tendly Vietnamese fashion-shop SaaS landing page. Warm cream, navy, oatmeal and soft terracotta palette; realistic natural light, tactile cotton, refined independent boutique art direction, not stock-photo smiles, not 3D illustration. No text, no logos, no UI, no watermark. Landscape 4:3 photograph of a tidy small Vietnamese clothing boutique, close view of a pale oak rail carrying navy blue cotton short-sleeve polo shirts on wooden hangers, a few beige polos behind, cream plaster walls, sunlight from the left, a folded navy polo in foreground. The navy polos have a plain collar, two buttons, no branding. Sharp photographic detail."
+    },
+    {
+      "name": "live-host",
+      "prompt": "Create one premium editorial photograph for the Tendly Vietnamese fashion-shop SaaS landing page. Warm cream, navy, oatmeal and soft terracotta palette; realistic natural light, tactile cotton, refined independent boutique art direction, not stock-photo smiles, not 3D illustration. No text, no logos, no UI, no watermark. Portrait 4:5 photograph. A young adult Vietnamese woman boutique owner hosting a fashion livestream in a cream-walled clothing shop. She wears an oatmeal linen shirt, holds up a navy short-sleeve cotton polo with both hands at chest level and speaks naturally toward a smartphone on a small tripod at the left edge. Warm oak clothing rail behind. Framed from waist upward, face fully visible, garment fully visible. No social-media interface burned into image."
+    },
+    {
+      "name": "cotton-detail",
+      "prompt": "Create one premium editorial photograph for the Tendly Vietnamese fashion-shop SaaS landing page. Warm cream, navy, oatmeal and soft terracotta palette; realistic natural light, tactile cotton, refined independent boutique art direction, not stock-photo smiles, not 3D illustration. No text, no logos, no UI, no watermark. Square macro fashion photograph of deep navy blue cotton pique polo fabric, richly visible small knit texture and folded collar edge with a single dark button, soft raking daylight, minimal composition."
+    },
+    {
+      "name": "office-style",
+      "prompt": "Create one premium editorial photograph for the Tendly Vietnamese fashion-shop SaaS landing page. Warm cream, navy, oatmeal and soft terracotta palette; realistic natural light, tactile cotton, refined independent boutique art direction, not stock-photo smiles, not 3D illustration. No text, no logos, no UI, no watermark. Portrait 4:5 candid editorial fashion photograph of a young adult Vietnamese man wearing a plain deep navy short-sleeve polo tucked into beige chinos, walking beside a warm pale stone office wall with a canvas shoulder bag. Frame from upper chest to knees so garment, hand, bag and trousers dominate, no face needed, natural elegant styling."
+    },
+    {
+      "name": "beige-polo",
+      "prompt": "Create one premium editorial photograph for the Tendly Vietnamese fashion-shop SaaS landing page. Warm cream, navy, oatmeal and soft terracotta palette; realistic natural light, tactile cotton, refined independent boutique art direction, not stock-photo smiles, not 3D illustration. No text, no logos, no UI, no watermark. Square e-commerce fashion photograph of one plain oatmeal beige cotton short-sleeve polo shirt, two-button placket and regular fit, laid flat neatly on warm off-white seamless paper, entire shirt visible, small soft shadow, no accessories, texture sharp."
+    },
+    {
+      "name": "shop-approve",
+      "prompt": "Create one premium editorial photograph for the Tendly Vietnamese fashion-shop SaaS landing page. Warm cream, navy, oatmeal and soft terracotta palette; realistic natural light, tactile cotton, refined independent boutique art direction, not stock-photo smiles, not 3D illustration. No text, no logos, no UI, no watermark. Landscape 4:3 close-up photograph of a Vietnamese boutique owner's hand with a natural index finger touching a tablet on a pale oak packing table. Tablet screen is plain dark olive and mostly cropped at a shallow angle, absolutely no legible writing or icons. A neatly folded navy polo and beige tissue paper beside the hand. Focus on the hand, warm soft daylight, realistic anatomy."
+    }
+  ]
+}

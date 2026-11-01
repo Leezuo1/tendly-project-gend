@@ -1,212 +1,101 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import { LandingNavigation, LandingMotion } from './LandingExperience';
+import type { CSSProperties } from 'react';
+import { LandingExperience } from './LandingExperience';
 import styles from './landing.module.css';
 
 export function LandingPage() {
   return (
     <div className={styles.root} id="landing-root">
-      <a className="tl-skip-link" href="#home">Đến nội dung chính</a>
-      <LandingNavigation />
-      
-      <main id="home">
-        {/* HERO SECTION: Tập trung vào e-commerce và livestream */}
-        <section className="tl-hero tl-wrap" aria-labelledby="hero-title">
-          <div className="tl-hero-top tl-eyebrow">
-            <span className="tl-dot" aria-hidden="true"></span> Trợ lý AI cho E-Commerce & Livestream
-          </div>
-          <div className="tl-hero-grid">
-            <div>
-              <h1 id="hero-title">
-                Chốt đơn mỏi tay, <br />
-                Livestream rối trí? <br />
-                <em className="tl-serif">Đã có AI lo.</em>
-              </h1>
-              <p className="tl-hero-copy">
-                Nền tảng AI toàn diện giúp các shop vừa và nhỏ tổng hợp thông tin sản phẩm, tự động soạn nội dung marketing đa kênh (Facebook, TikTok) và đặc biệt là <strong>Trợ lý Livestream</strong> tự động gom đơn, tổng kết phiên stream khúc cuối giờ không sót một khách.
-              </p>
-              <div className="tl-hero-actions">
-                <Link className="tl-button tl-coral" href="/dang-ky">
-                  Dùng thử miễn phí <span className="tl-arrow" aria-hidden="true">↗</span>
-                </Link>
-                <a className="tl-text-link" href="#features">Khám phá tính năng</a>
-              </div>
-              <div className="tl-hero-foot">
-                <span>Tích hợp sẵn:</span>
-                <span className="tl-channel-word">Live Summary</span>
-                <span className="tl-channel-word">Auto Marketing</span>
-                <span className="tl-channel-word">Smart Inbox</span>
-              </div>
+<svg width="0" height="0" aria-hidden="true" style={{"position":"absolute"} as CSSProperties}><defs><symbol id="arrow-up" viewBox="0 0 24 24"><path d="M6 18 18 6M6 6h12v12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></symbol><symbol id="arrow-down" viewBox="0 0 24 24"><path d="M12 4v16m-6-6 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></symbol></defs></svg>
+  <a className={styles["skip"]} href="#home">Đến nội dung chính</a>
+  <header className={styles["header"]}><div className={[styles["wrap"], styles["header-inner"]].join(' ')}>
+    <a className={styles["brand"]} href="#home" aria-label="Tendly — về đầu trang"><Image unoptimized src="/tendly-logo.png" alt="Tendly" width={960} height={377} loading="eager" /></a>
+    <nav id="main-nav" className={styles["nav"]} aria-label="Điều hướng chính"><a href="#features">Sản phẩm</a><a href="#how-it-works">Cách hoạt động</a><a href="#faq">Câu hỏi thường gặp</a></nav>
+    <div className={styles["nav-actions"]}><Link className={styles["button"]} href="/dang-nhap">Bắt đầu cùng Tendly <svg className={styles["arrow"]} aria-hidden="true"><use href="#arrow-up"/></svg></Link><button className={styles["menu-button"]} type="button" aria-label="Mở menu" aria-controls="main-nav" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button></div>
+  </div></header>
+  <main id="home">
+    <section className={[styles["hero"], styles["wrap"]].join(' ')} aria-labelledby="hero-title">
+      <div className={styles["hero-light"]} aria-hidden="true"><i></i><i></i></div>
+      <h1 id="hero-title" lang="en">Your AI teammate<br />for every <em>customer.</em></h1>
+      <p>Từ <strong>tìm nguồn hàng</strong> đến <strong>chăm khách</strong>.<br className={styles["desktop-break"]} /> Một đồng đội hiểu shop, suốt ngày bán hàng.</p>
+      <div className={styles["hero-actions"]}><a className={[styles["button"], styles["coral"]].join(' ')} href="#workspace">Khám phá workspace <svg className={styles["arrow"]} aria-hidden="true"><use href="#arrow-down"/></svg></a><a className={styles["text-link"]} href="#features">Khám phá cách hoạt động <svg className={styles["arrow"]} aria-hidden="true"><use href="#arrow-down"/></svg></a></div>
+      <div className={styles["workspace-frame"]} id="workspace-frame"><div className={styles["workspace"]} id="workspace" aria-label="Không gian làm việc Tendly">
+        <aside className={styles["sidebar"]} aria-label="Không gian shop"><div className={styles["shop"]}><span className={styles["shop-avatar"]}>M</span><div><strong>Thời trang Mộc</strong><small>Không gian làm việc</small></div></div><div className={styles["side-list"]} aria-hidden="true"><span>Tổng quan</span><span className={styles["active"]}>Trợ lý của shop</span><span>Sản phẩm & FAQ</span><span>Cấu hình AI</span></div><div className={styles["side-bottom"]}><i aria-hidden="true"></i>Shop luôn quyết định</div></aside>
+        <div className={styles["workspace-main"]}>
+          <div className={styles["workspace-bar"]}><strong>Trợ lý của shop</strong><div className={styles["demo-tools"]}><button id="autoplay-toggle" type="button" aria-pressed="true">Tạm dừng trình diễn</button></div></div>
+          <div className={styles["workspace-tabs"]} role="tablist" aria-label="Chọn công việc"><button id="tab-0" type="button" role="tab" aria-selected="true" aria-controls="demo-panel" tabIndex={0} data-scene="0">Chăm sóc khách hàng</button><button id="tab-1" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" tabIndex={-1} data-scene="1">Livestream</button><button id="tab-2" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" tabIndex={-1} data-scene="2">Marketing</button><button id="tab-3" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" tabIndex={-1} data-scene="3">Tư vấn bán hàng</button><button id="tab-4" type="button" role="tab" aria-selected="false" aria-controls="demo-panel" tabIndex={-1} data-scene="4">Smart Sourcing</button></div>
+          <div className={styles["workspace-content"]} id="demo-panel" role="tabpanel" aria-labelledby="tab-0" tabIndex={0}>
+            <div className={styles["conversations"]}><p className={styles["conversation-label"]}>Tình huống của shop</p>
+              <button type="button" className={styles["conversation"]} aria-pressed="true" data-question="0"><span className={styles["avatar"]}>LA</span><div><strong>Lan Anh</strong><p>Áo polo này có size L không ạ?</p></div><time>10:24</time></button>
+              <button type="button" className={styles["conversation"]} aria-pressed="false" data-question="1"><span className={styles["avatar"]}>MH</span><div><strong>Minh Hoàng</strong><p>Chất vải có bị xù lông không?</p></div><time>10:19</time></button>
+              <button type="button" className={styles["conversation"]} aria-pressed="false" data-question="2"><span className={styles["avatar"]}>TN</span><div><strong>Thảo Nguyên</strong><p>Mình muốn đổi màu sang navy.</p></div><time>10:14</time></button>
             </div>
-
-            {/* MOCKUP LIVE DASHBOARD BÊN CẠNH */}
-            <div className="tl-live-preview-card">
-              <div className="tl-preview-header">
-                <span className="tl-live-badge"><span className="tl-dot-pulse"></span> LIVE STREAMING SESSIONS</span>
-                <span className="tl-preview-time">Phiên tối nay: 2.400.000đ</span>
-              </div>
-              <div className="tl-preview-body">
-                <div className="tl-preview-metric-row">
-                  <div>
-                    <small>Tổng đơn chốt qua chat</small>
-                    <strong>48 đơn</strong>
-                  </div>
-                  <div>
-                    <small>Khách cần hỗ trợ gấp</small>
-                    <strong className="tl-text-coral">2 ca</strong>
-                  </div>
-                </div>
-                <div className="tl-stream-summary-box">
-                  <div className="tl-box-tag">Tóm tắt AI phiên stream cuối giờ</div>
-                  <p>• Áo polo cotton xám size L là sản phẩm bán chạy nhất (18 chiếc).</p>
-                  <p>• Còn 3 bình luận hỏi ship hỏa tốc chưa được chốt đơn.</p>
-                </div>
-              </div>
-              <div className="tl-preview-footer">
-                <span>Trợ lý AI đang hoạt động 24/7 cho shop của bạn</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* BENTO GRID FEATURES: Chia khối hiện đại */}
-        <section className="tl-section tl-wrap" id="features" aria-labelledby="features-title">
-          <div className="tl-section-heading">
-            <div>
-              <h2 id="features-title">
-                Mọi công việc của shop <br />
-                được thu gọn trong 1 hệ sinh thái.
-              </h2>
-            </div>
-            <p>Không cần mở hàng chục tab hay thuê nhiều nhân sự vận hành. AI tự động hóa từ khâu chuẩn bị đến khi tổng kết doanh thu.</p>
-          </div>
-
-          <div className="tl-bento-grid">
-            {/* Ô Bento 1: Trợ lý Livestream */}
-            <div className="tl-bento-card tl-bento-span-2">
-              <div className="tl-bento-tag">TÍNH NĂNG ĐẶC BIỆT</div>
-              <h3>Trợ lý Livestream & Tổng hợp đơn khúc cuối</h3>
-              <p>Phiên live kết thúc là lúc AI bắt đầu làm việc: tự động quét toàn bộ bình luận, lọc ra các từ khóa chốt đơn, tổng hợp số lượng từng mặt hàng và lập báo cáo doanh thu chi tiết chỉ trong 1 phút.</p>
-              <div className="tl-bento-mini-mockup">
-                <span>⚡ Tự động gom đơn từ cmt</span>
-                <span>📊 Thống kê sản phẩm hot nhất</span>
-                <span>🎯 Báo cáo nhanh doanh thu livestream</span>
-              </div>
-            </div>
-
-            {/* Ô Bento 2: AI Marketing */}
-            <div className="tl-bento-card">
-              <div className="tl-bento-tag">MARKETING ĐA KÊNH</div>
-              <h3>Tự tạo bài viết Facebook, TikTok</h3>
-              <p>Chọn sản phẩm từ kho, chọn phong cách, AI sẽ viết sẵn nội dung kèm hashtag chuẩn chỉnh để bạn đăng ngay.</p>
-            </div>
-
-            {/* Ô Bento 3: Knowledge Base & FAQ */}
-            <div className="tl-bento-card">
-              <div className="tl-bento-tag">DỮ LIỆU THÔNG MINH</div>
-              <h3>Tổng hợp thông tin & FAQ</h3>
-              <p>Upload danh mục, giá, tồn kho. AI nắm rõ như lòng bàn tay để tư vấn khách chuẩn xác không lệch nhịp.</p>
-            </div>
-
-            {/* Ô Bento 4: Smart Inbox */}
-            <div className="tl-bento-card tl-bento-span-2">
-              <div className="tl-bento-tag">HỘP THƯ ĐA KÊNH</div>
-              <h3>Phân tích cảm xúc khách hàng & Ưu tiên xử lý</h3>
-              <p>Nhận diện ngay khách đang phàn nàn, lo lắng để đẩy lên hàng đầu. Kèm theo gợi ý trả lời thông minh giúp nhân viên bấm gửi trong 1 giây.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* HOW IT WORKS */}
-        <section className="tl-section tl-how" id="how" aria-labelledby="how-title">
-          <div className="tl-wrap">
-            <div className="tl-section-heading">
-              <div>
-                <h2 id="how-title">
-                  Vận hành đơn giản <br />
-                  Chỉ với 3 bước cơ bản.
-                </h2>
-              </div>
-              <p>Quy trình tối ưu hóa giúp chủ shop e-commerce bắt đầu ứng dụng AI ngay lập tức mà không cần rành công nghệ.</p>
-            </div>
-            <div className="tl-steps">
-              <article className="tl-step">
-                <span className="tl-step-number">01</span>
-                <h3>Kết nối kênh bán & Livestream</h3>
-                <p>Liên kết Fanpage, TikTok Shop và các nguồn dữ liệu sản phẩm, giá bán, chính sách đổi trả vào hệ thống.</p>
-              </article>
-              <article className="tl-step">
-                <span className="tl-step-number">02</span>
-                <h3>AI học dữ liệu & Trợ giúp</h3>
-                <p>Hệ thống tự động đồng bộ tồn kho, chuẩn bị sẵn các mẫu câu trả lời và kịch bản marketing theo ý muốn.</p>
-              </article>
-              <article className="tl-step">
-                <span className="tl-step-number">03</span>
-                <h3>Thảnh thơi chốt đơn & Nhận báo cáo</h3>
-                <p>Tập trung livestream và phát triển sản phẩm, mọi khâu chăm sóc khách, viết bài và tổng kết stream đã có AI lo.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        {/* FAQ SECTION */}
-        <section className="tl-wrap tl-faq" aria-labelledby="faq-title">
-          <div>
-            <h2 id="faq-title">Câu hỏi thường gặp</h2>
-            <p className="tl-faq-lead">Mọi thắc mắc về cách AI hỗ trợ cho shop e-commerce và livestream.</p>
-          </div>
-          <div>
-            <details>
-              <summary>Trợ lý Livestream hoạt động như thế nào?</summary>
-              <p>Trợ lý AI sẽ kết nối vào phiên live, tự động đọc các bình luận chứa cú pháp chốt đơn, phân loại sản phẩm khách chọn và xuất ra bảng tổng kết số lượng đơn hàng ngay sau khi tắt máy.</p>
-            </details>
-            <details>
-              <summary>AI soạn bài đăng mạng xã hội có chuẩn không?</summary>
-              <p>AI sử dụng đúng dữ liệu sản phẩm thực tế của shop (giá, size, màu, chất liệu) kết hợp với các xu hướng ngôn ngữ mạng xã hội để tạo ra các bài viết tự nhiên, thu hút tương tác cao trên Facebook và TikTok.</p>
-            </details>
-            <details>
-              <summary>Shop nhỏ mới bắt đầu có dễ sử dụng không?</summary>
-              <p>Cực kỳ dễ dàng! Bạn chỉ mất chưa đầy 5 phút để nhập thông tin sản phẩm và kết nối các kênh là hệ thống có thể bắt đầu hỗ trợ vận hành ngay lập tức.</p>
-            </details>
-          </div>
-        </section>
-
-        {/* CTA CLOSING */}
-        <section className="tl-closing" id="start">
-          <div className="tl-wrap tl-closing-inner">
-            <div>
-              <h2>
-                Tối ưu hóa vận hành shop. <br />
-                Bán hàng thảnh thơi cùng <em className="tl-serif">Tendly.</em>
-              </h2>
-              <p>Bắt đầu tự động hóa khâu marketing và tổng hợp đơn livestream ngay hôm nay.</p>
-            </div>
-            <div className="tl-closing-action">
-              <Link className="tl-button" href="/dang-nhap">
-                Trải nghiệm miễn phí <span className="tl-arrow" aria-hidden="true">↗</span>
-              </Link>
-              <p>Livestream Assistant · AI Marketing · Smart Inbox</p>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer>
-        <div className="tl-wrap tl-footer-inner">
-          <div className="tl-footer-brand">
-            <Link className="tl-brand" href="/">
-              <img src="/tendly-logo.png" width="950" height="371" alt="Tendly" />
-            </Link>
-            <p>Chăm khách chu đáo.<br />Bán hàng thảnh thơi.</p>
-          </div>
-          <div className="tl-footer-links">
-            <a href="#features">Tính năng</a>
-            <a href="#how">Cách hoạt động</a>
-            <Link href="/pricing">Bảng giá</Link>
-          </div>
-          <small>© 2026 Tendly</small>
+            <div className={styles["message-area"]}><div className={styles["message-top"]}><strong id="demo-name">Lan Anh</strong><small id="demo-context">Câu hỏi từ khách</small></div><div className={styles["message"]}><span className={styles["avatar"]} id="demo-avatar">LA</span><p className={styles["bubble"]} id="demo-question">Áo polo này có size L không ạ? Mình cao 1m72, nặng 68kg thì mặc size nào vừa?</p></div><div className={styles["draft"]} id="demo-draft" data-state="ready"><div className={styles["draft-header"]}><strong id="demo-result">Gợi ý trả lời từ Tendly</strong><span className={styles["pending"]} id="demo-status">Chờ shop duyệt</span></div><p id="demo-answer">Dạ mẫu polo có size L ạ. Theo hướng dẫn của shop, với chiều cao 1m72 và cân nặng 68kg, bạn có thể tham khảo size L. Shop sẽ kiểm tra màu bạn chọn trước khi xác nhận nhé.</p><label className={styles["edit-label"]} htmlFor="draft-editor" hidden>Sửa bản nháp</label><textarea id="draft-editor" rows={4} maxLength={1800} hidden></textarea><p className={styles["edit-error"]} id="edit-error" role="alert" hidden>Nội dung không được để trống.</p><div className={styles["draft-footer"]}><span id="demo-source">Nguồn: Sản phẩm & FAQ của shop</span><span id="review-note">Shop xem lại trước</span></div><div className={styles["draft-actions"]}><button id="edit-draft" type="button">Sửa nhanh</button><button id="cancel-edit" type="button" hidden>Hủy</button><button id="approve-draft" className={styles["approve"]} type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg><span>Duyệt & chuẩn bị gửi</span></button></div></div></div>
+          </div><div className={styles["workspace-footer"]}><span><i className={styles["status-dot"]} aria-hidden="true"></i>Gợi ý dựa trên thông tin shop</span><span>Bạn kiểm soát mọi phản hồi</span></div>
         </div>
-      </footer>
-      <LandingMotion />
+      </div>
+<div className={styles["floating-visuals"]} aria-label="Sản phẩm và hoạt động của shop"><figure className={[styles["floating-card"], styles["float-shop"], styles["parallax-layer"]].join(' ')}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/shop-rack.webp" alt="Kệ áo polo navy trong shop" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption>Đã đồng bộ <strong>48 mẫu</strong> từ Shopee</figcaption></figure><figure className={[styles["floating-card"], styles["float-host"], styles["parallax-layer"]].join(' ')}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/live-host.webp" alt="Host giới thiệu áo polo navy" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption><strong>3 khách</strong> đang hỏi size L</figcaption></figure><div className={[styles["floating-card"], styles["float-size"], styles["parallax-layer"]].join(' ')}><span>Gợi ý size cho khách</span><div className={styles["mini-size-result"]}><span>1m72<br /><b>68kg</b></span><span className={styles["size-direction"]} aria-hidden="true">→</span><strong>L</strong></div></div></div>
+      </div><p id="demo-announcement" className={styles["sr-only"]} role="status" aria-live="polite"></p>
+      <div className={styles["caption"]}><span>Hiểu thông tin shop. Giữ đúng giọng thương hiệu.</span><a href="#features">Cuộn để khám phá <svg className={styles["arrow"]} aria-hidden="true"><use href="#arrow-down"/></svg></a></div>
+    </section>
+
+    <section className={styles["metric-band"]} aria-label="Cùng Tendly vận hành shop"><div className={[styles["wrap"], styles["metric-heading"]].join(' ')}><span>Ít việc lặp lại. Nhiều thời gian cho khách hàng.</span></div><div className={"marquee-window"}><div className={styles["marquee-track"]}><p>Khám phá nguồn hàng phù hợp <span>•</span> Tra cứu sản phẩm & FAQ nhanh hơn <span>•</span> Shop giữ quyền quyết định <span>•</span> Hỗ trợ nhiều công việc <span>•</span></p><p aria-hidden="true">Khám phá nguồn hàng phù hợp <span>•</span> Tra cứu sản phẩm & FAQ nhanh hơn <span>•</span> Shop giữ quyền quyết định <span>•</span> Hỗ trợ nhiều công việc <span>•</span></p></div></div></section>
+    <section className={[styles["feature-section"], styles["wrap"]].join(' ')} id="features" aria-labelledby="features-title">
+      <div className={styles["section-heading"]}><h2 id="features-title">Nhiều việc trong ngày.<br /><span>Một đồng đội xuyên suốt.</span></h2><p>Một ngày bán hàng, bốn việc có Tendly đồng hành.</p></div>
+      <div className={styles["story"]}>
+        <div className={styles["story-chapters"]}>
+          <article className={styles["story-chapter"]} id="care" data-chapter="0"><h3>Mỗi câu hỏi đều xứng đáng được quan tâm.</h3><span className={styles["chapter-label"]}>Chăm sóc khách hàng</span><p>Khớp câu hỏi với <strong>sản phẩm và FAQ.</strong> Soạn câu trả lời, chờ shop duyệt.</p><div className={styles["chapter-details"]}><span>Giữ ngữ cảnh hội thoại</span><span>Gợi ý từ FAQ</span></div><div className={styles["mobile-canvas"]}><div className={[styles["visual-canvas"], styles["canvas-care"]].join(' ')} aria-label="Tư vấn size áo polo từ số đo khách">
+  <div className={[styles["care-photo"], styles["layer"]].join(' ')} style={{"--enter-x":"-35px","--layer-order":"0"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Áo polo navy, form regular" width="640" height="640" loading="lazy" decoding="async" /></div><div className={styles["product-caption"]}><strong>Polo Essential</strong><span>Cotton · Regular fit</span></div></div>
+  <div className={[styles["care-chart"], styles["layer"]].join(' ')} style={{"--enter-x":"35px","--layer-order":"1"} as CSSProperties}><div className={styles["size-chart"]}><table><caption>Hướng dẫn chọn size</caption><thead><tr><th scope="col">Size</th><th scope="col">Chiều cao</th><th scope="col">Cân nặng</th></tr></thead><tbody><tr><th scope="row">M</th><td>1m60–1m68</td><td>55–64kg</td></tr><tr className={styles["size-selected"]}><th scope="row">L</th><td>1m68–1m75</td><td>65–70kg</td></tr><tr><th scope="row">XL</th><td>1m75–1m82</td><td>71–80kg</td></tr></tbody></table><div className={styles["size-result"]}><span>1m72 · 68kg</span><strong>Size L</strong></div></div></div>
+  <div className={styles["visual-connector"]} aria-hidden="true"></div>
+  <div className={[styles["canvas-chat"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"2"} as CSSProperties}><span className={styles["chat-from"]}>Tendly → Lan Anh</span><p>Với số đo của bạn, <strong>size L</strong> sẽ vừa thoải mái ạ.</p><span className={styles["canvas-status"]}>Chờ shop duyệt</span></div>
+</div></div></article>
+          <article className={styles["story-chapter"]} id="live" data-chapter="1"><h3>Bạn giữ nhịp live.<br />Tendly theo nhịp khách.</h3><span className={styles["chapter-label"]}>Livestream assistant</span><p>Gom câu hỏi, nhận diện <strong>ý định mua.</strong> Shop xem đơn nháp rồi xác nhận.</p><div className={styles["chapter-details"]}><span>Gom câu hỏi cùng chủ đề</span><span>Đơn nháp chờ xác nhận</span></div><div className={styles["mobile-canvas"]}><div className={[styles["visual-canvas"], styles["canvas-live"]].join(' ')} aria-label="Bình luận livestream được gom thành đơn nháp">
+  <div className={[styles["live-photo"], styles["layer"]].join(' ')} style={{"--layer-order":"0"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/live-host.webp" alt="Chủ shop giới thiệu áo polo navy trong buổi livestream" width="640" height="640" loading="lazy" decoding="async" /></div><span className={styles["live-label"]}>Đang live · Thời trang Mộc</span></div>
+  <div className={styles["live-comments"]}><p className={styles["live-comment"]} style={{"--comment-delay":".1s"} as CSSProperties}><strong>Lan Anh</strong> Còn size L không shop?</p><p className={styles["live-comment"]} style={{"--comment-delay":".25s"} as CSSProperties}><strong>Minh Hoàng</strong> Mình lấy navy L nhé!</p><p className={styles["live-comment"]} style={{"--comment-delay":".4s"} as CSSProperties}><strong>Thảo Nguyên</strong> Cho em một áo L ạ.</p></div>
+  <div className={[styles["draft-order"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"5","--enter-x":"35px"} as CSSProperties}><div className={styles["order-heading"]}><strong>Đơn nháp #TD024</strong><span className={[styles["canvas-status"], "order-status"].join(' ')}>Chờ xác nhận</span></div><div className={styles["order-product"]}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Áo polo navy trong đơn hàng" width="640" height="640" loading="lazy" decoding="async" /></div><div><strong>Polo Essential</strong><p>Navy · Size L · SL 1</p><b>289.000đ</b></div></div><button className={styles["confirm-order"]} type="button">Xác nhận đơn</button></div>
+</div></div></article>
+          <article className={styles["story-chapter"]} id="marketing" data-chapter="2"><h3>Từ sản phẩm quen thuộc đến một góc kể mới.</h3><span className={styles["chapter-label"]}>Marketing assistant</span><p>Từ chất vải, cách mặc đến bài đăng mang <strong>giọng riêng của shop.</strong></p><div className={styles["chapter-details"]}><span>Soạn nội dung sản phẩm</span><span>Điều chỉnh giọng viết</span></div><div className={styles["mobile-canvas"]}><div className={[styles["visual-canvas"], styles["canvas-marketing"]].join(' ')} aria-label="Ba góc hình sản phẩm kết hợp thành bài đăng">
+  <div className={styles["moodboard"]}><figure className={[styles["mood-tile"], styles["layer"]].join(' ')} style={{"--layer-order":"0","--enter-x":"-30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/cotton-detail.webp" alt="Cận chất cotton dệt pique của áo polo" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption>Chất vải</figcaption></figure><figure className={[styles["mood-tile"], styles["layer"]].join(' ')} style={{"--layer-order":"1","--enter-y":"-25px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/office-style.webp" alt="Phối polo navy và quần kaki đi làm" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption>Đi làm</figcaption></figure><figure className={[styles["mood-tile"], styles["layer"]].join(' ')} style={{"--layer-order":"2","--enter-x":"30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/shop-rack.webp" alt="Bộ sưu tập áo polo navy và be trong shop" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption>Phối đồ</figcaption></figure></div>
+  <div className={[styles["social-post"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"3"} as CSSProperties}><div className={styles["social-heading"]}><span className={styles["shop-avatar"]}>M</span><div><strong>Thời trang Mộc</strong><span>Bài viết mới · Facebook</span></div><span className={styles["social-more"]} aria-hidden="true">···</span></div><div className={[styles["image-unveil"], styles["social-photo"]].join(' ')}><Image unoptimized src="/landing/story/office-style.webp" alt="Ảnh phối áo polo navy trong bài đăng Facebook" width="640" height="640" loading="lazy" decoding="async" /></div><p>Đi làm gọn gàng, cuối ngày vẫn thoải mái.<br /><strong>Polo cotton co giãn, cho nhịp sống của bạn.</strong></p><div className={styles["social-footer"]}><span>#PoloEssential</span><span className={styles["canvas-status"]}>Bản nháp chờ duyệt</span></div></div>
+</div></div></article>
+          <article className={styles["story-chapter"]} id="sales" data-chapter="3"><h3>Hiểu điều khách cần.<br />Tư vấn điều phù hợp.</h3><span className={styles["chapter-label"]}>Sales assistant</span><p>So sánh <strong>màu, size và tồn kho.</strong> Gợi ý đúng nhu cầu, shop giữ quyết định.</p><div className={styles["chapter-details"]}><span>Tham khảo sản phẩm</span><span>Shop xác nhận tồn kho</span></div><div className={styles["mobile-canvas"]}><div className={[styles["visual-canvas"], styles["canvas-sales"]].join(' ')} aria-label="So sánh polo navy và be theo nhu cầu của khách">
+  <div className={[styles["customer-need"], styles["layer"]].join(' ')} style={{"--layer-order":"0"} as CSSProperties}><span>Khách đang tìm</span><strong>Đi làm · Dễ phối · Thoải mái</strong></div>
+  <div className={styles["compare-products"]}><article className={[styles["compare-card"], styles["layer"]].join(' ')} style={{"--layer-order":"1","--enter-x":"-30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Áo polo màu navy" width="640" height="640" loading="lazy" decoding="async" /></div><div><span className={styles["color-name"]}><i className={"navy-swatch"} aria-hidden="true"></i>Navy</span><strong>Polo Essential</strong><p>289.000đ</p><span className={styles["stock-label"]}>Còn 4 áo</span></div></article><article className={[styles["compare-card"], styles["layer"]].join(' ')} style={{"--layer-order":"2","--enter-x":"30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/beige-polo.webp" alt="Áo polo màu be" width="640" height="640" loading="lazy" decoding="async" /></div><div><span className={styles["color-name"]}><i className={styles["beige-swatch"]} aria-hidden="true"></i>Be</span><strong>Polo Essential</strong><p>289.000đ</p><span className={[styles["stock-label"], styles["stock-pending"]].join(' ')}>Chờ shop kiểm tra kho</span></div></article></div>
+  <div className={[styles["recommendation"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"3"} as CSSProperties}><span className={styles["canvas-status"]}>Gợi ý phù hợp</span><p><strong>Polo navy, size L.</strong> Dễ phối cùng quần kaki cho ngày đi làm.</p></div>
+</div></div></article>
+        </div>
+        <div className={styles["story-stage"]} id="story-stage" data-changing="false">
+          <div className={styles["story-stage-top"]}><span id="story-label">Chăm sóc khách hàng</span><nav className={styles["story-progress"]} aria-label="Các bước khám phá"><a href="#care" aria-label="Chăm sóc khách hàng" aria-current="step">01</a><a href="#live" aria-label="Livestream">02</a><a href="#marketing" aria-label="Marketing">03</a><a href="#sales" aria-label="Tư vấn bán hàng">04</a></nav></div>
+<div className={styles["visual-stage"]} aria-label="Câu chuyện một ngày bán hàng"><div className={[styles["visual-canvas"], styles["canvas-care"]].join(' ')} data-canvas="0" aria-label="Tư vấn size áo polo từ số đo khách">
+  <div className={[styles["care-photo"], styles["layer"]].join(' ')} style={{"--enter-x":"-35px","--layer-order":"0"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Áo polo navy, form regular" width="640" height="640" loading="lazy" decoding="async" /></div><div className={styles["product-caption"]}><strong>Polo Essential</strong><span>Cotton · Regular fit</span></div></div>
+  <div className={[styles["care-chart"], styles["layer"]].join(' ')} style={{"--enter-x":"35px","--layer-order":"1"} as CSSProperties}><div className={styles["size-chart"]}><table><caption>Hướng dẫn chọn size</caption><thead><tr><th scope="col">Size</th><th scope="col">Chiều cao</th><th scope="col">Cân nặng</th></tr></thead><tbody><tr><th scope="row">M</th><td>1m60–1m68</td><td>55–64kg</td></tr><tr className={styles["size-selected"]}><th scope="row">L</th><td>1m68–1m75</td><td>65–70kg</td></tr><tr><th scope="row">XL</th><td>1m75–1m82</td><td>71–80kg</td></tr></tbody></table><div className={styles["size-result"]}><span>1m72 · 68kg</span><strong>Size L</strong></div></div></div>
+  <div className={styles["visual-connector"]} aria-hidden="true"></div>
+  <div className={[styles["canvas-chat"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"2"} as CSSProperties}><span className={styles["chat-from"]}>Tendly → Lan Anh</span><p>Với số đo của bạn, <strong>size L</strong> sẽ vừa thoải mái ạ.</p><span className={styles["canvas-status"]}>Chờ shop duyệt</span></div>
+</div><div hidden className={[styles["visual-canvas"], styles["canvas-live"]].join(' ')} data-canvas="1" aria-label="Bình luận livestream được gom thành đơn nháp">
+  <div className={[styles["live-photo"], styles["layer"]].join(' ')} style={{"--layer-order":"0"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/live-host.webp" alt="Chủ shop giới thiệu áo polo navy trong buổi livestream" width="640" height="640" loading="lazy" decoding="async" /></div><span className={styles["live-label"]}>Đang live · Thời trang Mộc</span></div>
+  <div className={styles["live-comments"]}><p className={styles["live-comment"]} style={{"--comment-delay":".1s"} as CSSProperties}><strong>Lan Anh</strong> Còn size L không shop?</p><p className={styles["live-comment"]} style={{"--comment-delay":".25s"} as CSSProperties}><strong>Minh Hoàng</strong> Mình lấy navy L nhé!</p><p className={styles["live-comment"]} style={{"--comment-delay":".4s"} as CSSProperties}><strong>Thảo Nguyên</strong> Cho em một áo L ạ.</p></div>
+  <div className={[styles["draft-order"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"5","--enter-x":"35px"} as CSSProperties}><div className={styles["order-heading"]}><strong>Đơn nháp #TD024</strong><span className={[styles["canvas-status"], "order-status"].join(' ')}>Chờ xác nhận</span></div><div className={styles["order-product"]}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Áo polo navy trong đơn hàng" width="640" height="640" loading="lazy" decoding="async" /></div><div><strong>Polo Essential</strong><p>Navy · Size L · SL 1</p><b>289.000đ</b></div></div><button className={styles["confirm-order"]} type="button">Xác nhận đơn</button></div>
+</div><div hidden className={[styles["visual-canvas"], styles["canvas-marketing"]].join(' ')} data-canvas="2" aria-label="Ba góc hình sản phẩm kết hợp thành bài đăng">
+  <div className={styles["moodboard"]}><figure className={[styles["mood-tile"], styles["layer"]].join(' ')} style={{"--layer-order":"0","--enter-x":"-30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/cotton-detail.webp" alt="Cận chất cotton dệt pique của áo polo" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption>Chất vải</figcaption></figure><figure className={[styles["mood-tile"], styles["layer"]].join(' ')} style={{"--layer-order":"1","--enter-y":"-25px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/office-style.webp" alt="Phối polo navy và quần kaki đi làm" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption>Đi làm</figcaption></figure><figure className={[styles["mood-tile"], styles["layer"]].join(' ')} style={{"--layer-order":"2","--enter-x":"30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/shop-rack.webp" alt="Bộ sưu tập áo polo navy và be trong shop" width="640" height="640" loading="lazy" decoding="async" /></div><figcaption>Phối đồ</figcaption></figure></div>
+  <div className={[styles["social-post"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"3"} as CSSProperties}><div className={styles["social-heading"]}><span className={styles["shop-avatar"]}>M</span><div><strong>Thời trang Mộc</strong><span>Bài viết mới · Facebook</span></div><span className={styles["social-more"]} aria-hidden="true">···</span></div><div className={[styles["image-unveil"], styles["social-photo"]].join(' ')}><Image unoptimized src="/landing/story/office-style.webp" alt="Ảnh phối áo polo navy trong bài đăng Facebook" width="640" height="640" loading="lazy" decoding="async" /></div><p>Đi làm gọn gàng, cuối ngày vẫn thoải mái.<br /><strong>Polo cotton co giãn, cho nhịp sống của bạn.</strong></p><div className={styles["social-footer"]}><span>#PoloEssential</span><span className={styles["canvas-status"]}>Bản nháp chờ duyệt</span></div></div>
+</div><div hidden className={[styles["visual-canvas"], styles["canvas-sales"]].join(' ')} data-canvas="3" aria-label="So sánh polo navy và be theo nhu cầu của khách">
+  <div className={[styles["customer-need"], styles["layer"]].join(' ')} style={{"--layer-order":"0"} as CSSProperties}><span>Khách đang tìm</span><strong>Đi làm · Dễ phối · Thoải mái</strong></div>
+  <div className={styles["compare-products"]}><article className={[styles["compare-card"], styles["layer"]].join(' ')} style={{"--layer-order":"1","--enter-x":"-30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Áo polo màu navy" width="640" height="640" loading="lazy" decoding="async" /></div><div><span className={styles["color-name"]}><i className={"navy-swatch"} aria-hidden="true"></i>Navy</span><strong>Polo Essential</strong><p>289.000đ</p><span className={styles["stock-label"]}>Còn 4 áo</span></div></article><article className={[styles["compare-card"], styles["layer"]].join(' ')} style={{"--layer-order":"2","--enter-x":"30px"} as CSSProperties}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/beige-polo.webp" alt="Áo polo màu be" width="640" height="640" loading="lazy" decoding="async" /></div><div><span className={styles["color-name"]}><i className={styles["beige-swatch"]} aria-hidden="true"></i>Be</span><strong>Polo Essential</strong><p>289.000đ</p><span className={[styles["stock-label"], styles["stock-pending"]].join(' ')}>Chờ shop kiểm tra kho</span></div></article></div>
+  <div className={[styles["recommendation"], "canvas-result", styles["layer"], styles["parallax-layer"]].join(' ')} style={{"--layer-order":"3"} as CSSProperties}><span className={styles["canvas-status"]}>Gợi ý phù hợp</span><p><strong>Polo navy, size L.</strong> Dễ phối cùng quần kaki cho ngày đi làm.</p></div>
+</div></div>
+          <p className={styles["story-stage-note"]}>Cuộn để theo dõi ngày bán hàng của shop.</p>
+        </div>
+      </div>
+    </section>
+
+    <section className={styles["how"]} id="how-it-works" aria-labelledby="how-title"><div className={styles["wrap"]}><div className={styles["section-heading"]}><h2 id="how-title">Bắt đầu từ những gì<br />shop đã có.</h2><p>Thêm thông tin. Chọn việc. Duyệt kết quả.</p></div><ol className={styles["steps"]}><li><div className={[styles["storyboard"], "storyboard-knowledge"].join(' ')}><div className={styles["knowledge-drop"]}><span>Kho tri thức của shop</span><div className={styles["drop-zone"]}><span>Sản phẩm + FAQ</span><b>Thả vào để bắt đầu</b></div></div><div className={[styles["knowledge-product"], styles["parallax-layer"]].join(' ')}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Ảnh sản phẩm được thêm vào kho tri thức" width="640" height="640" loading="lazy" decoding="async" /></div></div><div className={styles["knowledge-faq"]}><strong>FAQ của shop</strong><span>Chọn size</span><span>Đổi trả</span></div></div><h3>Cho Tendly hiểu shop</h3><p>Thêm sản phẩm và FAQ vào kho tri thức.</p></li><li><div className={[styles["storyboard"], styles["storyboard-routing"]].join(' ')}><div className={styles["route-inputs"]}><span>Tin nhắn mới</span><span>Bình luận live</span><span>Bài viết mới</span></div><div className={styles["route-hub"]}><Image unoptimized src="/tendly-logo.png" alt="Tendly" width={960} height={377} loading="lazy" /></div><div className={styles["route-outputs"]}><span>CSKH</span><span>Livestream</span><span>Marketing</span></div><svg className={styles["routing-lines"]} viewBox="0 0 360 200" preserveAspectRatio="none" aria-hidden="true"><path d="M110 45C150 45 145 100 180 100M110 100H180M110 155C150 155 145 100 180 100M180 100C220 100 210 45 250 45M180 100H250M180 100C220 100 210 155 250 155"/></svg></div><h3>Chọn việc cần hỗ trợ</h3><p>Hội thoại, livestream hay một bài đăng mới.</p></li><li><div className={[styles["storyboard"], styles["storyboard-approval"]].join(' ')}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/shop-approve.webp" alt="Bàn tay chủ shop chạm máy tính bảng để duyệt nội dung" width="640" height="640" loading="lazy" decoding="async" /></div><div className={[styles["approval-overlay"], styles["parallax-layer"]].join(' ')}><strong>Nội dung đã sẵn sàng</strong><span>Shop duyệt trước khi gửi</span><span className={styles["approval-pill"]}>Đã duyệt <i aria-hidden="true"></i></span></div></div><h3>Xem lại rồi quyết định</h3><p>Sửa nhanh rồi duyệt. Shop luôn cầm lái.</p></li></ol><div className={styles["ecosystem"]}><article><div className={styles["supplier-visual"]}><div className={[styles["image-unveil"], styles["supplier-texture"]].join(' ')}><Image unoptimized src="/landing/story/cotton-detail.webp" alt="Chất vải cotton navy của nguồn hàng" width="640" height="640" loading="lazy" decoding="async" /></div><div className={[styles["supplier-card"], styles["parallax-layer"]].join(' ')}><div className={styles["supplier-title"]}><span className={styles["shop-avatar"]}>N</span><div><strong>Nhà cung cấp An Nhiên</strong><span>May mặc · TP. Hồ Chí Minh</span></div></div><dl><div><dt>MOQ</dt><dd>50 áo</dd></div><div><dt>Chất vải</dt><dd>Cotton pique</dd></div></dl><div className={styles["fabric-swatches"]} aria-label="Màu navy và be"><i></i><i></i><span>2 màu · 4 size</span></div></div></div><h3>Tìm ý tưởng trước khi nhập hàng.</h3><p>So sánh chất liệu, MOQ và nhà cung cấp trước khi nhập hàng.</p><a className={styles["text-link"]} href="#workspace" id="open-sourcing">Thử Smart Sourcing <svg className={styles["arrow"]} aria-hidden="true"><use href="#arrow-up"/></svg></a></article><article><div className={styles["email-visual"]}><div className={styles["email-envelope"]} aria-hidden="true"></div><div className={[styles["email-card"], styles["parallax-layer"]].join(' ')}><div className={styles["email-sender"]}><strong>Thời trang Mộc</strong><span>Gửi đến Lan Anh</span></div><h4>Cảm ơn bạn đã chọn Mộc.</h4><div className={styles["email-product"]}><div className={styles["image-unveil"]}><Image unoptimized src="/landing/story/navy-polo.webp" alt="Sản phẩm polo navy trong email cảm ơn" width="640" height="640" loading="lazy" decoding="async" /></div><div><strong>Polo Essential</strong><span>Navy · Size L</span><p>Một chiếc áo mới,<br />một ngày thật thoải mái.</p></div></div><span className={styles["email-delivery"]} data-email-delivery>Gửi sau khi xác nhận đơn</span></div></div><h3>Giữ liên lạc sau đơn hàng.</h3><p>Gửi lời cảm ơn đúng sản phẩm, đúng lúc sau mua.</p></article></div><div className={styles["control-note"]}><strong>AI hỗ trợ. Shop cầm lái.</strong><p>Bạn chọn mức tự động hóa. Việc cần người thật vẫn về shop.</p></div></div></section>
+    <section className={[styles["faq-section"], styles["wrap"]].join(' ')} id="faq" aria-labelledby="faq-title"><div className={styles["faq-intro"]}><h2 id="faq-title">Bạn có thể<br />đang thắc mắc.</h2><p>Một vài điều cần biết<br />trước khi bắt đầu.</p><a href="#workspace" className={styles["text-link"]}>Xem lại workspace <svg className={styles["arrow"]} aria-hidden="true"><use href="#arrow-up"/></svg></a></div><div className={styles["faq"]}><details><summary>Tendly hỗ trợ những công việc nào?</summary><p>Tìm nguồn hàng, chăm khách, hỗ trợ livestream, soạn bài và gửi email sau mua — cùng dữ liệu sản phẩm của shop.</p></details><details><summary>Kênh nào có thể kết nối?</summary><p>Facebook Messenger, Zalo, TikTok và Shopee trong cùng không gian làm việc. Hội thoại và sản phẩm được kết nối xuyên suốt.</p></details><details><summary>AI có tự gửi câu trả lời không?</summary><p>Shop chủ động bật tự trả lời, chỉnh bản nháp và duyệt trước khi gửi. Ca cần xử lý riêng được chuyển cho nhân viên.</p></details><details><summary>Đơn trong livestream đã được chốt chưa?</summary><p>Tendly tạo đơn nháp. Shop xác nhận rồi theo dõi thanh toán, vận chuyển và chăm sóc sau mua.</p></details></div></section>
+    <section className={styles["closing"]} aria-labelledby="closing-title"><h2 id="closing-title">Thêm một đồng đội.<br /><span>Nhẹ một ngày bán hàng.</span></h2><p>Để bạn dành nhiều sự chú ý hơn cho khách hàng.</p><Link className={[styles["button"], styles["coral"]].join(' ')} href="/dang-nhap">Bắt đầu sử dụng Tendly <svg className={styles["arrow"]} aria-hidden="true"><use href="#arrow-up"/></svg></Link></section>
+  </main>
+  <footer className={[styles["footer"], styles["wrap"]].join(' ')}><a className={styles["footer-brand"]} href="#home">Tendly</a><span>Đồng đội AI cho shop online.</span><a href="#features">Sản phẩm</a><a href="#faq">Câu hỏi thường gặp</a><small>© 2026 Tendly</small></footer>
+      <LandingExperience />
     </div>
   );
 }

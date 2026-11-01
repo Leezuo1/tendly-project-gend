@@ -1,0 +1,5 @@
+{
+  "prompt": "Recreate this reference crop as a clean production product photograph: exactly one dark navy short-sleeve polo shirt with a folded collar, a short button placket and a tiny neutral stitched emblem, front-facing and centered. Match the crop's framing, shape, neutral lighting and soft pale warm-gray background. Keep the entire shirt visible with a small margin. Photographic fabric detail, no text, labels, prices, UI, borders, card corners, or extra objects. Nearly square opaque image, minimum 512 by 512 pixels. This is synthetic demonstration merchandise, not a real merchant's product.",
+  "tool": "image_gen.imagegen",
+  "purpose": "Synthetic sample product photo for landing demo"
+}
