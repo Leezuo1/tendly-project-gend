@@ -45,7 +45,6 @@ function save(data: MockOnboarding) {
 
 export function loginMock(username: string, password: string): boolean {
   if (username.trim() !== 'admin' || password !== 'admin123') return false;
-  save({ ...readMockOnboarding(), completed: false });
   sessionStorage.setItem(SESSION_KEY, 'admin');
   window.dispatchEvent(new Event(CHANGE_EVENT));
   return true;

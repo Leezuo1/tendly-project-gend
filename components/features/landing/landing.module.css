@@ -141,7 +141,11 @@
 .root .closing h2 span{color:#8b4939}
 .root .closing p{font-size:14px;line-height:1.9;color:#7b4a3b;margin:24px 0 27px}
 .root .footer{display:flex;align-items:center;gap:28px;min-height:112px;color:var(--muted);font-size:12px}
-.root .footer-brand{font-size:28px;font-weight:650;letter-spacing:-.04em;color:var(--coral)}
+.root .footer-brand{flex-shrink:0}
+.root .inline-logo{display:inline-block;width:auto;height:1.15em;min-height:16px;max-width:none;vertical-align:-.12em;object-fit:contain}
+.root .button .inline-logo{height:22px}
+.root .footer-brand .inline-logo{width:108px;height:auto;vertical-align:middle}
+.root .footer small{display:flex;align-items:center;gap:5px}
 .root .footer small{margin-left:auto;font-size:12px}
 .root .footer a{min-height:44px;display:flex;align-items:center}
 .root .footer a:hover{color:var(--coral)}

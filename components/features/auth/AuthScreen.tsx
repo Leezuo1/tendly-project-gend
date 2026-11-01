@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { loginMock } from '@/lib/services/mockOnboarding';
+import { loginMock, readMockOnboarding } from '@/lib/services/mockOnboarding';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import styles from './auth.module.css';
@@ -116,7 +116,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
       if (!response.ok) throw new Error(data.error || 'Không đăng nhập được.');
       if (data.role === 'user') loginMock(email, password);
       await refresh();
-      router.push(data.role === 'admin' ? '/quan-tri' : '/tao-shop');
+      router.push(data.role === 'admin' ? '/quan-tri' : readMockOnboarding().completed ? '/tong-quan' : '/tao-shop');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Không kết nối được máy chủ. Vui lòng thử lại.'); }
     finally { setBusy(false); }
   }

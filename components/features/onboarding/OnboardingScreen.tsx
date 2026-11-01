@@ -52,10 +52,11 @@ export function OnboardingScreen({ step }: { step: 'workspace' | 'connections' }
   useEffect(() => {
     if (!state.ready) return;
     if (!state.authenticated) router.replace('/dang-nhap');
+    else if (state.completed) router.replace('/tong-quan');
     else if (step === 'connections' && !state.workspace) router.replace('/tao-shop');
-  }, [state.ready, state.authenticated, !!state.workspace, step, router]);
+  }, [state.ready, state.authenticated, state.completed, state.workspace, step, router]);
 
-  if (!state.ready || !state.authenticated || (step === 'connections' && !state.workspace)) return <main className={styles.loading} role="status">Đang mở không gian của bạn…</main>;
+  if (!state.ready || !state.authenticated || state.completed || (step === 'connections' && !state.workspace)) return <main className={styles.loading} role="status">Đang mở không gian của bạn…</main>;
   return <div className={`${styles.root} ${step === 'connections' ? styles.connectionsRoot : ''}`}>{step === 'connections' && <div className={styles.mobileBackBar}><Link className={styles.back} href="/tao-shop">← Quay lại</Link></div>}<OnboardingHeader /><main className={`${styles.layout} ${step === 'workspace' ? styles.workspaceLayout : styles.connectionsLayout}`}><StepRail step={step} /><section className={styles.content} aria-labelledby="onboarding-title">{step === 'workspace' ? <WorkspaceForm initial={state.workspace} /> : <Connections workspace={state.workspace!} connections={state.connections} />}</section></main><footer className={styles.footer}><span>© {new Date().getFullYear()} Tendly</span><span>Đồng hành cùng shop Việt <span aria-hidden="true">✳</span></span></footer></div>;
 }
 

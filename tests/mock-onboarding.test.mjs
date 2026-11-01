@@ -30,7 +30,7 @@ test('mock login rejects wrong credentials, accepts admin, and never stores the 
   assert.ok(!JSON.stringify([...local, ...session]).includes('admin123'));
 });
 
-test('reload retains setup, and every successful login restarts setup while preserving shop details', () => {
+test('reload and repeated login retain completed setup and shop details', () => {
   const { api, local, load } = fixture();
   local.set('tendly.mockdb', '{"existing":"keep"}');
   api.loginMock('admin', 'admin123');
@@ -46,14 +46,14 @@ test('reload retains setup, and every successful login restarts setup while pres
   api.logoutMock();
   assert.equal(api.isMockLoggedIn(), false);
   api.loginMock('admin', 'admin123');
-  assert.equal(api.readMockOnboarding().completed, false);
+  assert.equal(api.readMockOnboarding().completed, true);
   assert.equal(api.readMockOnboarding().workspace.name, 'Tiệm Nhà Linh');
   assert.deepEqual(api.readMockOnboarding().connections, { messenger: 'Fanpage mẫu', shopee: 'Shop mẫu' });
   api.completeMockOnboarding();
   assert.equal(api.loginMock('admin', 'wrong'), false);
   assert.equal(api.readMockOnboarding().completed, true, 'failed login must not reset saved progress');
   api.loginMock('admin', 'admin123');
-  assert.equal(api.readMockOnboarding().completed, false, 'login restarts setup even without an explicit logout');
+  assert.equal(api.readMockOnboarding().completed, true, 'login must preserve completed setup even without an explicit logout');
   assert.equal(local.get('tendly.mockdb'), '{"existing":"keep"}');
 });
 
@@ -112,11 +112,11 @@ test('storage errors are reported, and subscriptions update on changes and unsub
   const unsubscribe = api.subscribeMockOnboarding(() => changes++);
   api.loginMock('admin', 'admin123');
   api.saveMockWorkspace(shop);
-  assert.equal(changes, 3);
+  assert.equal(changes, 2);
   assert.equal(api.mockOnboardingSnapshot(), api.mockOnboardingSnapshot());
   unsubscribe();
   api.connectMockPlatform('shopee', 'Shop mẫu');
-  assert.equal(changes, 3);
+  assert.equal(changes, 2);
   globalThis.localStorage.setItem = () => { throw new Error('Storage disabled'); };
   assert.throws(() => api.saveMockWorkspace(shop), /Storage disabled/);
 });
