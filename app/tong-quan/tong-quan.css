@@ -1,23 +1,11 @@
 /* ========== TENDLY DASHBOARD (TỔNG QUAN) STYLES ========== */
 .dashboard-root {
-  --canvas: #FAF9F8;
-  --coral: #F06A6A;
-  --coral-deep: #D8514F;
-  --ink: #2B211E;
-  --ink-soft: #6B5F5A;
-  --sand: #F1EAE3;
-  --line: #E7DED7;
-  --moss: #4B6358;
-  --moss-soft: #DCE6E1;
-  --paper: #FFFFFF;
-  --alert-bg: #FCE4E2;
-  --amber: #B8790A;
-  --amber-soft: #F5E7CC;
+  --alert-bg: var(--coral-soft);
   
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-tendly), Arial, sans-serif;
   background: var(--canvas);
   color: var(--ink);
-  line-height: 1.5;
+  line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
@@ -340,9 +328,8 @@
 .card {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: 26px 28px;
-  box-shadow: 0 4px 16px rgba(43, 33, 30, 0.03);
 }
 
 .card-head {
@@ -387,7 +374,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: 9px;
+  border-radius: var(--radius-action);
   padding: 9px 16px;
   font-size: 13.5px;
   font-weight: 700;

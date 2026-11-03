@@ -11,19 +11,14 @@ export function PricingCard({ plan }: PricingCardProps) {
     <div
       className={`pricing-card${plan.isPopular ? ' is-popular' : ''}`}
       style={{
-        background: plan.isPopular
-          ? 'linear-gradient(180deg, #FFFDFD 0%, #FFFFFF 100%)'
-          : 'var(--paper)',
+        background: 'var(--paper)',
         border: plan.isPopular ? '1px solid var(--coral)' : '1px solid var(--line)',
-        borderRadius: 20,
+        borderRadius: 'var(--radius-card)',
         padding: '32px 26px 28px',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: plan.isPopular
-          ? '0 12px 32px rgba(240,106,106,0.16)'
-          : '0 4px 16px rgba(43,33,30,0.03)',
       }}
     >
       {/* Top accent bar */}
@@ -89,7 +84,7 @@ export function PricingCard({ plan }: PricingCardProps) {
             color: plan.ctaVariant === 'primary' ? 'white' : 'var(--ink)',
             border: plan.ctaVariant === 'ghost-box' ? '1px solid var(--line)' : 'none',
             padding: '13px 20px',
-            borderRadius: 9,
+            borderRadius: 'var(--radius-action)',
             fontWeight: 700,
             fontSize: 14.5,
             cursor: 'pointer',
@@ -126,7 +121,7 @@ export function PricingCard({ plan }: PricingCardProps) {
                 width: 18,
                 height: 18,
                 borderRadius: 5,
-                background: '#FCE4E2',
+                background: 'var(--coral-soft)',
                 color: 'var(--coral-deep)',
                 display: 'flex',
                 alignItems: 'center',

@@ -30,11 +30,9 @@ export function PricingGrid() {
           width: 100%;
         }
         .pricing-card {
-          transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+          transition: border-color 0.2s ease;
         }
         .pricing-card:hover {
-          transform: translateY(-6px);
-          box-shadow: 0 18px 40px rgba(43, 33, 30, 0.1) !important;
           border-color: var(--coral) !important;
         }
         .pricing-card:hover .card-topbar {
@@ -43,7 +41,6 @@ export function PricingGrid() {
         .plan-cta-primary:hover {
           background: var(--coral-deep) !important;
           transform: translateY(-2px);
-          box-shadow: 0 10px 24px rgba(240, 106, 106, 0.35);
         }
         .plan-cta-ghost:hover {
           background: var(--line) !important;

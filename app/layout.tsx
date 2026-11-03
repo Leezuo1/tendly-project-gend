@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import localFont from 'next/font/local';
 import "./globals.css";
 import { AppSecurityProvider } from '@/components/shared/AppSecurityProvider';
+
+const rem = localFont({ src: '../public/landing/fonts/REM.ttf', weight: '100 900', display: 'swap', variable: '--font-tendly' });
 
 export const metadata: Metadata = {
   title: "Tendly — Nền tảng chăm sóc khách hàng AI cho shop online",
@@ -13,14 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Lora:ital,wght@0,500;0,600;1,500;1,600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="vi" className={rem.variable}>
       <body><AppSecurityProvider>{children}</AppSecurityProvider></body>
     </html>
   );

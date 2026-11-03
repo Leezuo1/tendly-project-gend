@@ -198,3 +198,8 @@ vite.config.ts.timestamp-*
 /.gemini/
 /.impeccable/
 /.playwright-mcp/
+
+# Taste skill (local design tooling) and its review screenshots
+/.claude/skills/design-taste-frontend/
+/.taste-skill/
+/skills-lock.json

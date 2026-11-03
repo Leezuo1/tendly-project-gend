@@ -33,6 +33,11 @@ if (!process.env.DATABASE_URL?.trim()) {
       stage = `applying ${file}`;
       await client.query(await readFile(new URL(file, directory), 'utf8'));
     }
+    stage = 'binding the existing Page to the demo account';
+    const pageId = process.env.PAGE_ID?.trim();
+    if (pageId && /^\d{1,64}$/.test(pageId)) {
+      await client.query("UPDATE app_users SET page_id=$1 WHERE id='demo' AND page_id IS NULL", [pageId]);
+    }
     stage = 'committing migration';
     await client.query('COMMIT');
     console.log(`Postgres tables are ready (${files.join(', ')}). Existing data was preserved.`);

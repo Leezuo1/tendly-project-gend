@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { loginMock, readMockOnboarding } from '@/lib/services/mockOnboarding';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import styles from './auth.module.css';
@@ -103,20 +102,23 @@ export function AuthScreen({ mode }: { mode: Mode }) {
     if (!register && !email) next.email = 'Vui lòng nhập tài khoản hoặc email.';
     if (!password) next.password = 'Vui lòng nhập mật khẩu.';
     else if (register && password.length < 8) next.password = 'Mật khẩu cần ít nhất 8 ký tự.';
+    else if (password.length > 1024) next.password = 'Mật khẩu tối đa 1024 ký tự.';
     if (register && String(values.get('confirmPassword') || '') !== password) next.confirmPassword = 'Mật khẩu nhập lại chưa khớp.';
     setErrors(next);
     setNotice('');
     const first = Object.keys(next)[0];
     if (first) { form.querySelector<HTMLInputElement>(`[name="${first}"]`)?.focus(); return; }
-    if (register) { setNotice('Đăng ký tài khoản hiện chưa khả dụng. Bạn có thể đăng nhập bằng tài khoản mẫu admin / admin123.'); return; }
     setBusy(true);
     try {
-      const response = await fetch('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: email, password }) });
+      const response = await fetch(register ? '/api/auth/register' : '/api/auth/session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(register ? { name: String(values.get('name') || '').trim(), email, password,
+          confirmPassword: String(values.get('confirmPassword') || '') } : { username: email, password }),
+      });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Không đăng nhập được.');
-      if (data.role === 'user') loginMock(email, password);
+      if (!response.ok) throw new Error(data.error || (register ? 'Không tạo được tài khoản.' : 'Không đăng nhập được.'));
       await refresh();
-      router.push(data.role === 'admin' ? '/quan-tri' : readMockOnboarding().completed ? '/tong-quan' : '/tao-shop');
+      router.replace(data.role === 'admin' ? '/quan-tri' : '/tong-quan');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Không kết nối được máy chủ. Vui lòng thử lại.'); }
     finally { setBusy(false); }
   }
@@ -145,7 +147,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           {register && <Field name="confirmPassword" label="Nhập lại mật khẩu" error={errors.confirmPassword}><div className={styles.passwordInput}><input {...inputProps('confirmPassword')} type={showConfirm ? 'text' : 'password'} placeholder="Nhập lại mật khẩu vừa tạo" autoComplete="new-password" required /><button type="button" aria-label={showConfirm ? 'Ẩn mật khẩu nhập lại' : 'Hiện mật khẩu nhập lại'} aria-pressed={showConfirm} onClick={() => setShowConfirm(!showConfirm)}><Eye visible={showConfirm} /></button></div></Field>}
           {!register && <div className={styles.formOptions}><button type="button" onClick={() => { setRecoveryNotice(''); recoveryDialog.current?.showModal(); }}>Quên mật khẩu?</button></div>}
           {notice && <p className={styles.notice} role="status">{notice}</p>}
-          <button type="submit" disabled={busy} className={styles.submit}>{busy ? 'Đang đăng nhập…' : register ? 'Tạo tài khoản' : 'Đăng nhập'}<Arrow /></button>
+          <button type="submit" disabled={busy} className={styles.submit}>{busy ? register ? 'Đang tạo tài khoản…' : 'Đang đăng nhập…' : register ? 'Tạo tài khoản' : 'Đăng nhập'}<Arrow /></button>
         </form>
         {!register && <button type="button" className={styles.demoButton} onClick={fillDemo}><Sparkle /> Dùng tài khoản demo <span aria-hidden="true">↗</span></button>}
         <span className={styles.srOnly} role="status">{demoFilled ? 'Đã điền tài khoản demo. Bấm Đăng nhập để tiếp tục.' : ''}</span>

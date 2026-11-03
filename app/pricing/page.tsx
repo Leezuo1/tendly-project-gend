@@ -30,9 +30,9 @@ export default function PricingPage() {
             <h1
               style={{
                 fontSize: 'clamp(30px, 3.2vw, 46px)',
-                fontWeight: 800,
-                letterSpacing: '-0.02em',
-                lineHeight: 1.2,
+                fontWeight: 650,
+                letterSpacing: '-0.01em',
+                lineHeight: 1.35,
               }}
             >
               Chọn gói phù hợp cho shop của bạn

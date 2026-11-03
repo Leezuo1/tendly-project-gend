@@ -19,13 +19,15 @@ Kiểm tra quyền: `node --test tests/app-security.test.mjs` dùng PostgreSQL g
 
 Kết nối một shop Shopee thật, cấu hình callback và đồng bộ sản phẩm: [hướng dẫn Shopee demo](docs/shopee-demo.md). Nút đồng bộ ở Cấu hình AI gọi API thật; lựa chọn Shopee trong onboarding vẫn là mô phỏng.
 
-### Flow onboarding mẫu
+### Đăng ký và đăng nhập
 
-Mở `/dang-nhap`, dùng tài khoản `admin` và mật khẩu `admin123` để đi qua `/tao-shop` → `/ket-noi` → `/tong-quan`. Có thể chọn tài khoản mẫu cho Messenger, Zalo, TikTok và Shopee, ngắt kết nối hoặc bỏ qua bước kết nối. Trang tổng quan giữ nguyên giao diện và luồng dữ liệu hiện có.
+Chạy `npm run db:migrate` trước khi chạy bản này. Migration `013-app-accounts.sql` tạo bảng `app_users` và tài khoản demo `admin / admin123`, vai trò user. Script migration gắn `PAGE_ID` hiện cấu hình trên server với riêng tài khoản demo nếu tài khoản chưa có Page; chạy lại không ghi đè Page đã gán hay dữ liệu hiện có. Demo đăng nhập vào thẳng `/tong-quan`, bỏ qua setup. Quyền sử dụng dữ liệu thật vẫn theo công tắc bảo vệ. Nếu đổi `PAGE_ID` sang Page khác, demo bị chặn truy cập cho đến khi việc chuyển Page được xử lý có chủ đích.
 
-Phiên đăng nhập mẫu lưu trong `sessionStorage`; thông tin shop và lựa chọn kết nối lưu riêng tại khóa `tendly.onboarding.mock.v1` trong `localStorage`. Mỗi lần đăng nhập thành công đều bắt đầu lại tại `/tao-shop`, sau đó qua `/ket-noi`, kể cả đã hoàn tất trước đó. Thông tin cũ được điền sẵn để có thể chỉnh sửa. Đây là flow giao diện mô phỏng, chưa có xác thực backend hay cấp quyền nền tảng thật. Đăng ký mới và đăng nhập Google/Facebook vẫn là giao diện xem trước.
+`/dang-ky` tạo tài khoản bằng tên, email và mật khẩu (8–1024 ký tự), băm scrypt có salt riêng trong PostgreSQL và đăng nhập ngay. Email được trim/chuyển chữ thường và không được trùng. `/dang-nhap` dùng lại tài khoản đã lưu; cookie HttpOnly có thời hạn 8 giờ, đăng xuất thu hồi phiên trên server. Phiên demo cũ trước migration cần đăng nhập lại.
 
-Chạy `node --test tests/mock-onboarding.test.mjs` để kiểm tra tài khoản mẫu, lưu/khôi phục tiến độ, kết nối/ngắt kết nối và bỏ qua thiết lập.
+Tài khoản mới có màn hình xác nhận đăng nhập, hiển thị tên/email và nút đăng xuất; chưa có Page và chưa được truy cập API nghiệp vụ, kể cả khi mở khóa demo. `/tao-shop` và `/ket-noi` cũng hiển thị trạng thái chờ này. Setup thật, xác minh email, quên mật khẩu và đăng nhập Google/Facebook chưa triển khai. Trạng thái onboarding/cài đặt mẫu trong `localStorage` chỉ còn là dữ liệu demo, không cấp quyền cho tài khoản thật.
+
+Kiểm tra: `node --test tests/app-security.test.mjs` (đăng ký, đăng nhập, email trùng, validation, phiên, rate limit và cách ly dữ liệu demo). Thuật toán băm tài khoản mới dùng scrypt N=131072, r=8, p=1 theo [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html); hash quản trị định dạng cũ vẫn được hỗ trợ.
 
 ### Smart Sourcing demo & thông tin setup
 
