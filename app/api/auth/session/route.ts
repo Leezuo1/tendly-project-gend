@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     if (typeof body?.username !== 'string' || typeof body?.password !== 'string') {
       throw new AppSecurityError('Vui lòng nhập tài khoản và mật khẩu.', 400, 'INVALID_LOGIN');
     }
-    const { token, role } = await loginApp(request, body.username.trim(), body.password);
-    return Response.json({ authenticated: true, role }, { headers: { ...headers, 'Set-Cookie': sessionCookie(request, token) } });
+    const { token, role, needsSetup } = await loginApp(request, body.username, body.password);
+    return Response.json({ authenticated: true, role, needsSetup }, { headers: { ...headers, 'Set-Cookie': sessionCookie(request, token) } });
   } catch (error) { return failure(error); }
 }
 export async function DELETE(request: Request) {

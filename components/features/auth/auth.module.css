@@ -110,14 +110,14 @@
 .socialButtons button { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 8px 12px; border: 1px solid #c6b9ae; border-radius: 9px; background: var(--paper); color: var(--ink); font-size: 12px; font-weight: 500; transition: border-color .2s, background .2s; }
 .socialButtons button:hover { border-color: #b8aaa0; background: var(--canvas); }
 .socialButtons svg { flex-shrink: 0; }
-.socialNotice { margin-top: 12px; padding: 9px 12px; border-left: 2px solid var(--coral-deep); background: #fbf3ef; font-size: 10px; color: var(--ink-soft); line-height: 1.8; }
+.socialNotice { margin-top: 12px; padding: 9px 12px; background: #fbf3ef; font-size: 10px; color: var(--ink-soft); line-height: 1.8; }
 .switchPrompt { text-align: center; margin-top: 21px; font-size: 11px; color: var(--ink-soft); }
 .switchPrompt a { color: var(--ink); font-weight: 600; margin-left: 4px; }
 .switchPrompt a:hover { color: var(--coral-deep); }
 .panelFooter { padding-top: 17px; border-top: 1px solid var(--line); font-size: 10px; }
 .panelFooter > span:last-child { display: inline-flex; align-items: center; gap: 7px; }
 .smallFlower { color: var(--coral-deep); font-size: 15px; }
-.notice { border-left: 2px solid var(--coral-deep); padding: 9px 12px; background: #fbf3ef; color: var(--ink-soft); font-size: 11px; line-height: 1.8; }
+.notice { padding: 9px 12px; background: #fbf3ef; color: var(--ink-soft); font-size: 11px; line-height: 1.8; }
 .dialog { position: fixed; margin: auto; width: min(440px, calc(100% - 32px)); padding: 32px; border: 1px solid var(--line); border-radius: 12px; background: var(--canvas); color: var(--ink); box-shadow: 0 20px 80px #2b211e26; }
 .dialog::backdrop { background: #2b211e66; backdrop-filter: blur(3px); }
 .dialog h2 { font-size: 25px; letter-spacing: -.8px; }
@@ -132,6 +132,9 @@
 @media (prefers-reduced-motion: reduce) { .root *, .root *::before, .root *::after { animation: none !important; transition: none !important; } }
 
 .formLogo { display: none; }
+.pendingPanel { grid-column: 1 / -1; }
+.pendingPanel .formDescription { overflow-wrap: anywhere; }
+.pendingPanel .submit { margin-top: 24px; }
 @media (max-width: 760px) {
   .story { display: none; }
   .root { grid-template-columns: minmax(0, 1fr); }

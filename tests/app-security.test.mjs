@@ -27,6 +27,8 @@ afterEach(() => { globalThis.fetch = originalFetch; for (const [key, value] of O
 async function fixture() {
   await ready;
   await db.exec('TRUNCATE app_sessions,app_login_attempts');
+  await query("DELETE FROM app_users WHERE id<>'demo'");
+  await query("UPDATE app_users SET page_id='111' WHERE id='demo'");
   await query("UPDATE app_security_settings SET protection_enabled=true,revision=1,updated_at=1,updated_by='system',automatic_after=1 WHERE id=1");
   Object.assign(process.env, { APP_ADMIN_USERNAME: 'owner-test', APP_ADMIN_PASSWORD_HASH: adminHash, INBOX_ACCESS_KEY: 'old-inbox-secret-at-least-24-characters',
     DASHBOARD_KEY: 'old-dashboard-secret', DATABASE_URL: 'postgresql://test-only', PAGE_ID: '111', PAGE_ACCESS_TOKEN: 'test-page-token', META_GRAPH_VERSION: 'v26.0' });
@@ -105,7 +107,7 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
   let checked = 0;
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    if (['/meta/webhook/', '/auth/session/', '/inbox/session/', '/security/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;
@@ -188,4 +190,114 @@ test('setup script preserves existing env values and generates a salted admin ha
     assert.ok(path.basename(directory).startsWith('tendly-security-'));
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+const registration = { name: 'Minh Anh', email: 'New.Shop@example.com', password: 'real-password-123', confirmPassword: 'real-password-123' };
+const cookieFrom = response => response.headers.get('set-cookie').split(';')[0];
+
+test('registration persists a salted account and issues a server session; logout and login restore its identity', async () => {
+  const f = await fixture();
+  const response = await f.load('app/api/auth/register/route.ts').POST(f.req('POST', '', registration));
+  assert.equal(response.status, 201);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.match(response.headers.get('set-cookie'), /HttpOnly; SameSite=Lax/);
+  assert.deepEqual(await response.json(), { authenticated: true, role: 'user', needsSetup: true });
+  const cookie = cookieFrom(response);
+  const session = await f.security.readAppSession(f.req('GET', cookie), pool);
+  assert.equal(session.authenticated, true); assert.equal(session.name, 'Minh Anh');
+  assert.equal(session.username, 'new.shop@example.com'); assert.equal(session.pageId, null);
+  assert.equal(session.needsSetup, true); assert.equal(session.canUse, false);
+  const saved = (await query('SELECT * FROM app_users WHERE id=$1', [session.userId])).rows[0];
+  assert.ok(!JSON.stringify(saved).includes(registration.password));
+  const [format, salt, encoded] = saved.password_hash.split('$');
+  assert.equal(format, 'scrypt-v1');
+  assert.equal(scryptSync(registration.password, salt, 64, { N: 131072, r: 8, p: 1, maxmem: 268435456 }).toString('hex'), encoded);
+  await f.security.logoutApp(f.req('DELETE', cookie), pool);
+  assert.equal((await f.security.readAppSession(f.req('GET', cookie), pool)).authenticated, false);
+  const loginRoute = f.load('app/api/auth/session/route.ts');
+  const login = await loginRoute.POST(f.req('POST', '', { username: ' NEW.SHOP@EXAMPLE.COM ', password: registration.password }));
+  assert.equal(login.status, 200);
+  assert.equal((await f.security.readAppSession(f.req('GET', cookieFrom(login)), pool)).userId, session.userId);
+  assert.ok(!JSON.stringify(session).includes('scrypt'));
+});
+
+test('duplicate emails cannot race into separate accounts; user input cannot assign role, ID or Page', async () => {
+  const f = await fixture(); const route = f.load('app/api/auth/register/route.ts');
+  const responses = await Promise.all([
+    route.POST(f.req('POST', '', { ...registration, role: 'admin', id: 'demo', pageId: '111' })),
+    route.POST(f.req('POST', '', { ...registration, email: 'new.shop@EXAMPLE.COM' })),
+  ]);
+  assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
+  const response = responses.find(response => response.status === 201);
+  const session = await f.security.readAppSession(f.req('GET', cookieFrom(response)), pool);
+  assert.equal(session.role, 'user'); assert.notEqual(session.userId, 'demo'); assert.equal(session.pageId, null);
+  assert.equal(Number((await query("SELECT count(*) FROM app_users WHERE username='new.shop@example.com'")).rows[0].count), 1);
+});
+
+test('registration validates all fields and rejects reserved admin identity, foreign origins and oversized JSON', async () => {
+  const f = await fixture(); const route = f.load('app/api/auth/register/route.ts');
+  for (const patch of [{ name: '' }, { name: 'a'.repeat(101) }, { email: 'admin' }, { email: 'a'.repeat(250) + '@x.com' },
+    { password: 'short', confirmPassword: 'short' }, { password: 'a'.repeat(1025), confirmPassword: 'a'.repeat(1025) },
+    { confirmPassword: 'mismatch' }, { password: null }, { email: ['test@example.com'] }]) {
+    assert.equal((await route.POST(f.req('POST', '', { ...registration, ...patch }))).status, 400);
+  }
+  process.env.APP_ADMIN_USERNAME = registration.email.toLowerCase();
+  assert.equal((await route.POST(f.req('POST', '', registration))).status, 409);
+  assert.equal((await route.POST(f.req('POST', '', registration, { origin: 'https://evil.example' }))).status, 403);
+  assert.equal((await route.POST(f.req('POST', '', { padding: 'a'.repeat(9000) }))).status, 413);
+  assert.equal(Number((await query('SELECT count(*) FROM app_users')).rows[0].count), 1);
+});
+
+test('new accounts cannot reach any business API even after the demo is unlocked', async () => {
+  const f = await fixture(); const owner = await f.login('admin'); const demo = await f.login('user');
+  await f.security.changeProtection(f.req('PATCH', owner), false, 1, pool);
+  const result = await f.security.registerApp(f.req('POST', demo), registration, pool);
+  assert.equal((await f.security.readAppSession(f.req('GET', demo), pool)).authenticated, false, 'account switch revokes old browser session');
+  const cookie = `tendly_app_session=${result.token}`;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new Error('new user must not reach providers'); };
+  for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
+    const file = `app/api/${relative.replaceAll('\\', '/')}`;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/'].some(part => file.includes(part))) continue;
+    const route = f.load(file);
+    for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
+      if (!route[method]) continue;
+      const response = await route[method](f.req(method, cookie), { params: Promise.resolve({ id: 'fake', key: 'fake', orderId: 'fake' }) });
+      assert.equal(response.status, 403, `${file}:${method}`);
+      assert.equal((await response.json()).code, 'SETUP_REQUIRED');
+    }
+  }
+  assert.equal(calls, 0);
+  await assert.rejects(f.security.changeProtection(f.req('PATCH', cookie), false, 2, pool), error => error.status === 403);
+  await query("UPDATE app_users SET page_id='111' WHERE username=$1", [registration.email.toLowerCase()]);
+  assert.equal((await f.security.readAppSession(f.req('GET', cookie), pool)).canUse, false);
+});
+
+test('demo Page binding persists through migrations and rejects a different configured Page; old user sessions expire safely', async () => {
+  const f = await fixture(); const owner = await f.login('admin'); const demo = await f.login('user');
+  await f.security.changeProtection(f.req('PATCH', owner), false, 1, pool);
+  await db.exec(readFileSync('db/migrations/013-app-accounts.sql', 'utf8'));
+  let session = await f.security.readAppSession(f.req('GET', demo), pool);
+  assert.equal(session.pageId, '111'); assert.equal(session.userId, 'demo'); assert.equal(session.needsSetup, false);
+  assert.equal(session.canUse, true);
+  process.env.PAGE_ID = '222';
+  session = await f.security.readAppSession(f.req('GET', demo), pool);
+  assert.equal(session.pageId, '111'); assert.equal(session.canUse, false);
+  await query('UPDATE app_sessions SET user_id=NULL WHERE role=$1', ['user']);
+  assert.equal((await f.security.readAppSession(f.req('GET', demo), pool)).authenticated, false);
+});
+
+test('registered accounts reject wrong passwords, expire, revoke after password changes, and registration is throttled', async () => {
+  const f = await fixture(); const result = await f.security.registerApp(f.req('POST'), registration, pool);
+  const cookie = `tendly_app_session=${result.token}`;
+  await assert.rejects(f.security.loginApp(f.req('POST'), registration.email, 'wrong-password', pool), error => error.status === 401);
+  await query('UPDATE app_sessions SET expires_at=1');
+  assert.equal((await f.security.readAppSession(f.req('GET', cookie), pool)).authenticated, false);
+  const login = await f.security.loginApp(f.req('POST'), registration.email, registration.password, pool);
+  await query('UPDATE app_users SET password_hash=$1 WHERE username=$2', ['invalidated', registration.email.toLowerCase()]);
+  assert.equal((await f.security.readAppSession(f.req('GET', `tendly_app_session=${login.token}`), pool)).authenticated, false);
+  await query("UPDATE app_login_attempts SET attempts=10 WHERE bucket='register'");
+  await assert.rejects(f.security.registerApp(f.req('POST'), { ...registration, email: 'second@example.com' }, pool), error => error.status === 429);
+  await query("UPDATE app_login_attempts SET reset_at=1 WHERE bucket='register'");
+  assert.equal((await f.security.registerApp(f.req('POST'), { ...registration, email: 'second@example.com' }, pool)).role, 'user');
 });

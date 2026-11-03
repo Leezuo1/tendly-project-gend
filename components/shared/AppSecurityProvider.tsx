@@ -3,12 +3,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppSecurityContext, lockedSession } from '@/lib/hooks/useAppSecurity';
-import { logoutMock } from '@/lib/services/mockOnboarding';
+import { PendingSetup } from '@/components/features/auth/PendingSetup';
 import type { AppSession } from '@/lib/types/security';
 import { ReadOnlyPreview } from './ReadOnlyPreview';
 import '@/components/features/admin/admin-shell.css';
 
-const publicPaths = ['/', '/pricing', '/dang-nhap', '/dang-ky', '/tao-shop', '/ket-noi'];
+const publicPaths = ['/', '/pricing', '/dang-nhap', '/dang-ky'];
 export function AppSecurityProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [session, setSession] = useState<AppSession>(lockedSession);
@@ -41,13 +41,15 @@ export function AppSecurityProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     const response = await fetch('/api/auth/session', { method: 'DELETE' });
     if (!response.ok) throw new Error('Chưa đăng xuất được. Vui lòng thử lại.');
-    logoutMock(); await refresh();
+    await refresh();
   };
   let content = children;
   if (!publicPaths.includes(pathname)) {
     if (loading) content = <main style={{ padding: 40 }} role="status">Đang kiểm tra quyền truy cập…</main>;
+    else if (session.authenticated && session.needsSetup) content = <PendingSetup />;
+    else if ((pathname === '/tao-shop' || pathname === '/ket-noi') && session.authenticated) content = children;
     else if (pathname === '/quan-tri' && session.role !== 'admin') content = <main style={{ padding: 40 }}><h1>Khu vực quản trị</h1><p>{session.error || 'Đăng nhập bằng tài khoản quản trị riêng để quản lý chế độ bảo vệ.'}</p><Link href="/dang-nhap">Đến trang đăng nhập</Link></main>;
     else if (!session.canUse) content = <ReadOnlyPreview pathname={pathname} />;
   }
-  return <AppSecurityContext.Provider value={{ session, loading, refresh, logout }}><div key={`${session.role}:${session.canUse}:${session.revision}`}>{content}</div></AppSecurityContext.Provider>;
+  return <AppSecurityContext.Provider value={{ session, loading, refresh, logout }}><div key={publicPaths.includes(pathname) ? 'public' : `${session.userId}:${session.username}:${session.canUse}:${session.revision}`}>{content}</div></AppSecurityContext.Provider>;
 }

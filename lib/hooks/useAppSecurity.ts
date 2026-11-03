@@ -2,7 +2,7 @@
 import { createContext, useContext } from 'react';
 import type { AppSession } from '@/lib/types/security';
 
-export const lockedSession: AppSession = { authenticated: false, role: null, username: '', protectionEnabled: true,
+export const lockedSession: AppSession = { authenticated: false, role: null, username: '', userId: null, name: '', pageId: null, needsSetup: false, protectionEnabled: true,
   canUse: false, revision: 0, updatedAt: 0, updatedBy: '' };
 export const AppSecurityContext = createContext({ session: lockedSession, loading: true,
   refresh: async (): Promise<AppSession> => lockedSession, logout: async () => {} });
