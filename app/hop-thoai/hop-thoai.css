@@ -10,24 +10,12 @@
 .inbox-root .modal .btn-danger { color: #fff; background: var(--coral, #f56565); }
 
 .inbox-root {
-  --canvas: #FAF9F8;
-  --coral: #F06A6A;
-  --coral-deep: #D8514F;
-  --ink: #2B211E;
-  --ink-soft: #6B5F5A;
-  --sand: #F1EAE3;
-  --line: #E7DED7;
-  --moss: #4B6358;
-  --moss-soft: #DCE6E1;
-  --paper: #FFFFFF;
-  --amber: #B8790A;
-  --amber-soft: #F5E7CC;
-  --alert-bg: #FCE4E2;
+  --alert-bg: var(--coral-soft);
 
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-tendly), Arial, sans-serif;
   background: var(--canvas);
   color: var(--ink);
-  line-height: 1.5;
+  line-height: 1.6;
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }

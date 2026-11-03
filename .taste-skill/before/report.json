@@ -1,0 +1,2660 @@
+{
+ "url": "http://localhost:3000/",
+ "at": "2026-11-03T15:44:41.772Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 8,
+   "filled": [
+    1,
+    1,
+    0.96,
+    0.93,
+    0.95,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 62,
+    "css": 15,
+    "transitions": 46,
+    "scripted": 1,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 6928,
+     "screens": 7.7,
+     "words": 855,
+     "img": 38,
+     "video": 0,
+     "canvas": 0,
+     "svg": 11,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 6,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "shop-rack.webp",
+      "live-host.webp",
+      "navy-polo.webp",
+      "beige-polo.webp",
+      "shop-approve.webp",
+      "cotton-detail.webp"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Your AI teammate for every customer.",
+     "words": 6,
+     "chars": 36,
+     "lines": 2,
+     "size": 70,
+     "vw": 4.9,
+     "font": "REM",
+     "weight": 600,
+     "tracking": -0.04,
+     "leading": 1.12,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.83,
+     "top": 158,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Your AI teammate for every customer.",
+     "words": 6,
+     "lines": 2,
+     "size": 70,
+     "font": "REM"
+    },
+    "headings": [
+     {
+      "text": "Your AI teammate for every customer.",
+      "words": 6,
+      "chars": 36,
+      "lines": 2,
+      "size": 70,
+      "vw": 4.9,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.83,
+      "top": 158,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "L",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "REM",
+      "weight": 500,
+      "tracking": 0,
+      "leading": 1.6,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.04,
+      "top": 1149,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "Nhiều việc trong ngày. Một đồng đội xuyên suốt.",
+      "words": 9,
+      "chars": 47,
+      "lines": 2,
+      "size": 46,
+      "vw": 3.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.37,
+      "top": 1560,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+      "words": 9,
+      "chars": 40,
+      "lines": 2,
+      "size": 35,
+      "vw": 2.4,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.29,
+      "top": 1985,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Bạn giữ nhịp live. theo nhịp khách.",
+      "words": 7,
+      "chars": 35,
+      "lines": 2,
+      "size": 35,
+      "vw": 2.4,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.29,
+      "top": 2686,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Từ sản phẩm quen thuộc đến một góc kể mới.",
+      "words": 10,
+      "chars": 42,
+      "lines": 2,
+      "size": 35,
+      "vw": 2.4,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.28,
+      "top": 3441,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Hiểu điều khách cần. Tư vấn điều phù hợp.",
+      "words": 9,
+      "chars": 41,
+      "lines": 2,
+      "size": 35,
+      "vw": 2.4,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.29,
+      "top": 4091,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Bắt đầu từ những gì shop đã có.",
+      "words": 8,
+      "chars": 31,
+      "lines": 2,
+      "size": 46,
+      "vw": 3.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.3,
+      "top": 4666,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Bạn có thể đang thắc mắc.",
+      "words": 6,
+      "chars": 25,
+      "lines": 2,
+      "size": 46,
+      "vw": 3.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.34,
+      "top": 5956,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Thêm một đồng đội. Nhẹ một ngày bán hàng.",
+      "words": 9,
+      "chars": 41,
+      "lines": 2,
+      "size": 54,
+      "vw": 3.8,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.97,
+      "top": 6440,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 10,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 2,
+     "medianWords": 9,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "REM",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      20,
+      24,
+      30,
+      35,
+      46,
+      54,
+      70
+     ],
+     "sizeCount": 13,
+     "notLoaded": [],
+     "body": {
+      "font": "REM",
+      "size": 13,
+      "leading": 1.8,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 12.7
+     },
+     "measureChars": 77,
+     "max": {
+      "size": 70,
+      "vw": 4.9,
+      "font": "REM",
+      "text": "Your AI teammatefor every"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.1,
+     "smallText": 66
+    },
+    "eyebrows": [
+     {
+      "text": "Shop luôn quyết định",
+      "above": "L",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 1071
+     },
+     {
+      "text": "Chăm sóc khách hàng",
+      "above": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 1940
+     },
+     {
+      "text": "Livestream assistant",
+      "above": "Bạn giữ nhịp live. theo nhịp khách.",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 2640
+     },
+     {
+      "text": "Marketing assistant",
+      "above": "Từ sản phẩm quen thuộc đến một góc kể mớ",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 3344
+     },
+     {
+      "text": "Sales assistant",
+      "above": "Hiểu điều khách cần. Tư vấn điều phù hợp",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 4046
+     }
+    ],
+    "numbered": [
+     {
+      "text": "01",
+      "size": 12,
+      "top": 1796
+     },
+     {
+      "text": "02",
+      "size": 12,
+      "top": 1796
+     },
+     {
+      "text": "03",
+      "size": 12,
+      "top": 1796
+     },
+     {
+      "text": "04",
+      "size": 12,
+      "top": 1796
+     }
+    ],
+    "color": {
+     "bodyBg": "#faf9f8",
+     "bodyBgHsl": {
+      "h": 30,
+      "s": 0.17,
+      "l": 0.98
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#faf8f5",
+       "top": 0,
+       "hsl": {
+        "h": 36,
+        "s": 0.33,
+        "l": 0.97
+       }
+      },
+      {
+       "color": "#fffefa",
+       "top": 564,
+       "hsl": {
+        "h": 48,
+        "s": 1,
+        "l": 0.99
+       }
+      },
+      {
+       "color": "#eee9df",
+       "top": 1773,
+       "hsl": {
+        "h": 40,
+        "s": 0.31,
+        "l": 0.9
+       }
+      },
+      {
+       "color": "#f8e4dc",
+       "top": 6360,
+       "hsl": {
+        "h": 17,
+        "s": 0.67,
+        "l": 0.92
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#4a4d45",
+       "share": 0.42
+      },
+      {
+       "color": "#252722",
+       "share": 0.4
+      },
+      {
+       "color": "#45614c",
+       "share": 0.08
+      },
+      {
+       "color": "#bc4532",
+       "share": 0.03
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.02
+      }
+     ],
+     "button": {
+      "bg": "#252722",
+      "hsl": {
+       "h": 84,
+       "s": 0.07,
+       "l": 0.14
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": [
+      {
+       "text": "Chăm sóc khách hàng",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Livestream assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Marketing assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Sales assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      }
+     ]
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 3,
+     "radius": 7,
+     "height": 49,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Đến nội dung chính",
+      "Bắt đầu cùng",
+      "Khám phá workspace"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 5,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "div.landing-module__ue1IDW__floating-card.landing-module__ue → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "div.landing-module__ue1IDW__supplier-card.landing-module__ue → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px"
+     ],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 27,
+     "hairlineSamples": [
+      "header.landing-module__ue1IDW__header 1440px",
+      "div.landing-module__ue1IDW__workspace-bar 848px",
+      "div.landing-module__ue1IDW__workspace-tabs 849px",
+      "div.landing-module__ue1IDW__conversations 229px",
+      "div.landing-module__ue1IDW__message-top 575px"
+     ],
+     "outlinedBoxes": 14,
+     "dashed": 1,
+     "blurred": 0,
+     "roundedBoxes": 22,
+     "boxRadius": 6,
+     "squareMedia": 0,
+     "roundedMedia": 4,
+     "mediaRadius": 8,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 6,
+     "fixed": true,
+     "height": 85,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "rem",
+     "inter"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 6928,
+    "margins": {
+     "left": 120,
+     "right": 120
+    },
+    "sections": [
+     {
+      "sel": "section.landing-module__ue1IDW__hero.landing-module__ue1IDW_",
+      "tag": "section",
+      "top": 85,
+      "height": 1209,
+      "words": 240,
+      "media": 2,
+      "middle": 0,
+      "heading": {
+       "text": "Your AI teammate",
+       "size": 70,
+       "tag": "h1"
+      },
+      "left": 51,
+      "right": 59,
+      "textLeft": 69,
+      "textRight": 81,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.landing-module__ue1IDW__section-heading.landing-module__",
+      "tag": "div",
+      "top": 1560,
+      "height": 167,
+      "words": 18,
+      "media": 0,
+      "middle": 329,
+      "heading": {
+       "text": "Nhiều việc trong ngày.",
+       "size": 46,
+       "tag": "h2"
+      },
+      "left": 120,
+      "right": 123,
+      "textLeft": 120,
+      "textRight": 123,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.landing-module__ue1IDW__story",
+      "tag": "div",
+      "top": 1727,
+      "height": 2809,
+      "words": 184,
+      "media": 2,
+      "middle": 193,
+      "heading": {
+       "text": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+       "size": 35,
+       "tag": "h3"
+      },
+      "left": 120,
+      "right": 144,
+      "textLeft": 120,
+      "textRight": 152,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#how-it-works.landing-module__ue1IDW__how",
+      "tag": "section",
+      "top": 4571,
+      "height": 1269,
+      "words": 217,
+      "media": 3,
+      "middle": 0,
+      "heading": {
+       "text": "Bắt đầu từ những gì",
+       "size": 46,
+       "tag": "h2"
+      },
+      "left": 120,
+      "right": 120,
+      "textLeft": 120,
+      "textRight": 120,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#faq.landing-module__ue1IDW__faq-section.landing-modu",
+      "tag": "section",
+      "top": 5841,
+      "height": 519,
+      "words": 124,
+      "media": 0,
+      "middle": 271,
+      "heading": {
+       "text": "Bạn có thể",
+       "size": 46,
+       "tag": "h2"
+      },
+      "left": 120,
+      "right": 156,
+      "textLeft": 120,
+      "textRight": 156,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.landing-module__ue1IDW__closing",
+      "tag": "section",
+      "top": 6360,
+      "height": 427,
+      "words": 24,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Thêm một đồng đội.",
+       "size": 54,
+       "tag": "h2"
+      },
+      "left": 419,
+      "right": 419,
+      "textLeft": 419,
+      "textRight": 419,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.landing-module__ue1IDW__footer.landing-module__ue1IDW",
+      "tag": "footer",
+      "top": 6787,
+      "height": 141,
+      "words": 14,
+      "media": 0,
+      "middle": 590,
+      "heading": null,
+      "left": 120,
+      "right": 166,
+      "textLeft": 256,
+      "textRight": 166,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Your AI teammate for every customer.",
+      "size": 70,
+      "top": 158,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 120,
+      "n": 11
+     },
+     {
+      "x": 222,
+      "n": 1
+     },
+     {
+      "x": 740,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 13,
+    "bodySize": 13,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0.12,
+    "voidBox": {
+     "x": 0,
+     "y": 120,
+     "w": 360,
+     "h": 420
+    }
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 8,
+   "filled": [
+    0.99,
+    0.99,
+    0.9,
+    0.99,
+    0.97,
+    1,
+    1,
+    1
+   ],
+   "motion": {
+    "elements": 76,
+    "css": 20,
+    "transitions": 55,
+    "scripted": 1,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 7248,
+     "screens": 7.1,
+     "words": 855,
+     "img": 38,
+     "video": 0,
+     "canvas": 0,
+     "svg": 11,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 6,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "shop-rack.webp",
+      "live-host.webp",
+      "navy-polo.webp",
+      "beige-polo.webp",
+      "shop-approve.webp",
+      "cotton-detail.webp"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Your AI teammate for every customer.",
+     "words": 6,
+     "chars": 36,
+     "lines": 2,
+     "size": 39.2,
+     "vw": 5.1,
+     "font": "REM",
+     "weight": 600,
+     "tracking": -0.04,
+     "leading": 1.12,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.93,
+     "top": 158,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Your AI teammate for every customer.",
+     "words": 6,
+     "lines": 2,
+     "size": 39.2,
+     "font": "REM"
+    },
+    "headings": [
+     {
+      "text": "Your AI teammate for every customer.",
+      "words": 6,
+      "chars": 36,
+      "lines": 2,
+      "size": 39.2,
+      "vw": 5.1,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.93,
+      "top": 158,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "L",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "REM",
+      "weight": 500,
+      "tracking": 0,
+      "leading": 1.6,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.07,
+      "top": 1199,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "Nhiều việc trong ngày. Một đồng đội xuyên suốt.",
+      "words": 9,
+      "chars": 47,
+      "lines": 2,
+      "size": 32,
+      "vw": 4.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.49,
+      "top": 1588,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+      "words": 9,
+      "chars": 40,
+      "lines": 2,
+      "size": 28,
+      "vw": 3.6,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.37,
+      "top": 2036,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Bạn giữ nhịp live. theo nhịp khách.",
+      "words": 7,
+      "chars": 35,
+      "lines": 3,
+      "size": 28,
+      "vw": 3.6,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.36,
+      "top": 2868,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Từ sản phẩm quen thuộc đến một góc kể mới.",
+      "words": 10,
+      "chars": 42,
+      "lines": 3,
+      "size": 28,
+      "vw": 3.6,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.37,
+      "top": 3615,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Hiểu điều khách cần. Tư vấn điều phù hợp.",
+      "words": 9,
+      "chars": 41,
+      "lines": 2,
+      "size": 28,
+      "vw": 3.6,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.37,
+      "top": 4432,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Bắt đầu từ những gì shop đã có.",
+      "words": 8,
+      "chars": 31,
+      "lines": 2,
+      "size": 32,
+      "vw": 4.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.39,
+      "top": 5047,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Bạn có thể đang thắc mắc.",
+      "words": 6,
+      "chars": 25,
+      "lines": 2,
+      "size": 32,
+      "vw": 4.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 6327,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Thêm một đồng đội. Nhẹ một ngày bán hàng.",
+      "words": 9,
+      "chars": 41,
+      "lines": 2,
+      "size": 33,
+      "vw": 4.3,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.94,
+      "top": 6811,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 10,
+     "maxLines": 3,
+     "over2Lines": 2,
+     "statements": 0,
+     "centered": 2,
+     "medianWords": 9,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "REM",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      20,
+      24,
+      28,
+      30,
+      32,
+      33,
+      39
+     ],
+     "sizeCount": 13,
+     "notLoaded": [],
+     "body": {
+      "font": "REM",
+      "size": 13,
+      "leading": 1.8,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 12.7
+     },
+     "measureChars": 48,
+     "max": {
+      "size": 39.2,
+      "vw": 5.1,
+      "font": "REM",
+      "text": "Your AI teammatefor every"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.1,
+     "smallText": 66
+    },
+    "eyebrows": [
+     {
+      "text": "Gợi ý size cho khách",
+      "above": "L",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 1169
+     },
+     {
+      "text": "Chăm sóc khách hàng",
+      "above": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 1991
+     },
+     {
+      "text": "Livestream assistant",
+      "above": "Bạn giữ nhịp live. theo nhịp khách.",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 2771
+     },
+     {
+      "text": "Marketing assistant",
+      "above": "Từ sản phẩm quen thuộc đến một góc kể mớ",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 3570
+     },
+     {
+      "text": "Sales assistant",
+      "above": "Hiểu điều khách cần. Tư vấn điều phù hợp",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 4387
+     }
+    ],
+    "numbered": [
+     {
+      "text": "01",
+      "size": 12,
+      "top": 1785
+     },
+     {
+      "text": "02",
+      "size": 12,
+      "top": 1785
+     },
+     {
+      "text": "03",
+      "size": 12,
+      "top": 1785
+     },
+     {
+      "text": "04",
+      "size": 12,
+      "top": 1785
+     }
+    ],
+    "color": {
+     "bodyBg": "#faf9f8",
+     "bodyBgHsl": {
+      "h": 30,
+      "s": 0.17,
+      "l": 0.98
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#faf8f5",
+       "top": 0,
+       "hsl": {
+        "h": 36,
+        "s": 0.33,
+        "l": 0.97
+       }
+      },
+      {
+       "color": "#fffefa",
+       "top": 465,
+       "hsl": {
+        "h": 48,
+        "s": 1,
+        "l": 0.99
+       }
+      },
+      {
+       "color": "#eee9df",
+       "top": 1767,
+       "hsl": {
+        "h": 40,
+        "s": 0.31,
+        "l": 0.9
+       }
+      },
+      {
+       "color": "#f8e4dc",
+       "top": 6731,
+       "hsl": {
+        "h": 17,
+        "s": 0.67,
+        "l": 0.92
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#4a4d45",
+       "share": 0.42
+      },
+      {
+       "color": "#252722",
+       "share": 0.4
+      },
+      {
+       "color": "#45614c",
+       "share": 0.08
+      },
+      {
+       "color": "#bc4532",
+       "share": 0.03
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.02
+      }
+     ],
+     "button": {
+      "bg": "#bc4532",
+      "hsl": {
+       "h": 8,
+       "s": 0.58,
+       "l": 0.47
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": [
+      {
+       "text": "Chăm sóc khách hàng",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Livestream assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Marketing assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Sales assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      }
+     ]
+    },
+    "buttons": {
+     "count": 5,
+     "inHero": 4,
+     "radius": 7,
+     "height": 49,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Đến nội dung chính",
+      "Khám phá workspace",
+      "Sửa nhanh",
+      "Duyệt & chuẩn bị gửi"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 5,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "div.landing-module__ue1IDW__floating-card.landing-module__ue → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "div.landing-module__ue1IDW__supplier-card.landing-module__ue → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px"
+     ],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 25,
+     "hairlineSamples": [
+      "header.landing-module__ue1IDW__header 768px",
+      "div.landing-module__ue1IDW__workspace-bar 565px",
+      "div.landing-module__ue1IDW__workspace-tabs 565px",
+      "div.landing-module__ue1IDW__conversations 185px",
+      "div.landing-module__ue1IDW__message-top 346px"
+     ],
+     "outlinedBoxes": 14,
+     "dashed": 1,
+     "blurred": 0,
+     "roundedBoxes": 22,
+     "boxRadius": 9,
+     "squareMedia": 0,
+     "roundedMedia": 1,
+     "mediaRadius": 9,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 3,
+       "iconTopped": false,
+       "rounded": true,
+       "top": 1125
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 6,
+     "fixed": true,
+     "height": 85,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "rem",
+     "inter"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 7248,
+    "margins": {
+     "left": 28,
+     "right": 46
+    },
+    "sections": [
+     {
+      "sel": "section.landing-module__ue1IDW__hero.landing-module__ue1IDW_",
+      "tag": "section",
+      "top": 85,
+      "height": 1237,
+      "words": 240,
+      "media": 2,
+      "middle": 0,
+      "heading": {
+       "text": "Your AI teammate",
+       "size": 39,
+       "tag": "h1"
+      },
+      "left": 28,
+      "right": 46,
+      "textLeft": 28,
+      "textRight": 46,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.landing-module__ue1IDW__section-heading.landing-module__",
+      "tag": "div",
+      "top": 1588,
+      "height": 133,
+      "words": 18,
+      "media": 0,
+      "middle": 49,
+      "heading": {
+       "text": "Nhiều việc trong ngày.",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 28,
+      "right": 76,
+      "textLeft": 28,
+      "textRight": 76,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.landing-module__ue1IDW__story",
+      "tag": "div",
+      "top": 1721,
+      "height": 3196,
+      "words": 181,
+      "media": 2,
+      "middle": 55,
+      "heading": {
+       "text": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+       "size": 28,
+       "tag": "h3"
+      },
+      "left": 28,
+      "right": 47,
+      "textLeft": 28,
+      "textRight": 53,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#how-it-works.landing-module__ue1IDW__how",
+      "tag": "section",
+      "top": 4952,
+      "height": 1260,
+      "words": 217,
+      "media": 3,
+      "middle": 0,
+      "heading": {
+       "text": "Bắt đầu từ những gì",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 28,
+      "right": 28,
+      "textLeft": 28,
+      "textRight": 28,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#faq.landing-module__ue1IDW__faq-section.landing-modu",
+      "tag": "section",
+      "top": 6212,
+      "height": 519,
+      "words": 124,
+      "media": 0,
+      "middle": 123,
+      "heading": {
+       "text": "Bạn có thể",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 28,
+      "right": 59,
+      "textLeft": 28,
+      "textRight": 59,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.landing-module__ue1IDW__closing",
+      "tag": "section",
+      "top": 6731,
+      "height": 376,
+      "words": 24,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Thêm một đồng đội.",
+       "size": 33,
+       "tag": "h2"
+      },
+      "left": 200,
+      "right": 200,
+      "textLeft": 200,
+      "textRight": 200,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.landing-module__ue1IDW__footer.landing-module__ue1IDW",
+      "tag": "footer",
+      "top": 7107,
+      "height": 141,
+      "words": 14,
+      "media": 0,
+      "middle": 102,
+      "heading": null,
+      "left": 28,
+      "right": 74,
+      "textLeft": 164,
+      "textRight": 74,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Your AI teammate for every customer.",
+      "size": 39,
+      "top": 158,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 28,
+      "n": 11
+     },
+     {
+      "x": 404,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 12,
+    "bodySize": 13,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 11,
+   "filled": [
+    0.99,
+    0.99,
+    0.91,
+    0.93,
+    0.9,
+    0.98,
+    0.99,
+    0.99,
+    0.99,
+    0.99,
+    0.99
+   ],
+   "motion": {
+    "elements": 59,
+    "css": 5,
+    "transitions": 53,
+    "scripted": 1,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 8959,
+     "screens": 10.6,
+     "words": 894,
+     "img": 38,
+     "video": 0,
+     "canvas": 0,
+     "svg": 11,
+     "sections": 6,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 9,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [
+      "shop-rack.webp",
+      "live-host.webp",
+      "navy-polo.webp",
+      "live-host.webp",
+      "office-style.webp",
+      "navy-polo.webp",
+      "beige-polo.webp",
+      "shop-approve.webp"
+     ],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Your AI teammate for every customer.",
+     "words": 6,
+     "chars": 36,
+     "lines": 2,
+     "size": 33,
+     "vw": 8.5,
+     "font": "REM",
+     "weight": 600,
+     "tracking": -0.04,
+     "leading": 1.12,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "center",
+     "position": "center",
+     "widthRatio": 0.92,
+     "top": 120,
+     "tag": "h1",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Your AI teammate for every customer.",
+     "words": 6,
+     "lines": 2,
+     "size": 33,
+     "font": "REM"
+    },
+    "headings": [
+     {
+      "text": "Your AI teammate for every customer.",
+      "words": 6,
+      "chars": 36,
+      "lines": 2,
+      "size": 33,
+      "vw": 8.5,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.12,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 120,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "L",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 25,
+      "vw": 6.4,
+      "font": "REM",
+      "weight": 500,
+      "tracking": 0,
+      "leading": 1.6,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.11,
+      "top": 1409,
+      "tag": "strong",
+      "kind": "heading"
+     },
+     {
+      "text": "→",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 24,
+      "vw": 6.2,
+      "font": "REM",
+      "weight": 400,
+      "tracking": 0,
+      "leading": 1.6,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.06,
+      "top": 1412,
+      "tag": "span",
+      "kind": "heading"
+     },
+     {
+      "text": "Nhiều việc trong ngày. Một đồng đội xuyên suốt.",
+      "words": 9,
+      "chars": 47,
+      "lines": 3,
+      "size": 32,
+      "vw": 8.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 1704,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+      "words": 9,
+      "chars": 40,
+      "lines": 2,
+      "size": 28,
+      "vw": 7.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 2016,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Bạn giữ nhịp live. theo nhịp khách.",
+      "words": 7,
+      "chars": 35,
+      "lines": 2,
+      "size": 28,
+      "vw": 7.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 2880,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Từ sản phẩm quen thuộc đến một góc kể mới.",
+      "words": 10,
+      "chars": 42,
+      "lines": 2,
+      "size": 28,
+      "vw": 7.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3797,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Hiểu điều khách cần. Tư vấn điều phù hợp.",
+      "words": 9,
+      "chars": 41,
+      "lines": 2,
+      "size": 28,
+      "vw": 7.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.28,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 4711,
+      "tag": "h3",
+      "kind": "heading"
+     },
+     {
+      "text": "Bắt đầu từ những gì shop đã có.",
+      "words": 8,
+      "chars": 31,
+      "lines": 2,
+      "size": 32,
+      "vw": 8.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 5619,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Bạn có thể đang thắc mắc.",
+      "words": 6,
+      "chars": 25,
+      "lines": 2,
+      "size": 32,
+      "vw": 8.2,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 7871,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Thêm một đồng đội. Nhẹ một ngày bán hàng.",
+      "words": 9,
+      "chars": 41,
+      "lines": 3,
+      "size": 33,
+      "vw": 8.5,
+      "font": "REM",
+      "weight": 600,
+      "tracking": -0.035,
+      "leading": 1.22,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.9,
+      "top": 8497,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 11,
+     "maxLines": 3,
+     "over2Lines": 2,
+     "statements": 0,
+     "centered": 2,
+     "medianWords": 9,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "REM",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      19,
+      20,
+      24,
+      25,
+      28,
+      32,
+      33
+     ],
+     "sizeCount": 13,
+     "notLoaded": [],
+     "body": {
+      "font": "REM",
+      "size": 12,
+      "leading": 1.8,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 12.7
+     },
+     "measureChars": 48,
+     "max": {
+      "size": 33,
+      "vw": 8.5,
+      "font": "REM",
+      "text": "Your AI teammatefor every"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.08,
+     "smallText": 84
+    },
+    "eyebrows": [
+     {
+      "text": "đang hỏi size L",
+      "above": "L",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 1321
+     },
+     {
+      "text": "đang hỏi size L",
+      "above": "→",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 12,
+      "top": 1321
+     },
+     {
+      "text": "Chăm sóc khách hàng",
+      "above": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 1971
+     },
+     {
+      "text": "Livestream assistant",
+      "above": "Bạn giữ nhịp live. theo nhịp khách.",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 2835
+     },
+     {
+      "text": "Marketing assistant",
+      "above": "Từ sản phẩm quen thuộc đến một góc kể mớ",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 3751
+     },
+     {
+      "text": "Sales assistant",
+      "above": "Hiểu điều khách cần. Tư vấn điều phù hợp",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": true,
+      "size": 12,
+      "top": 4666
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#faf9f8",
+     "bodyBgHsl": {
+      "h": 30,
+      "s": 0.17,
+      "l": 0.98
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#faf8f5",
+       "top": 0,
+       "hsl": {
+        "h": 36,
+        "s": 0.33,
+        "l": 0.97
+       }
+      },
+      {
+       "color": "#fffefa",
+       "top": 428,
+       "hsl": {
+        "h": 48,
+        "s": 1,
+        "l": 0.99
+       }
+      },
+      {
+       "color": "#eee9df",
+       "top": 2246,
+       "hsl": {
+        "h": 40,
+        "s": 0.31,
+        "l": 0.9
+       }
+      },
+      {
+       "color": "#f8e4dc",
+       "top": 8439,
+       "hsl": {
+        "h": 17,
+        "s": 0.67,
+        "l": 0.92
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#252722",
+       "share": 0.44
+      },
+      {
+       "color": "#4a4d45",
+       "share": 0.37
+      },
+      {
+       "color": "#45614c",
+       "share": 0.09
+      },
+      {
+       "color": "#bc4532",
+       "share": 0.03
+      },
+      {
+       "color": "#606657",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#252722",
+      "hsl": {
+       "h": 84,
+       "s": 0.07,
+       "l": 0.14
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": [
+      {
+       "text": "Chăm sóc khách hàng",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Livestream assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Marketing assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      },
+      {
+       "text": "Sales assistant",
+       "ratio": 4.2,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#bc4532",
+       "bg": "#f8e4dc"
+      }
+     ]
+    },
+    "buttons": {
+     "count": 10,
+     "inHero": 6,
+     "radius": 7,
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Đến nội dung chính",
+      "Bắt đầu cùng",
+      "Khám phá workspace",
+      "Lan Anh",
+      "Minh Hoàng"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 12,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "div.landing-module__ue1IDW__floating-card.landing-module__ue → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+      "div.landing-module__ue1IDW__care-chart.landing-module__ue1ID → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px"
+     ],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 24,
+     "hairlineSamples": [
+      "header.landing-module__ue1IDW__header 390px",
+      "div.landing-module__ue1IDW__workspace-bar 352px",
+      "div.landing-module__ue1IDW__workspace-tabs 353px",
+      "div.landing-module__ue1IDW__conversations 353px",
+      "div.landing-module__ue1IDW__message-top 319px"
+     ],
+     "outlinedBoxes": 16,
+     "dashed": 2,
+     "blurred": 3,
+     "roundedBoxes": 28,
+     "boxRadius": 10,
+     "squareMedia": 0,
+     "roundedMedia": 4,
+     "mediaRadius": 9,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 2,
+     "fixed": true,
+     "height": 71,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "rem",
+     "inter"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 8959,
+    "margins": {
+     "left": 16,
+     "right": 24
+    },
+    "sections": [
+     {
+      "sel": "div.landing-module__ue1IDW__hero-light",
+      "tag": "div",
+      "top": 71,
+      "height": 340,
+      "words": 0,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": null,
+      "right": null,
+      "textLeft": null,
+      "textRight": null,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div#workspace-frame.landing-module__ue1IDW__workspace-frame",
+      "tag": "div",
+      "top": 424,
+      "height": 1037,
+      "words": 136,
+      "media": 2,
+      "middle": 0,
+      "heading": null,
+      "left": 24,
+      "right": 24,
+      "textLeft": 27,
+      "textRight": 35,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.landing-module__ue1IDW__section-heading.landing-module__",
+      "tag": "div",
+      "top": 1704,
+      "height": 231,
+      "words": 18,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Nhiều việc trong ngày.",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 42,
+      "textLeft": 16,
+      "textRight": 42,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "div.landing-module__ue1IDW__story",
+      "tag": "div",
+      "top": 1936,
+      "height": 3587,
+      "words": 307,
+      "media": 5,
+      "middle": 0,
+      "heading": {
+       "text": "Mỗi câu hỏi đều xứng đáng được quan tâm.",
+       "size": 28,
+       "tag": "h3"
+      },
+      "left": 16,
+      "right": 25,
+      "textLeft": 16,
+      "textRight": 25,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#how-it-works.landing-module__ue1IDW__how",
+      "tag": "section",
+      "top": 5557,
+      "height": 2249,
+      "words": 217,
+      "media": 3,
+      "middle": 0,
+      "heading": {
+       "text": "Bắt đầu từ những gì",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 17,
+      "textLeft": 16,
+      "textRight": 30,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#faq.landing-module__ue1IDW__faq-section.landing-modu",
+      "tag": "section",
+      "top": 7806,
+      "height": 633,
+      "words": 124,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Bạn có thể",
+       "size": 32,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 54,
+      "textLeft": 16,
+      "textRight": 54,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.landing-module__ue1IDW__closing",
+      "tag": "section",
+      "top": 8439,
+      "height": 367,
+      "words": 24,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Thêm một đồng đội.",
+       "size": 33,
+       "tag": "h2"
+      },
+      "left": 41,
+      "right": 41,
+      "textLeft": 41,
+      "textRight": 41,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.landing-module__ue1IDW__footer.landing-module__ue1IDW",
+      "tag": "footer",
+      "top": 8806,
+      "height": 153,
+      "words": 14,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 16,
+      "right": 79,
+      "textLeft": 16,
+      "textRight": 79,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Your AI teammate for every customer.",
+      "size": 33,
+      "top": 120,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 16,
+      "n": 13
+     },
+     {
+      "x": 98,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 14,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "FAIL",
+   "id": "eyebrow",
+   "width": 1440,
+   "message": "5 eyebrow/kicker label(s) above headings: \"Shop luôn quyết định\" above \"L\"; \"Chăm sóc khách hàng\" (pill) above \"Mỗi câu hỏi đều xứng đáng được quan tâm.\"; \"Livestream assistant\" (pill) above \"Bạn giữ nhịp live. theo nhịp khách.\"; \"Marketing assistant\" (pill) above \"Từ sản phẩm quen thuộc đến một góc kể mớ\"; \"Sales assistant\" (pill) above \"Hiểu điều khách cần. Tư vấn điều phù hợp\"",
+   "fix": "Delete them. If the label carried real information, fold it into the headline or the supporting sentence.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "numbering",
+   "width": 1440,
+   "message": "Decorative index numbers: \"01\", \"02\", \"03\", \"04\"",
+   "fix": "Remove them. If order truly matters, write it into the words (\"First, …\") or use a real <ol>.",
+   "alsoAt": [
+    768
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "shadow",
+   "width": 1440,
+   "message": "5 box-shadow(s) on elements at rest: figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px | figure.landing-module__ue1IDW__floating-card.landing-module_ → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px | div.landing-module__ue1IDW__floating-card.landing-module__ue → rgba(37, 39, 34, 0.14) 0px 18px 40px -12px",
+   "fix": "Remove. Separate surfaces with a tone step or space. Shadows are for things that really float (menus, dialogs, sticky bars).",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "hairline",
+   "width": 1440,
+   "message": "27 thin rule(s)/divider line(s): header.landing-module__ue1IDW__header 1440px | div.landing-module__ue1IDW__workspace-bar 848px | div.landing-module__ue1IDW__workspace-tabs 849px | div.landing-module__ue1IDW__conversations 229px",
+   "fix": "Delete. Separate with space, a tone change, or scale. Lines are only for real tables and form fields.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "outlined-box",
+   "width": 1440,
+   "message": "14 boxes drawn with a 1px outline.",
+   "fix": "Define a surface by its fill (one tone step from the page) or leave the content unboxed.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "dashed",
+   "width": 1440,
+   "message": "1 dashed/dotted border(s).",
+   "fix": "Remove unless it is a real drop zone.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "palette-claude",
+   "width": 1440,
+   "message": "Cream + terracotta palette (page background #faf9f8, section #faf8f5, section #fffefa, section #eee9df).",
+   "fix": "Re-draw the palette from the library. This pairing reads as an assistant brand, not yours.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "contrast",
+   "width": 1440,
+   "message": "Low-contrast text: \"Chăm sóc khách hàng\" 4.2:1 needs 4.5:1; \"Livestream assistant\" 4.2:1 needs 4.5:1; \"Marketing assistant\" 4.2:1 needs 4.5:1; \"Sales assistant\" 4.2:1 needs 4.5:1",
+   "fix": "Darken or lighten the text colour.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "size-count",
+   "width": 1440,
+   "message": "13 different font sizes (12, 13, 14, 15, 16, 18, 20, 24, 30, 35, 46, 54, 70).",
+   "fix": "A page needs about five: display, heading, lead, body, small.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "body-size",
+   "width": 1440,
+   "message": "Body text is 13px (the size most of the running text is set in).",
+   "fix": "Body copy 16–20px. Map small sizes from blueprints onto your body step.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "no-footage",
+   "width": 1440,
+   "message": "No video anywhere on the page.",
+   "fix": "Look for one honest clip with scripts/assets.mjs --video (the place, the material, the process) and use it as a muted loop with a poster frame. Defend its absence only if no clip fits the subject."
+  },
+  {
+   "level": "FAIL",
+   "id": "small-text",
+   "width": 1440,
+   "message": "66 text blocks under 13px.",
+   "fix": "Nothing meant to be read goes below 13px.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "headline-lines",
+   "width": 768,
+   "message": "2 headline(s) wrap past two lines at 768px: \"Bạn giữ nhịp live. theo nhịp khách.\" → 3 lines (7 words, 28px); \"Từ sản phẩm quen thuộc đến một góc kể mới.\" → 3 lines (10 words, 28px)",
+   "fix": "Cut words first (a headline is a title, not a sentence). Then give it a wider measure. Lower the size only as a last resort and never below the scale you chose. A real statement paragraph belongs in a <p> or <blockquote> at 32px or less."
+  },
+  {
+   "level": "WARN",
+   "id": "off-centre",
+   "width": 768,
+   "message": "The margins differ: 28px on the left, 46px on the right, at 768px.",
+   "fix": "Put the navigation and the content on one pair of margins; check for padding on one side only, a scrollbar gutter, or a header on another inset than the page."
+  },
+  {
+   "level": "FAIL",
+   "id": "headline-lines",
+   "width": 390,
+   "message": "2 headline(s) wrap past two lines at 390px: \"Nhiều việc trong ngày. Một đồng đội xuyên suốt.\" → 3 lines (9 words, 32px); \"Thêm một đồng đội. Nhẹ một ngày bán hàng.\" → 3 lines (9 words, 33px)",
+   "fix": "Cut words first (a headline is a title, not a sentence). Then give it a wider measure. Lower the size only as a last resort and never below the scale you chose. A real statement paragraph belongs in a <p> or <blockquote> at 24px or less."
+  },
+  {
+   "level": "WARN",
+   "id": "glass",
+   "width": 390,
+   "message": "3 backdrop-blur surfaces.",
+   "fix": "One blurred sticky bar at most; glass cards are a tell."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\desktop-fold.jpg",
+   "pages": [
+    "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\desktop-page-01.jpg",
+    "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\desktop-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\tablet-fold.jpg",
+   "pages": [
+    "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\tablet-page-01.jpg",
+    "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\tablet-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\mobile-fold.jpg",
+   "pages": [
+    "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\mobile-page-01.jpg",
+    "D:\\KHTN\\Year_3\\Period 1\\GenD\\tendly-project-gend\\.taste-skill\\before\\mobile-page-02.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

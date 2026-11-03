@@ -1,25 +1,10 @@
 /* Scoped under .admin-root — CSS toàn cục của Next.js không bị gỡ khi chuyển trang */
-.admin-root {
-  --canvas: #FAF9F8;
-  --coral: #F06A6A;
-  --coral-deep: #D8514F;
-  --coral-soft: #FCE4E2;
-  --ink: #2B211E;
-  --ink-soft: #6B5F5A;
-  --sand: #F1EAE3;
-  --line: #E7DED7;
-  --moss: #4B6358;
-  --moss-soft: #DCE6E1;
-  --paper: #FFFFFF;
-  --amber: #B8790A;
-  --amber-soft: #F5E7CC;
-}
 .admin-root * { margin: 0; padding: 0; box-sizing: border-box; }
 .admin-root {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-tendly), Arial, sans-serif;
   background: var(--canvas);
   color: var(--ink);
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 .admin-root a { color: inherit; text-decoration: none; }
@@ -102,7 +87,7 @@
 .admin-root .tab-btn:hover, .admin-root .tab-btn.active { color: var(--ink); }
 .admin-root .tab-btn.active::after { transform: scaleX(1); }
 .admin-root .tab-panel { margin-top: 28px; display: flex; flex-direction: column; gap: 20px; animation: td-fade-in 0.25s ease; }
-.admin-root .card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 28px; }
+.admin-root .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 28px; }
 .admin-root .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .admin-root .card-head h2 { font-size: 16.5px; font-weight: 700; }
 .admin-root .card-head .hint { font-size: 13px; color: var(--ink-soft); }

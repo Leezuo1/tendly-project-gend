@@ -15,19 +15,19 @@ export default function Nav() {
 
   return (
     <nav className={scrolled ? 'scrolled' : ''} id="nav">
-      <div className="wrap nav-inner">
+      <div className="wrap-wide nav-inner">
         <Link className="logo" href="/" style={{ display: 'flex', alignItems: 'center' }}>
-          <img src="/tendly-logo.png" alt="Tendly" style={{ height: 32, width: 'auto', display: 'block' }} />
+          <img src="/tendly-logo.png" alt="Tendly" style={{ width: 108, height: 'auto', display: 'block' }} />
         </Link>
         <div className="nav-links">
-          <Link href="/#how">Cách hoạt động</Link>
-          <Link href="/#features">Tính năng</Link>
-          <Link href="/#care">AI hỗ trợ khách</Link>
+          <Link href="/#san-pham">Sản phẩm</Link>
+          <Link href="/#cach-hoat-dong">Cách hoạt động</Link>
+          <Link href="/#hoi-dap">Hỏi đáp</Link>
           <Link href="/pricing" className={pathname === '/pricing' ? 'active' : ''}>
             Bảng giá
           </Link>
         </div>
-        <Link href="/dang-nhap" className="nav-cta">Đăng ký / Đăng nhập</Link>
+        <Link href="/dang-nhap" className="nav-cta" aria-label="Đăng ký hoặc đăng nhập Tendly">Bắt đầu</Link>
       </div>
     </nav>
   );

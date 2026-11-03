@@ -1,6 +1,6 @@
-﻿---
-name: Tendly Landing
-description: Warm charcoal and coral product storytelling for the public landing.
+---
+name: Tendly
+description: Shared REM typography, warm paper, charcoal and coral across the landing and product.
 colors:
   paper: "#faf8f5"
   white: "#fffefa"
@@ -15,152 +15,77 @@ colors:
 typography:
   display:
     fontFamily: "REM, sans-serif"
-    fontSize: "clamp(38px,5.1vw,70px)"
-    fontWeight: 600
-    lineHeight: 1.12
-    letterSpacing: "-0.04em"
+    fontSize: "clamp(44px,6.2vw,104px)"
+    fontWeight: 650
+    lineHeight: 1.18
+    letterSpacing: "-0.015em"
   headline:
     fontFamily: "REM, sans-serif"
-    fontSize: "clamp(32px,3.5vw,46px)"
-    fontWeight: 600
-    lineHeight: 1.22
-    letterSpacing: "-0.035em"
+    fontWeight: 650
+    lineHeight: 1.4
+    letterSpacing: "-0.01em"
   body:
     fontFamily: "REM, sans-serif"
-    fontSize: "15px"
-    fontWeight: 400
-    lineHeight: 1.65
-  label:
-    fontFamily: "REM, sans-serif"
-    fontSize: "12px"
+    fontSize: "14px"
+    lineHeight: 1.6
 rounded:
   control: "5px"
   action: "7px"
   card: "8px"
-  stage: "12px"
-spacing:
-  compact: "12px"
-  panel: "16px"
-  content: "24px"
-  desktop-gutter: "48px"
-components:
-  button-primary:
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.white}"
-    rounded: "{rounded.action}"
-    padding: "13px 23px"
-    height: "48px"
-  button-primary-hover:
-    backgroundColor: "#41453b"
-  button-coral:
-    backgroundColor: "{colors.coral}"
-    textColor: "#ffffff"
-    rounded: "{rounded.action}"
-    padding: "13px 23px"
-  button-coral-hover:
-    backgroundColor: "#ad3c2b"
-  approval:
-    backgroundColor: "{colors.green}"
-    textColor: "{colors.white}"
-    rounded: "{rounded.control}"
-    padding: "9px 12px"
-  editor:
-    backgroundColor: "{colors.white}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.control}"
-    padding: "12px"
-  selected-situation:
-    backgroundColor: "{colors.sand}"
-    textColor: "{colors.ink}"
 ---
 
-# Design System: Tendly Landing
+# Tendly design system
 
-## Overview
+## Shared foundations
 
-**Creative North Star: "A shop's working day, made visible"**
+`app/globals.css` is the source of truth for the palette and radius variables. The public landing,
+authentication, pricing, onboarding, dashboard, inbox, marketing, livestream, settings, AI configuration,
+Smart Sourcing and customer previews inherit these foundations. Screen layouts and data behavior remain
+specific to their jobs; product screens keep their compact type scale instead of landing-sized headings.
 
-Warm paper surfaces, charcoal typography and coral accents frame a photographic product tour. Clothing, conversations and shop decisions appear together in layered compositions, so the page can explain more with less prose. This is the user-approved replacement implemented on the public `/` route; authenticated screens, global app styling, backend and authentication retain their own systems.
+`app/layout.tsx` loads the existing local variable REM font once through `next/font/local` and exposes
+`--font-tendly`. Retain `public/landing/fonts/REM-OFL.txt` with the font. Use the shared family for headings,
+body, forms and buttons. Vietnamese body and FAQ questions use normal tracking; large headings use
+-0.01em to -0.015em tracking and enough line height for accents. Numbers such as chapter times can keep
+tighter tracking. The exact slogan is `Your AI teammate for every customer`.
 
-**Key Characteristics:**
+The canvas is warm paper, content surfaces are off-white, and secondary surfaces use sand. Charcoal
+carries primary text; dark green communicates approval and focus; coral identifies primary actions.
+Keep platform and warning/error colors where they carry meaning. The supplied `/tendly-logo.png` stays
+transparent, with no white badge or padding added around the wordmark.
 
-- Local REM typography and the existing Tendly identity.
-- Flat tonal panels, fine dividers and layered photographic stories.
-- Five selectable work scenes and four independent visual chapters.
-- Visible shop review states and controllable motion.
+The landing aliases its `--paper` to the global canvas and its `--white` to the global surface.
+Do not restore independent copies of the palette inside each route root. The mini livestream's dark
+mode keeps its own legible semantic colors. Its picture-in-picture document copies the root font class
+along with styles so that local REM works in that separate document too.
 
-## Colors
+## Public landing
 
-### Primary
+The current direction is a fashion lookbook: bold editorial type, product photography and interface
+fragments showing the shop's review step. The persisted direction and subject notes live in
+`.taste-skill/direction.json` and `.taste-skill/notes.md`; this refinement keeps that composition.
 
-Coral identifies exploration, selected scenes and scroll progress. Charcoal gives navigation and account-entry actions their visual weight.
+`LandingPage.tsx` owns the content, `SizeDesk.tsx` the local size example, `DayStory.tsx` the daily work
+scenes, and `LandingMotion.tsx` the reveal/progress behavior. Local demonstrations do not prove live
+provider delivery. Preserve their validation, labels and review states.
 
-### Secondary
+The FAQ uses alternating flat bands with all answers visible. Its coral heading band is content-sized,
+with 28-56px vertical padding and a 36-64px heading; it has no viewport-height minimum. Questions use
+1.4 line height and normal tracking, answers 1.7 line height. At 760px and below, question and answer
+stack. Preserve this compact heading rather than restoring the former 30-40svh banner.
 
-Green communicates review, recommendation and keyboard focus; peach contains the closing invitation.
+## Shared navigation and controls
 
-### Neutral
+Pricing navigation and footer point to the landing's current anchors: `#san-pham`, `#cach-hoat-dong`
+and `#hoi-dap`. Account entry goes to `/dang-nhap`; prices and plan selection behavior are unchanged.
+On phones the public navigation wraps below the logo and account action, keeping links reachable.
 
-Paper is the page ground, white contains content, sand separates selected situations and supporting stages, and fine warm dividers organize dense UI. Muted text supports charcoal headings; the dark sidebar anchors the workspace.
+Use shared action and card radius tokens. Pricing cards have flat surfaces with a coral border for
+the existing featured plan. Auth primary actions use the same coral and darker hover color. Keep
+visible keyboard focus, input labels, error states, disabled states and the supplied logo.
 
-**The Scoped World Rule.** These tokens belong to the landing root; do not spread them into authenticated product screens without a separate brief.
+## Validation boundaries
 
-## Typography
-
-Local variable **REM**, with sans-serif fallback, serves display, prose and UI. The font at `public/landing/fonts/REM.ttf` supports weights 100–900, uses swap, and retains its OFL license. Large headlines are expressive without the earlier heavy navy treatment. Desktop roles are recorded in frontmatter; mobile display uses `clamp(33px,7.8vw,53px)`. Chapter titles use `clamp(28px,2.5vw,35px)` and UI uses readable 12–14px sizes. The exact English slogan **Your AI teammate for every customer** retains `lang="en"`; supporting copy is Vietnamese.
-
-## Layout
-
-The centered container caps at 1200px and expands to 1280px above 1450px. Navigation is sticky with 84px desktop and 70px mobile height. Floating shop, host and size cards surround the desktop workspace; at 1100px they enter the document flow. At 760px the sidebar hides, five tabs wrap, situation pills scroll horizontally, four visual canvases appear inline and setup/ecosystem stories stack. Gutters step from 48px desktop to 28px, 20px and 16px at the observed 1050px, 760px and 390px thresholds.
-
-Four scroll chapters share a pinned visual stage on desktop. Their compositions differ: polo/size chart/chat; live host/comments/draft order; moodboard/social draft; product comparison/recommendation. Three setup storyboards show knowledge, routing and shop approval. The routing hub uses the actual Tendly logo. Supplier MOQ and a static product-email card explain the ecosystem; there is no Email activation checkbox or status below the feature copy.
-
-## Elevation & Depth
-
-There is no card-shadow system. Depth comes from warm tonal layering, fine borders, overlapping photographs, small rotations and controlled parallax. Ambient hero light and a border beam add motion around the workspace. Images retain rounded clipping rather than heavy frames.
-
-## Shapes
-
-Broad rounded stages contain smaller rectangular cards and controls. The normative radius roles are in frontmatter; photographic cards vary within 5–10px according to their composition. Situation pills and status dots provide compact exceptions. Tables retain aligned numerals and readable row boundaries.
-
-## Components
-
-### Actions and navigation
-
-Charcoal account-entry actions and the coral exploration action share restrained geometry and a 200ms hover lift. Header and closing CTAs use Next Link to `/dang-nhap`; exploration anchors stay on the landing. Focus uses a green 3px outline with 5px offset. Mobile navigation exposes expanded state, closes on Escape and returns focus. Controls retain 44px minimum targets where implemented; primary actions use 48px.
-
-### Workspace and editor
-
-Five keyboard-operable tabs expose fifteen contextual situations. Streaming answers can be edited, validated, saved, cancelled and approved locally. Approval changes the local review state and emits a brief particle burst; it does not send, publish or place an order. The labeled textarea uses a visible focus outline and rejects empty edits. Streaming completion preserves editing/approved states.
-
-Playback advances every 4.5 seconds with a visible pause control and progress indicator. Hover, offscreen visibility, hidden document and editing suspend progression; manual selection stops autoplay. Ambient light, headline shimmer, border beam and qualitative marquee follow playback/visibility.
-
-### Photographic stories
-
-The pinned stage changes independently of the hero. Layers enter over 700ms with a 150ms stagger; photographs unveil with clipping over 800ms desktop and 650ms mobile. Scroll connectors use native timelines with a JavaScript fallback; parallax stays within 30px. Parent-observed reveals trigger near 80% viewport, with static visible content before enhancement. Contextual image alternatives and canvas labels describe the story.
-
-### Identity, assets and lifecycle
-
-Header and routing hub share `/tendly-logo.png`. Seven optimized WebPs in `public/landing/story/` total 635,496 bytes: six generated photographs and a derivative of the existing navy product illustration. Exact prompts and per-image provenance sidecars accompany them. These are synthetic brand images, not customer endorsements. Native Next Image renders already optimized assets with `unoptimized`.
-
-Server-rendered `LandingPage` owns markup. `LandingExperience` mounts the root-scoped interaction initializer and returns its cleanup. CSS Module classes and variables stay under the landing root; conditional document scroll styles apply only while that root exists. AbortSignal listeners, disconnected observers and cancelled timers/frames prevent interaction loops surviving navigation.
-
-**The Visible Without Motion Rule.** Reduced motion removes autoplay, streaming, spatial effects, particles and pseudo-element animation; all content remains visible and the marquee becomes static. Preserve skip link, native FAQ, tab arrows/Home/End, focus rings, editor labels, busy states and polite announcements.
-
-## Do's and Don'ts
-
-### Do:
-
-- **Do** retain the existing logo, exact English slogan and local font license.
-- **Do** preserve distinct visual chapters, mobile inline canvases and shop review states.
-- **Do** preserve root scoping, navigation cleanup and reduced-motion visibility.
-- **Do** keep image provenance with optimized public assets.
-
-### Don't:
-
-- **Don't** apply landing tokens to other app surfaces without a separate brief.
-- **Don't** restore the removed Email toggle, activation status or Pilot form.
-- **Don't** infer live-provider delivery from local tour interactions.
-- **Don't** treat synthetic photographs as customer endorsements.
-
-Chapter reading focus uses 35% opacity for inactive desktop chapters and an 8px shift for the active chapter, with four coral progress nodes. Mobile keeps every chapter fully readable; reduced motion removes the shift and entrances. Chapter labels are peach pills above headings per the supplied brief. Narrative copy uses 18px hero, 16px section/chapter and 14.5px step text, with selected ink semibold keywords. Overlay cards use soft depth shadows and livestream comments use backdrop blur.
+Verify desktop, tablet and phone layouts, navigation after route transitions, Vietnamese wrapping,
+auth form validation and reduced-motion visibility. Mocked browser sessions and API responses validate
+UI behavior only; they do not validate Meta/Shopee delivery or production deployment.

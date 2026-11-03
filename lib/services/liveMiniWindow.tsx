@@ -24,6 +24,7 @@ export const miniUrl = (sessionId: string) => `/livestream/mini?session=${encode
 
 /** Chép CSS của trang vào cửa sổ nổi (cửa sổ nổi là tài liệu riêng, không tự có style). */
 function copyStyles(target: Document) {
+  target.documentElement.className = document.documentElement.className;
   for (const sheet of Array.from(document.styleSheets)) {
     try {
       const style = target.createElement('style');

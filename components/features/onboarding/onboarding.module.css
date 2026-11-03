@@ -1,4 +1,4 @@
-.root { min-height: 100svh; display: flex; flex-direction: column; background: var(--canvas); color: var(--ink); font-family: 'Be Vietnam Pro', Arial, sans-serif; font-size: 13px; line-height: 1.7; }
+.root { min-height: 100svh; display: flex; flex-direction: column; background: var(--canvas); color: var(--ink); font-family: var(--font-tendly), Arial, sans-serif; font-size: 13px; line-height: 1.7; }
 .root button, .root input, .root select { font: inherit; }
 .root button { cursor: pointer; }
 .root a:focus-visible, .root button:focus-visible { outline: 3px solid var(--moss); outline-offset: 4px; }
@@ -12,8 +12,8 @@
 .layout { width: min(1220px, calc(100% - 80px)); margin: 0 auto; display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 65px; flex: 1; padding: 60px 0 65px; }
 .rail { padding: 5px 25px 0 0; border-right: 1px solid var(--line); }
 .eyebrow { color: var(--ink-soft); font-size: 9px; font-weight: 600; letter-spacing: 1.6px; }
-.rail h2 { margin-top: 20px; font-size: 30px; line-height: 1.45; letter-spacing: -1.3px; font-weight: 600; }
-.rail h2 em { font-family: 'Lora', Georgia, serif; color: var(--coral-deep); font-weight: 500; }
+.rail h2 { margin-top: 20px; font-size: 30px; line-height: 1.45; letter-spacing: -0.01em; font-weight: 600; }
+.rail h2 em { color: var(--coral-deep); font-weight: 500; }
 .railDescription { margin-top: 16px; max-width: 215px; font-size: 11px; line-height: 1.9; color: var(--ink-soft); }
 .steps { padding: 0; list-style: none; margin: 40px 0 0; }
 .steps li { position: relative; display: flex; gap: 12px; padding-bottom: 30px; color: var(--ink-soft); }
@@ -28,9 +28,9 @@
 .railNote { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; gap: 13px; align-items: center; }
 .railNote > span { font-size: 36px; color: var(--coral); }
 .railNote p { font-size: 13px; line-height: 1.7; }
-.railNote em { font-family: 'Lora', Georgia, serif; color: var(--coral-deep); }
+.railNote em { color: var(--coral-deep); }
 .content { min-width: 0; padding-top: 5px; }
-.content h1 { margin-top: 13px; font-size: clamp(27px, 2.7vw, 38px); letter-spacing: -1.5px; line-height: 1.4; font-weight: 600; }
+.content h1 { margin-top: 13px; font-size: clamp(27px, 2.7vw, 38px); letter-spacing: -0.01em; line-height: 1.4; font-weight: 600; }
 .description { margin-top: 13px; max-width: 590px; font-size: 12px; line-height: 1.9; color: var(--ink-soft); }
 .description strong { color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
 .workspaceColumns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .78fr); align-items: start; gap: 35px; margin-top: 35px; }
@@ -109,7 +109,7 @@
 .workspaceLayout .railNote > span { font-size: 30px; }
 .workspaceLayout .content { padding-top: 0; }
 .workspacePanel { padding: 28px; border: 1px solid #e9e0d7; border-radius: 16px; background: var(--paper); box-shadow: 0 5px 20px #2b211e03; }
-.workspacePanel h1 { font-size: clamp(26px, 2.4vw, 33px); letter-spacing: -1px; }
+.workspacePanel h1 { font-size: clamp(26px, 2.4vw, 33px); letter-spacing: -0.01em; }
 .workspacePanel .description { font-size: 12px; margin-top: 10px; }
 .workspaceLayout .workspaceColumns { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 26px; margin-top: 29px; }
 .workspaceLayout .preview { display: block; }
@@ -163,11 +163,11 @@
 .footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: auto max(28px, calc((100vw - 1260px) / 2)) 0; padding: 20px 0; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 9px; }
 .footer > span:last-child { display: flex; align-items: center; gap: 7px; }
 .footer > span:last-child > span { color: var(--coral-deep); font-size: 16px; }
-.loading { display: grid; place-items: center; min-height: 100svh; padding: 24px; background: var(--canvas); color: var(--ink-soft); font: 13px 'Be Vietnam Pro', Arial, sans-serif; }
+.loading { display: grid; place-items: center; min-height: 100svh; padding: 24px; background: var(--canvas); color: var(--ink-soft); font: 13px var(--font-tendly), Arial, sans-serif; }
 .dialog { position: fixed; margin: auto; width: min(480px, calc(100% - 32px)); padding: 32px; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas); color: var(--ink); box-shadow: 0 20px 80px #2b211e26; }
 .dialog::backdrop { background: #2b211e66; backdrop-filter: blur(3px); }
 .close { position: absolute; top: 10px; right: 10px; height: 36px; width: 36px; border: 0; background: none; color: var(--ink-soft); font-size: 25px !important; }
-.dialog h2 { margin-top: 18px; font-size: 24px; letter-spacing: -.8px; }
+.dialog h2 { margin-top: 18px; font-size: 24px; letter-spacing: -0.01em; }
 .dialog > p { margin-top: 8px; color: var(--ink-soft); font-size: 11px; }
 .dialog form { display: flex; flex-direction: column; gap: 16px; margin-top: 23px; }
 .dialog fieldset { border: 0; padding: 0; min-width: 0; }
@@ -186,7 +186,7 @@
 .connectionsLayout .railNote > span { font-size: 30px; }
 .connectionsLayout .content { padding-top: 0; }
 .connectionsPanel { padding: 26px; border: 1px solid #e9e0d7; border-radius: 16px; background: var(--paper); box-shadow: 0 5px 20px #2b211e03; }
-.connectionsPanel h1 { font-size: clamp(27px, 2.4vw, 34px); letter-spacing: -1.2px; }
+.connectionsPanel h1 { font-size: clamp(27px, 2.4vw, 34px); letter-spacing: -0.01em; }
 .connectionsPanel .description { color: #62564f; }
 .connectionsPanel .mockBanner { gap: 10px; margin-top: 21px; padding: 11px 13px; border: 1px solid #e5e9df; border-radius: 10px; background: #f4f6ef; }
 .connectionsPanel .mockBanner svg { flex-shrink: 0; color: #4b6358; }
@@ -232,7 +232,7 @@
 .connectionsPanel .connectionCount { margin-top: 10px; font-size: 9px; color: #62564f; }
 .connectionsPanel .announcement { font-size: 10px; margin-top: 12px; min-height: 24px; }
 @media (max-width: 1100px) { .layout { width: calc(100% - 56px); grid-template-columns: 205px minmax(0, 1fr); gap: 30px; } .rail { padding-right: 15px; } .rail h2 { font-size: 26px; } .workspaceColumns { grid-template-columns: minmax(0, 1fr); } .preview { display: none; } .platformGrid { gap: 9px; } .platformCard { padding: 15px 12px; } .platformTop { align-items: flex-start; flex-direction: column; } .productGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); } .actions { align-items: flex-start; } .actions > div { flex-direction: column-reverse; align-items: flex-end; gap: 7px; } }
-@media (max-width: 760px) { .header { min-height: 73px; padding: 16px 20px; } .header img { width: 105px; } .headerRight { gap: 7px; } .headerRight > .adminAvatar, .headerRight > span:not(.demoBadge) { display: none; } .demoBadge { font-size: 7px; margin-right: 0; padding: 3px 6px; } .headerRight > button { padding-left: 9px; font-size: 9px; } .layout { width: calc(100% - 40px); display: block; padding: 25px 0 40px; } .rail { padding: 0; border: 0; } .rail > .eyebrow, .rail h2, .railDescription, .railNote { display: none; } .steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 0 0 30px; padding-bottom: 20px; border-bottom: 1px solid var(--line); } .steps li { display: block; padding-bottom: 0; } .steps li::before { display: none; } .steps li > span { width: 27px; height: 27px; font-size: 9px; } .steps strong { font-size: 8px; line-height: 1.7; margin-top: 8px; } .steps p { display: none; } .content h1 { font-size: 28px; letter-spacing: -1px; } .description { font-size: 11px; } .workspaceColumns { margin-top: 28px; } .field input, .field select { font-size: 16px; } .groupHeading { display: block; margin-top: 24px; } .groupHeading > span { display: block; margin-top: 3px; } .platformGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .platformCard { padding: 17px 14px; } .platformTop { gap: 8px; } .platformDescription { font-size: 10px; } .productGrid { grid-template-columns: 1fr 1fr; gap: 12px; } .productNote { padding: 15px 10px; display: block; } .productNote > span { font-size: 24px; } .productNote p { font-size: 9px; } .productNote small { font-size: 8px; } .actions { flex-direction: column-reverse; gap: 15px; } .actions > div { width: 100%; align-items: stretch; } .actions .primary { width: 100%; } .connectionCount { text-align: left; } .footer { margin-left: 20px; margin-right: 20px; } .dialog { padding: 25px; }        }
+@media (max-width: 760px) { .header { min-height: 73px; padding: 16px 20px; } .header img { width: 105px; } .headerRight { gap: 7px; } .headerRight > .adminAvatar, .headerRight > span:not(.demoBadge) { display: none; } .demoBadge { font-size: 7px; margin-right: 0; padding: 3px 6px; } .headerRight > button { padding-left: 9px; font-size: 9px; } .layout { width: calc(100% - 40px); display: block; padding: 25px 0 40px; } .rail { padding: 0; border: 0; } .rail > .eyebrow, .rail h2, .railDescription, .railNote { display: none; } .steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 0 0 30px; padding-bottom: 20px; border-bottom: 1px solid var(--line); } .steps li { display: block; padding-bottom: 0; } .steps li::before { display: none; } .steps li > span { width: 27px; height: 27px; font-size: 9px; } .steps strong { font-size: 8px; line-height: 1.7; margin-top: 8px; } .steps p { display: none; } .content h1 { font-size: 28px; letter-spacing: -0.01em; } .description { font-size: 11px; } .workspaceColumns { margin-top: 28px; } .field input, .field select { font-size: 16px; } .groupHeading { display: block; margin-top: 24px; } .groupHeading > span { display: block; margin-top: 3px; } .platformGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .platformCard { padding: 17px 14px; } .platformTop { gap: 8px; } .platformDescription { font-size: 10px; } .productGrid { grid-template-columns: 1fr 1fr; gap: 12px; } .productNote { padding: 15px 10px; display: block; } .productNote > span { font-size: 24px; } .productNote p { font-size: 9px; } .productNote small { font-size: 8px; } .actions { flex-direction: column-reverse; gap: 15px; } .actions > div { width: 100%; align-items: stretch; } .actions .primary { width: 100%; } .connectionCount { text-align: left; } .footer { margin-left: 20px; margin-right: 20px; } .dialog { padding: 25px; }        }
 @media (max-width: 760px) { .actions .back { width: 100%; } }
 @media (max-width: 960px) { .workspaceLayout { width: calc(100% - 40px); grid-template-columns: 185px minmax(0, 1fr); gap: 18px; } .workspaceLayout .rail { padding: 20px 15px; } .workspaceLayout .rail h2 { font-size: 23px; } .workspacePanel { padding: 23px; } .workspaceLayout .workspaceColumns { grid-template-columns: minmax(0, 1fr); gap: 24px; } .workspaceLayout .preview { width: 100%; max-width: 420px; margin: 0 auto; } }
 @media (max-width: 760px) { .workspaceLayout { display: block; padding-top: 20px; } .workspaceLayout .rail { padding: 0; border: 0; background: none; } .workspaceLayout .steps { margin: 0 0 22px; padding-bottom: 16px; } .workspaceLayout .railNote { display: none; } .workspacePanel { padding: 23px 18px; border-radius: 13px; } .workspacePanel h1 { font-size: 26px; } .workspaceLayout .workspaceColumns { margin-top: 23px; } .workspaceForm .field input, .workspaceForm .field select { font-size: 16px; } .preview { padding: 13px; } }

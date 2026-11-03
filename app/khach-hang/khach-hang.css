@@ -1,25 +1,10 @@
 /* Scoped under .customer-root — CSS toàn cục của Next.js không bị gỡ khi chuyển trang */
-.customer-root {
-  --canvas: #FAF9F8;
-  --coral: #F06A6A;
-  --coral-deep: #D8514F;
-  --coral-soft: #FCE4E2;
-  --ink: #2B211E;
-  --ink-soft: #6B5F5A;
-  --sand: #F1EAE3;
-  --line: #E7DED7;
-  --moss: #4B6358;
-  --moss-soft: #DCE6E1;
-  --paper: #FFFFFF;
-  --amber: #B8790A;
-  --amber-soft: #F5E7CC;
-}
 .customer-root * { margin: 0; padding: 0; box-sizing: border-box; }
 .customer-root {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-tendly), Arial, sans-serif;
   background: var(--canvas);
   color: var(--ink);
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 .customer-root a { color: inherit; text-decoration: none; }
