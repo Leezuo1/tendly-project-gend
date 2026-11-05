@@ -13,8 +13,8 @@ export const metadata: Metadata = {
 
 export default async function CauHinhAiPage({ searchParams }: { searchParams: Promise<{ tab?: string; shopee?: string }> }) {
   const params = await searchParams;
-  if (params.tab && ['products', 'faq', 'email'].includes(params.tab)) {
-    const query = new URLSearchParams({ tab: params.tab });
+  if (params.tab && ['products', 'faq', 'email', 'tags'].includes(params.tab)) {
+    const query = new URLSearchParams({ tab: params.tab === 'email' ? 'tags' : params.tab });
     if (params.shopee === 'connected') query.set('shopee', 'connected');
     redirect(`/cai-dat?${query}`);
   }

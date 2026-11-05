@@ -87,6 +87,7 @@
 .admin-root .tab-btn:hover, .admin-root .tab-btn.active { color: var(--ink); }
 .admin-root .tab-btn.active::after { transform: scaleX(1); }
 .admin-root .tab-panel { margin-top: 28px; display: flex; flex-direction: column; gap: 20px; animation: td-fade-in 0.25s ease; }
+.admin-root .tab-panel[hidden] { display: none; }
 .admin-root .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 28px; }
 .admin-root .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .admin-root .card-head h2 { font-size: 16.5px; font-weight: 700; }

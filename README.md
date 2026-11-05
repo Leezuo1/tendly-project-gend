@@ -4,10 +4,20 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ### FAQ và cấu hình vai trò AI
 
-- **Cài đặt** có các tab Nguồn sản phẩm (`/cai-dat?tab=products`), FAQ (`/cai-dat?tab=faq`) và Email tự động (`/cai-dat?tab=email`). Link cũ `/faq` và `/cau-hinh-ai?tab=products|faq|email` chuyển đến tab tương ứng trong Cài đặt; callback Shopee cũng về tab Nguồn sản phẩm. Dữ liệu hiện có được giữ nguyên.
-- `/cau-hinh-ai` là màn hình mới với năm vai trò Content, Chat, Review, Smart Sourcing và Livestream. Có mục tiêu, văn phong, input/output, nguồn tri thức, chỉ dẫn bổ sung, trạng thái và mức tự động hóa cho từng vai trò; thêm tab Tri thức chung và Gán Fanpage.
-- Đây là **bản thiết lập prototype**, lưu trên trình duyệt theo tài khoản. Các lựa chọn vai trò và Page minh họa chưa được áp dụng vào prompt/backend, chưa kết nối Page thật và không bật/tắt gửi tin hiện hành. Công tắc Messenger thật vẫn ở Hộp thoại. Lưu lỗi phải báo lỗi; không thay dữ liệu cũ bằng cấu hình mặc định khi đọc thất bại.
-- Kiểm tra cấu hình: `node --test tests/ai-configuration.test.mjs`. Tri thức sản phẩm/FAQ vẫn dùng luồng hiện tại; chưa bổ sung USP/keyword hoặc chuyển nguồn tri thức chung lên server trong bước này.
+- **Cài đặt** có các tab Nguồn sản phẩm (`/cai-dat?tab=products`), FAQ (`/cai-dat?tab=faq`) và Gắn thẻ theo ngữ cảnh (`/cai-dat?tab=tags`). Link cũ `/faq` và `/cau-hinh-ai?tab=products|faq|email` chuyển đến Cài đặt; `tab=email` chuyển sang gắn thẻ. Callback Shopee về tab Nguồn sản phẩm. Dữ liệu hiện có được giữ nguyên.
+- Gắn thẻ hỗ trợ thêm/sửa/xóa, chọn màu, bật/tắt và thử quy tắc. Khớp một trong các từ khóa/cụm từ đầy đủ, không phân biệt hoa thường và dấu tiếng Việt, trên tin nhắn mới nhất của khách. Hộp thoại hiển thị thẻ trong danh sách và hồ sơ khách, hỗ trợ tìm theo tên thẻ. Quy tắc lưu trong mock DB hiện có của trình duyệt; chưa chạy phân loại ở webhook/backend.
+- `/cau-hinh-ai` gồm hai tab **Quản lý AI** và **Thiết lập AI**. Quản lý hiển thị năm AI, nhiệm vụ, trạng thái, nơi sử dụng, chi tiết và lối tắt chỉnh quy tắc. AI Chat đọc Fanpage đã kết nối từ `/api/settings/channels`, gán/bật/tắt riêng theo ID trang. Nội dung/Review đọc bài viết, Livestream đọc phiên thực tế; chưa có thực thể campaign độc lập nên không suy diễn bài viết thành campaign.
+- Thiết lập có bộ chọn AI, trường ngắn theo vai trò, mẫu gợi ý và quy tắc mặc định. Tùy chỉnh nền tảng lưu từng trường, các trường còn lại kế thừa mặc định; tắt tùy chỉnh vẫn giữ nội dung để bật lại. Smart Sourcing có ngành, giá VND, MOQ và khu vực. Link `?tab=settings&ai=chat|content|review|sourcing|livestream` chọn sẵn AI.
+- Cấu hình lưu trên trình duyệt theo tài khoản, giữ cấu hình v1 cũ và bổ sung các trường mới khi đọc. Page cũ nhập tên không được tự coi là Fanpage đã kết nối. Quy tắc/gán trang chưa được áp dụng vào prompt hay công tắc gửi tin backend; Messenger thật vẫn được điều khiển ở Hộp thoại. Lỗi lưu không ghi đè dữ liệu cũ; lỗi đọc không tự thay bằng mặc định.
+- Kiểm tra cấu hình: `node --test tests/ai-configuration.test.mjs`. Tri thức sản phẩm/FAQ vẫn dùng luồng hiện tại; chưa chuyển nguồn tri thức chung lên server.
+
+### Danh mục sản phẩm và chỉnh sửa
+
+Trong **Cài đặt → Nguồn sản phẩm**, danh mục mặc định gồm 10 sản phẩm Coolmate có ảnh và link gốc. Thông tin nguồn/giá tại ngày lấy được ghi tại [nguồn danh mục](docs/product-catalog-sources.md). Tồn kho shop để chưa nhập; giá là dữ liệu tại lần lấy, không tự cập nhật theo website.
+
+Nút **Sửa** mở hồ sơ riêng: SKU, tên, thương hiệu, giá/tồn, chất liệu, màu/size, mô tả, tính năng, lợi ích, USP, tệp khách, tình huống dùng, keyword, sản phẩm liên quan, bảo quản và giới hạn cam kết. Thông tin được lưu lại và đưa vào nguồn AI khi đọc danh mục hiện hành; soạn bài nhận các trường tư vấn mới. Messenger tự trả lời vẫn dùng bản nguồn đã lưu lúc bật/cập nhật tại Hộp thoại; phiên Live chỉ nhận sản phẩm đã xác nhận tồn kho và giữ danh mục lúc bắt đầu phiên.
+
+Danh mục mới thay các dòng mẫu cũ chưa chỉnh; giữ lại sản phẩm đã sửa, CSV và Shopee cùng thông tin shop/FAQ. Đồng bộ Shopee cập nhật dữ kiện thương mại, giữ nội dung tư vấn đã bổ sung và bỏ liên kết tới sản phẩm đã ngừng có trong danh mục. Lưu lỗi không thay dữ liệu/cached state trước đó. Kiểm tra: `node --test tests/products.test.mjs tests/shopee.test.mjs tests/ai-chat.test.mjs tests/ai-post.test.mjs tests/livestream.test.mjs`.
 
 ### Bảo vệ dữ liệu & tài khoản quản trị
 
@@ -93,7 +103,7 @@ Trang Cài đặt bỏ banner khôi phục và thông tin mẫu. Nút bút chì 
 
 Dashboard `/tong-quan` lấy số hội thoại đang chờ, tin đến/tin gửi hôm nay, 10 tin khách gần đây và thống kê hội thoại 7 ngày từ PostgreSQL qua `/api/dashboard`, cập nhật khoảng 2 giây khi tab đang mở. Tổng quan và Hộp thoại dùng phiên đăng nhập app và công tắc bảo vệ dữ liệu; không nhập hay lưu mã truy cập trong trình duyệt. Các số liệu email, đơn hàng và cảm xúc chưa có nguồn lưu thật được để trống. Tên chủ shop đọc từ thành viên chủ shop đã lưu trong cấu hình trình duyệt, bỏ qua tên mẫu; chưa có backend tài khoản nên chưa có tên thì để trống.
 
-Trong Cài đặt (`/cai-dat`), nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình email tự động tại các tab tương ứng. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email đang bật được cung cấp cho Gemini. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng này.
+Trong Cài đặt (`/cai-dat`), nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình gắn thẻ theo ngữ cảnh tại các tab tương ứng. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email cũ đang bật được cung cấp cho Gemini. Dữ liệu email cũ được giữ để tương thích khung email khách hàng; tab gắn thẻ không gửi email. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng hỏi AI này.
 
 Sản phẩm là nguồn cho giá, chất liệu, size, màu và tổng tồn kho. FAQ là nguồn cho chính sách shop. Mẫu email chỉ cung cấp thông tin về kịch bản, không chứng minh khách đủ điều kiện nhận ưu đãi hay email đã được gửi. Chỉ dẫn yêu cầu AI báo thiếu dữ liệu thay vì đoán thông tin hoặc tự xác nhận đã tạo đơn/gửi email. Việc gửi email thực tế không nằm trong tính năng này.
 

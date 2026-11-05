@@ -66,6 +66,18 @@ const knowledge = {
 };
 const START = Date.UTC(2026, 9, 27, 12);
 
+test('live excludes products with unknown shop stock and rejects a catalog without confirmed stock', async () => {
+  const engine = loader()('lib/services/live/engine.ts');
+  const source = structuredClone(knowledge);
+  source.products.forEach(p => { p.stockKnown = false; });
+  const input = { platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500', title: 'Kiểm tra tồn kho' };
+  await assert.rejects(engine.createSession('111', input, source, pool, START), /nhập tồn kho/);
+  source.products[0].stockKnown = true;
+  const session = await engine.createSession('111', input, source, pool, START);
+  const snapshot = await engine.buildSnapshot('111', session.id, pool);
+  assert.deepEqual(snapshot.products.map(p => p.sku), ['AT-01']);
+});
+
 /** Phiên Facebook (nguồn là bài đăng 111_500), mẫu đang lên sóng AT-01. */
 async function liveSession(load, now = START) {
   const engine = load('lib/services/live/engine.ts');

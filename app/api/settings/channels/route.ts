@@ -30,6 +30,6 @@ export const GET = withAppAccess(async function GET(request: Request) {
       }
     } catch { /* Return safe status, never expose Meta token or raw errors. */ }
   }
-  return Response.json({ configured, pageAccessible, pageName, pageAvatarUrl, databaseConfigured: Boolean(process.env.DATABASE_URL) },
+  return Response.json({ configured, pageAccessible, pageId: pageAccessible ? pageId : null, pageName, pageAvatarUrl, databaseConfigured: Boolean(process.env.DATABASE_URL) },
     { headers: { 'Cache-Control': 'no-store' } });
 });

@@ -16,8 +16,11 @@ import type { MessengerMessage } from '@/lib/types/messenger';
 import { useInboxSession } from '@/lib/services/inboxCredentials';
 import type { AiChatReply, AiSessionMessage } from '@/lib/types/ai';
 import { ConfirmDialog } from '@/components/ui/Modal';
+import { applyContextTags, readContextTagRules } from '@/lib/services/contextTags';
+import { useMockDbVersion } from '@/lib/hooks/useMockDbVersion';
 
 export function InboxShell() {
+  const dbVersion = useMockDbVersion();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const selectedIdRef = useRef('');
@@ -121,8 +124,12 @@ export function InboxShell() {
     };
   }, [conversations]);
 
+  const taggedConversations = useMemo(() => {
+    const rules = dbVersion < 0 ? [] : readContextTagRules();
+    return conversations.map(conversation => applyContextTags(conversation, rules));
+  }, [conversations, dbVersion]);
   const filteredConversations = useMemo(() => {
-    return sortReplyQueue(conversations.filter((conv) => {
+    return sortReplyQueue(taggedConversations.filter((conv) => {
       if (filter === 'urgent' && (!conv.isUnreplied || !conv.isUrgent)) return false;
       if (filter === 'unreplied' && !conv.isUnreplied) return false;
 
@@ -132,18 +139,19 @@ export function InboxShell() {
         const matchesPreview = conv.preview.toLowerCase().includes(query);
         const matchesMessages = conv.messages.some((m) => m.text.toLowerCase().includes(query));
         const matchesArea = conv.profile.shippingArea.toLowerCase().includes(query);
-        if (!matchesName && !matchesPreview && !matchesMessages && !matchesArea) {
+        const matchesTag = conv.tags.some(tag => tag.label.toLowerCase().includes(query));
+        if (!matchesName && !matchesPreview && !matchesMessages && !matchesArea && !matchesTag) {
           return false;
         }
       }
 
       return true;
     }));
-  }, [conversations, filter, searchQuery]);
+  }, [taggedConversations, filter, searchQuery]);
 
   const selectedConv = useMemo(() => {
-    return conversations.find((c) => c.id === selectedId) || conversations[0];
-  }, [conversations, selectedId]);
+    return taggedConversations.find((c) => c.id === selectedId) || taggedConversations[0];
+  }, [taggedConversations, selectedId]);
 
   const handleSelectConv = (id: string) => {
     const changed = id !== selectedIdRef.current;

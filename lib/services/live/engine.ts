@@ -95,7 +95,8 @@ export interface CreateSessionInput {
 
 export async function createSession(pageId: string, input: CreateSessionInput, knowledge: AiKnowledge,
   db: Database = getMessengerPool(), now = Date.now()): Promise<LiveSession> {
-  if (!knowledge.products.length) throw new LiveError('Cần có sản phẩm trong FAQ & sản phẩm trước khi bắt đầu phiên live.');
+  knowledge = { ...knowledge, products: knowledge.products.filter(product => product.stockKnown !== false) };
+  if (!knowledge.products.length) throw new LiveError('Cần nhập tồn kho cho ít nhất một sản phẩm trong Cài đặt trước khi bắt đầu phiên live.');
   if (input.platform === 'facebook' && !input.sourceId && !input.waitForLive) {
     throw new LiveError('Chọn video Live hoặc bài đăng làm nguồn bình luận.');
   }

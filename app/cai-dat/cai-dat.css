@@ -98,7 +98,29 @@
   .admin-root .invite-row select { width: 100%; }
 }
 
+.admin-root .settings-workspace { font-family: var(--font-tendly), Arial, sans-serif; }
+.admin-root .settings-workspace legend { font: inherit; }
 .admin-root .settings-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.admin-root .context-tags .card-head { align-items: flex-start; flex-wrap: wrap; }
+.admin-root .context-tags .card-desc { max-width: 70ch; }
+.admin-root .context-tag-form { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.admin-root .context-tag-form h3 { font-size: 15px; margin-bottom: 16px; }
+.admin-root .context-tag-rule { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.admin-root .context-tag-rule:last-child { border-bottom: 0; padding-bottom: 0; }
+.admin-root .context-tag-rule > div:first-child { min-width: 0; }
+.admin-root .context-tag-rule p { font-size: 13px; color: var(--ink-soft); margin-top: 8px; overflow-wrap: anywhere; }
+.admin-root .context-tag-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.admin-root .context-tag-results { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.admin-root .context-tags .tag { display: inline-block; border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; background: var(--sand); color: var(--ink); }
+.admin-root .context-tags .tag.positive { background: var(--moss-soft); color: var(--moss); }
+.admin-root .context-tags .tag.high { background: var(--coral-soft); color: var(--coral-deep); }
+.admin-root .context-tags .tag.risk { background: var(--amber-soft); color: #76500a; }
+.admin-root .context-tags .tag.vip { background: #eee7f4; color: #62417d; }
+.admin-root .context-tags .tag.loop { background: #e4edf5; color: #355b7a; }
+@media (max-width: 600px) {
+  .admin-root .context-tag-rule { flex-wrap: wrap; }
+  .admin-root .context-tag-actions { flex-wrap: wrap; }
+}
 .admin-root .settings-fields:disabled input,
 .admin-root .settings-fields:disabled select { color: var(--ink); opacity: 1; cursor: default; }
 

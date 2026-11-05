@@ -15,8 +15,8 @@ export type TagType = 'high' | 'vip' | 'risk' | 'loop' | 'positive' | 'neutral';
 export interface ConversationTag {
   label: string;
   type: TagType;
-  source?: 'ai';
-  kind?: 'emotion' | 'priority';
+  source?: 'ai' | 'rule';
+  kind?: 'emotion' | 'priority' | 'context';
 }
 
 export interface ChatMessage {

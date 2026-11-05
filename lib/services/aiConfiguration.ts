@@ -45,23 +45,75 @@ export const AI_ROLES = [
 ] as const;
 export type AiRoleId = typeof AI_ROLES[number]['id'];
 
+export const AI_PLATFORMS = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', zalo: 'Zalo' } as const;
+export type AiPlatform = keyof typeof AI_PLATFORMS;
+export const ROLE_PLATFORMS: Record<AiRoleId, AiPlatform[]> = {
+  chat: ['facebook', 'instagram', 'zalo'], content: ['facebook', 'instagram', 'tiktok'],
+  review: ['facebook', 'instagram', 'tiktok'], sourcing: [], livestream: ['facebook', 'tiktok'],
+};
+export interface AiRuleField { key: string; label: string; value: string; type?: 'number' | 'check'; }
+export const AI_RULE_FIELDS: Record<AiRoleId, AiRuleField[]> = {
+  chat: [
+    { key: 'address', label: 'Cách xưng hô', value: 'shop – bạn' },
+    { key: 'tone', label: 'Giọng điệu', value: 'Thân thiện, ngắn gọn, dễ hiểu' },
+    { key: 'advice', label: 'Cách tư vấn', value: 'Dùng thông tin sản phẩm và FAQ của shop; hỏi lại khi chưa đủ dữ liệu' },
+    { key: 'handoff', label: 'Chuyển cho chủ shop khi', value: 'Khách hỏi đổi trả, hoàn tiền, khiếu nại hoặc thông tin chưa được xác nhận' },
+  ],
+  content: [
+    { key: 'goal', label: 'Mục tiêu', value: 'Giới thiệu sản phẩm và giúp khách hiểu lợi ích' },
+    { key: 'tone', label: 'Giọng điệu', value: 'Gần gũi, rõ ràng, đúng giọng thương hiệu' },
+    { key: 'format', label: 'Định dạng bài', value: 'Mở đầu ngắn, lợi ích chính, thông tin sản phẩm, lời kêu gọi hành động' },
+    { key: 'cta', label: 'Lời kêu gọi hành động', value: 'Nhắn tin để shop tư vấn sản phẩm phù hợp' },
+  ],
+  review: [
+    { key: 'productFacts', label: 'Đối chiếu thông tin sản phẩm', value: 'yes', type: 'check' },
+    { key: 'prices', label: 'Kiểm tra giá và ưu đãi', value: 'yes', type: 'check' },
+    { key: 'brandVoice', label: 'Kiểm tra giọng thương hiệu', value: 'yes', type: 'check' },
+    { key: 'avoid', label: 'Từ ngữ cần tránh', value: 'Cam kết tuyệt đối, tốt nhất, đảm bảo 100%' },
+    { key: 'result', label: 'Cách trình bày kết quả', value: 'Liệt kê lỗi, vị trí và gợi ý sửa để chủ shop duyệt' },
+  ],
+  sourcing: [
+    { key: 'category', label: 'Ngành hàng', value: 'Thời trang & Phụ kiện' },
+    { key: 'minPrice', label: 'Giá từ (VND)', value: '', type: 'number' },
+    { key: 'maxPrice', label: 'Giá đến (VND)', value: '', type: 'number' },
+    { key: 'moq', label: 'MOQ tối đa chấp nhận', value: '', type: 'number' },
+    { key: 'region', label: 'Khu vực nhà cung cấp', value: 'Việt Nam' },
+    { key: 'criteria', label: 'Tiêu chí bổ sung', value: 'Có thông tin giá, số lượng đặt tối thiểu và nguồn tham khảo rõ ràng' },
+  ],
+  livestream: [
+    { key: 'tone', label: 'Giọng điệu', value: 'Năng động, ngắn gọn, dễ nghe' },
+    { key: 'introduction', label: 'Cách giới thiệu sản phẩm', value: 'Tên sản phẩm, công dụng, giá đã xác nhận và cách đặt hàng' },
+    { key: 'handoff', label: 'Chuyển người phụ trách khi', value: 'Khách khiếu nại, hỏi tồn kho chưa rõ hoặc yêu cầu ngoài chính sách' },
+  ],
+};
+export function defaultAiRules(role: AiRoleId): Record<string, string> {
+  return Object.fromEntries(AI_RULE_FIELDS[role].map(field => [field.key, field.value]));
+}
+export function effectiveAiRules(profile: AiProfile, platform?: AiPlatform): Record<string, string> {
+  const override = platform && profile.platformRules[platform];
+  return { ...profile.rules, ...(override && override.enabled ? override.values : {}) };
+}
+
 export interface AiProfile {
   name: string; enabled: boolean; goal: string; tone: string; input: string; output: string;
   instructions: string; mode: AiMode; sources: AiSource[];
+  rules: Record<string, string>;
+  platformRules: Partial<Record<AiPlatform, { enabled: boolean; values: Record<string, string> }>>;
 }
 export interface AiConfiguration {
   version: 1;
   profiles: Record<AiRoleId, AiProfile>;
   binding: { pageName: string; enabled: boolean; mode: AiMode };
+  pageBindings: { pageId: string; assigned: boolean; enabled: boolean }[];
   updatedAt: number | null;
 }
 
 export function defaultAiConfiguration(): AiConfiguration {
   const profiles = Object.fromEntries(AI_ROLES.map(role => [role.id, {
     name: role.label, enabled: false, goal: role.goal, tone: role.tone, input: role.input, output: role.output,
-    instructions: '', mode: 'assist', sources: [...role.sources],
+    instructions: '', mode: 'assist', sources: [...role.sources], rules: defaultAiRules(role.id), platformRules: {},
   }])) as AiConfiguration['profiles'];
-  return { version: 1, profiles, binding: { pageName: '', enabled: false, mode: 'assist' }, updatedAt: null };
+  return { version: 1, profiles, binding: { pageName: '', enabled: false, mode: 'assist' }, pageBindings: [], updatedAt: null };
 }
 
 export function parseAiConfiguration(value: unknown): AiConfiguration {
@@ -88,17 +140,55 @@ export function parseAiConfiguration(value: unknown): AiConfiguration {
   const profiles = Object.fromEntries(AI_ROLES.map(role => {
     const p = object(storedProfiles[role.id]);
     if (!Array.isArray(p.sources) || p.sources.length > role.sources.length || p.sources.some(s => !(role.sources as readonly unknown[]).includes(s))) throw new Error(`${role.label}: nguồn tri thức không hợp lệ.`);
+    const parseRules = (value: unknown, partial: boolean) => {
+      const data = object(value);
+      const fields = AI_RULE_FIELDS[role.id];
+      if (Object.keys(data).some(key => !fields.some(field => field.key === key))) throw new Error('Trường quy tắc không hợp lệ.');
+      const result: Record<string, string> = partial ? {} : defaultAiRules(role.id);
+      for (const field of fields) {
+        if (!(field.key in data)) continue;
+        const value = text(data[field.key], 500, field.label, field.type !== 'number');
+        if (field.type === 'check' && value !== 'yes' && value !== 'no') throw new Error(`${field.label}: lựa chọn không hợp lệ.`);
+        if (field.type === 'number' && value !== '' && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))) throw new Error(`${field.label}: nhập số nguyên không âm.`);
+        result[field.key] = value;
+      }
+      return result;
+    };
+    const rules = p.rules === undefined ? { ...defaultAiRules(role.id), tone: text(p.tone, 500, 'Giọng điệu') } : parseRules(p.rules, false);
+    if (!AI_RULE_FIELDS[role.id].some(field => field.key === 'tone')) delete rules.tone;
+    if (p.rules === undefined && role.id === 'content') rules.goal = text(p.goal, 1500, 'Mục tiêu').slice(0, 500);
+    const platformRules: AiProfile['platformRules'] = {};
+    if (p.platformRules !== undefined) {
+      for (const [platform, value] of Object.entries(object(p.platformRules))) {
+        if (!(ROLE_PLATFORMS[role.id] as string[]).includes(platform)) throw new Error('Nền tảng không phù hợp với AI này.');
+        const override = object(value);
+        platformRules[platform as AiPlatform] = { enabled: boolean(override.enabled), values: parseRules(override.values, true) };
+      }
+    }
+    if (role.id === 'sourcing' && rules.minPrice && rules.maxPrice && Number(rules.minPrice) > Number(rules.maxPrice)) throw new Error('Giá đến phải lớn hơn hoặc bằng giá từ.');
     return [role.id, {
       name: text(p.name, 100, `${role.label} — tên`), enabled: boolean(p.enabled),
       goal: text(p.goal, 1500, `${role.label} — mục tiêu`), tone: text(p.tone, 500, `${role.label} — văn phong`),
       input: text(p.input, 1500, `${role.label} — input`), output: text(p.output, 1500, `${role.label} — output`),
       instructions: text(p.instructions, 2000, `${role.label} — chỉ dẫn bổ sung`, false),
       mode: mode(p.mode, role.id === 'chat'), sources: [...new Set(p.sources)] as AiSource[],
+      rules, platformRules,
     }];
   })) as AiConfiguration['profiles'];
   const binding = object(data.binding);
   const enabled = boolean(binding.enabled);
-  return { version: 1, profiles, updatedAt: data.updatedAt as number | null,
+  const pageBindings = data.pageBindings === undefined ? [] : data.pageBindings;
+  if (!Array.isArray(pageBindings) || pageBindings.length > 100) throw new Error('Danh sách Fanpage không hợp lệ.');
+  const pages = pageBindings.map(value => {
+    const page = object(value);
+    const pageId = text(page.pageId, 64, 'Mã Fanpage');
+    if (!/^\d+$/.test(pageId)) throw new Error('Mã Fanpage không hợp lệ.');
+    const assigned = boolean(page.assigned), enabled = boolean(page.enabled);
+    if (enabled && !assigned) throw new Error('Cần gán AI Chat trước khi bật cho Fanpage.');
+    return { pageId, assigned, enabled };
+  });
+  if (new Set(pages.map(page => page.pageId)).size !== pages.length) throw new Error('Fanpage bị trùng.');
+  return { version: 1, profiles, pageBindings: pages, updatedAt: data.updatedAt as number | null,
     binding: { pageName: text(binding.pageName, 200, 'Tên Fanpage', enabled), enabled, mode: mode(binding.mode, true) } };
 }
 

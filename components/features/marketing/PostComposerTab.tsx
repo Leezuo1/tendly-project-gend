@@ -316,14 +316,14 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
                 <button
                   type="button"
                   key={p.id}
-                  className={`pc-product${productIds.includes(p.id) ? ' selected' : ''}${p.qty === 0 ? ' out' : ''}`}
+                  className={`pc-product${productIds.includes(p.id) ? ' selected' : ''}${p.stockKnown !== false && p.qty === 0 ? ' out' : ''}`}
                   onClick={() => toggleProduct(p.id)}
-                  title={p.qty === 0 ? 'Hết hàng — AI sẽ không quảng bá như còn hàng' : undefined}
+                  title={p.stockKnown === false ? 'Chưa nhập tồn kho của shop' : p.qty === 0 ? 'Hết hàng — AI sẽ không quảng bá như còn hàng' : undefined}
                 >
                   <span className="pc-product-emoji">{p.emoji}</span>
                   <span className="pc-product-info">
                     <span className="pc-product-name">{p.name}</span>
-                    <span className="pc-product-meta">{p.sku} · {formatMoney(p.price)} · {p.qty === 0 ? 'Hết hàng' : `Còn ${p.qty}`}</span>
+                    <span className="pc-product-meta">{p.sku} · {formatMoney(p.price)} · {p.stockKnown === false ? 'Chưa nhập tồn kho' : p.qty === 0 ? 'Hết hàng' : `Còn ${p.qty}`}</span>
                   </span>
                 </button>
               ))}

@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useState } from 'react';
+import { useTabParam } from '@/lib/hooks/useTabParam';
 import { MarketingTab } from '@/lib/types/marketing';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { MobileSections } from '@/components/ui/MobileSections';
@@ -22,8 +23,8 @@ const TABS: { key: MarketingTab; label: string }[] = [
 ];
 
 export function MarketingShell() {
-  const [activeTab, setActiveTab] = useState<MarketingTab>('queue');
-  const [sectionOpen, setSectionOpen] = useState(false);
+  const [activeTab, setActiveTab, hasTab] = useTabParam(TABS.map(tab => tab.key), 'queue');
+  const [sectionOpen, setSectionOpen] = useState(hasTab);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState<number | null>(null);
   const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 3200); };

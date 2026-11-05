@@ -40,11 +40,11 @@ const COMPLAINT_WORDS = [
 const hasPhrase = (text: string, phrases: string[]) => phrases.some((p) => text.includes(` ${p} `));
 
 /** Tên/SKU sản phẩm trong FAQ & sản phẩm để dò khách đã hỏi sản phẩm nào (bỏ chữ thương hiệu chung). */
-export function productMatchers(products: { name: string; sku: string }[], shopName = '') {
+export function productMatchers(products: { name: string; sku: string; keywords?: string[] }[], shopName = '') {
   const brand = normalize(shopName);
   return products.slice(0, 200).map((p) => {
     const name = normalize(p.name).split(' ').filter((w) => w && w !== brand).join(' ');
-    return { label: p.name, terms: [normalize(p.sku), name].filter((t) => t.length >= 3) };
+    return { label: p.name, terms: [normalize(p.sku), name, ...(p.keywords || []).map(normalize)].filter((t) => t.length >= 3) };
   });
 }
 

@@ -236,10 +236,17 @@ test('real sync reaches AI knowledge, preserves manual CSV edits and never mutat
   };
   const result = await api.syncShopee();
   assert.equal(result.products.length, 2);
+  assert.ok(result.products.every(p => (p.relatedProductIds || []).every(id => result.products.some(other => other.id === id))));
+  assert.equal(result.products.find(p => p.id === real.id).stockKnown, true);
   assert.equal(result.products.find((p) => p.id === sample.id).price, 123456);
   const knowledge = f.load('lib/services/aiChat.ts').currentAiKnowledge();
   assert.equal(knowledge.products.find((p) => p.id === real.id).qty, 0);
   assert.match(f.load('lib/services/aiKnowledge.ts').buildAiSystemPrompt(knowledge), /shopee:/);
+  const synced = browserDb.readDb().products.find(p => p.id === real.id);
+  await api.update(real.id, { ...synced, description: 'Tư vấn của chủ shop', keywords: ['từ khóa riêng'] });
+  await api.syncShopee();
+  assert.equal(browserDb.readDb().products.find(p => p.id === real.id).description, 'Tư vấn của chủ shop');
+  assert.deepEqual(browserDb.readDb().products.find(p => p.id === real.id).keywords, ['từ khóa riêng']);
   await api.importMany([{ ...real, price: 55555 }]);
   assert.equal(browserDb.readDb().products.find((p) => p.id === real.id).price, 99999);
   const before = structuredClone(browserDb.readDb().products);

@@ -33,7 +33,8 @@ const CHANNEL_RULES: Record<PostChannel, string> = {
 export const POST_SYSTEM_PROMPT = `Bạn là chuyên viên viết nội dung marketing tiếng Việt cho shop thương mại điện tử nhỏ.
 - Viết đúng kênh, mục tiêu và giọng văn được yêu cầu. Mỗi phương án phải khác nhau rõ về góc tiếp cận (ví dụ: kể chuyện, nêu lợi ích, tạo cảm giác khan hiếm, đặt câu hỏi).
 - DỮ LIỆU SẢN PHẨM bên dưới là nguồn duy nhất cho tên, giá, chất liệu, màu, size và tồn kho. Không bịa thông số, giá, chương trình giảm giá, quà tặng, thời hạn ưu đãi hay phí ship. Chỉ nhắc khuyến mãi/mã giảm giá khi có trong GHI CHÚ của chủ shop.
-- qty = 0 là hết hàng: không quảng bá sản phẩm đó như đang có sẵn. qty dưới 20 có thể nói "số lượng có hạn"; không nói con số tồn kho chính xác.
+- stockKnown = false là chưa có tồn kho của shop: không khẳng định có sẵn hoặc khan hiếm. Khi tồn kho đã biết, qty = 0 là hết hàng; không quảng bá như đang có sẵn. Không nói con số tồn kho chính xác.
+- Dùng description, features, benefits, usp và keywords để bám đặc điểm sản phẩm; tuân thủ limitations. Không biến nguồn tham khảo thành chính sách giao hàng/đổi trả của shop.
 - Giá viết dạng 259.000đ. Có thể dùng FAQ đang bật để nói chính sách (đổi trả, giao hàng, COD) nếu phù hợp, không tự suy diễn thêm.
 - hashtags: 3–6 hashtag tiếng Việt không dấu hoặc tiếng Anh, bắt đầu bằng #, không trùng lặp. Không chèn hashtag vào content.
 - imageIdea: gợi ý ảnh/video cụ thể để chủ shop tự chụp, không mô tả ảnh có sẵn.
@@ -111,7 +112,8 @@ export function parsePostRequest(value: unknown): PostGenerationRequest {
 export function buildPostPrompt(request: PostGenerationRequest, knowledge: AiKnowledge): { system: string; user: string } {
   const products = knowledge.products
     .filter((p) => request.productIds.includes(p.id))
-    .map(({ sku, name, material, category, colors, sizes, qty, price }) => ({ sku, name, material, category, colors, sizes, qty, price }));
+    .map(({ id, sku, name, material, category, colors, sizes, qty, price, stockKnown, brand, description, features, benefits, usp, targetAudience, useCases, keywords, relatedProductIds, relatedReason, limitations, careInstructions }) =>
+      ({ id, sku, name, material, category, colors, sizes, qty, price, stockKnown, brand, description, features, benefits, usp, targetAudience, useCases, keywords, relatedProductIds, relatedReason, limitations, careInstructions }));
   if (products.length !== request.productIds.length) {
     throw new InvalidPostRequest('Có sản phẩm đã chọn không còn trong FAQ & sản phẩm. Vui lòng chọn lại.');
   }

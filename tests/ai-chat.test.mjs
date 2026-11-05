@@ -250,7 +250,7 @@ test('chat gửi nguồn sản phẩm, FAQ và email đã lưu; không gửi h�
   assert.equal(f.sent[0].url.includes('test-key'), false);
   assert.equal(f.sent[0].options.headers['x-goog-api-key'], 'test-key');
   assert.equal(result.model, 'test-model');
-  assert.match(result.sourceSummary, /20 sản phẩm.*5 FAQ.*3 kịch bản/);
+  assert.match(result.sourceSummary, /10 sản phẩm.*5 FAQ.*3 kịch bản/);
 });
 
 test('chỉnh giá/tồn kho qua nhập sản phẩm, sửa FAQ và mẫu email áp dụng ở câu hỏi kế tiếp', async () => {

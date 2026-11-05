@@ -83,3 +83,52 @@ test('corrupt or unsupported saved data is reported without silently overwriting
   }
   assert.throws(() => api.readAiConfiguration(''));
 });
+
+test('older v1 profiles keep their data and gain role-specific rules without inventing page bindings', () => {
+  const { api } = fixture();
+  const old = api.defaultAiConfiguration();
+  delete old.pageBindings;
+  for (const profile of Object.values(old.profiles)) { delete profile.rules; delete profile.platformRules; }
+  old.profiles.chat.tone = 'Giọng shop đã lưu';
+  old.profiles.chat.instructions = 'Giữ chỉ dẫn cũ';
+  old.binding = { pageName: 'Tên trang cũ', enabled: true, mode: 'assist' };
+  const next = api.parseAiConfiguration(old);
+  assert.equal(next.profiles.chat.rules.tone, 'Giọng shop đã lưu');
+  assert.equal(next.profiles.chat.instructions, 'Giữ chỉ dẫn cũ');
+  assert.deepEqual(next.pageBindings, []);
+  assert.equal(next.binding.pageName, 'Tên trang cũ');
+  assert.ok(next.profiles.sourcing.rules.category);
+});
+
+test('platform overrides inherit unspecified defaults and survive disabling, page switches stay independent', () => {
+  const { api } = fixture();
+  const config = api.defaultAiConfiguration();
+  const profile = config.profiles.content;
+  profile.platformRules.instagram = { enabled: true, values: { format: 'Caption ngắn' } };
+  assert.equal(api.effectiveAiRules(profile, 'instagram').format, 'Caption ngắn');
+  profile.rules.tone = 'Ấm áp';
+  assert.equal(api.effectiveAiRules(profile, 'instagram').tone, 'Ấm áp');
+  assert.equal(api.effectiveAiRules(profile, 'facebook').format, profile.rules.format);
+  profile.platformRules.instagram.enabled = false;
+  assert.equal(api.effectiveAiRules(profile, 'instagram').format, profile.rules.format);
+  profile.platformRules.instagram.enabled = true;
+  config.pageBindings = [{ pageId: '123', assigned: true, enabled: true }, { pageId: '456', assigned: true, enabled: false }];
+  const saved = api.saveAiConfiguration(config, 'owner');
+  assert.equal(saved.pageBindings[1].enabled, false);
+  assert.equal(api.readAiConfiguration('owner').profiles.content.platformRules.instagram.values.format, 'Caption ngắn');
+});
+
+test('rejects unsupported platform fields, invalid price ranges and unsafe page assignments', () => {
+  const { api } = fixture();
+  for (const mutate of [
+    c => { c.profiles.chat.rules.unknown = 'x'; },
+    c => { c.profiles.review.rules.prices = 'sometimes'; },
+    c => { c.profiles.sourcing.rules.minPrice = '-1'; },
+    c => { c.profiles.sourcing.rules.minPrice = '100'; c.profiles.sourcing.rules.maxPrice = '10'; },
+    c => { c.profiles.sourcing.platformRules.facebook = { enabled: true, values: {} }; },
+    c => { c.profiles.chat.platformRules.facebook = { enabled: true, values: { cta: 'x' } }; },
+    c => { c.pageBindings = [{ pageId: '123', assigned: false, enabled: true }]; },
+    c => { c.pageBindings = [{ pageId: 'invalid', assigned: true, enabled: true }]; },
+    c => { c.pageBindings = Array(2).fill({ pageId: '123', assigned: true, enabled: true }); },
+  ]) { const config = api.defaultAiConfiguration(); mutate(config); assert.throws(() => api.parseAiConfiguration(config)); }
+});
