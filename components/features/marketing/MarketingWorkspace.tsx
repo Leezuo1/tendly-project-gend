@@ -1,0 +1,98 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { ConfirmDialog } from '@/components/ui/Modal';
+import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
+import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
+import { dashboardRequest, prepareUploadImage } from '@/lib/services/postsClient';
+import { emptyMarketingProfile, MARKETING_GOALS } from '@/lib/services/marketingBrief';
+import type { MarketingCampaign, MarketingProfile, MarketingWorkspaceView, ReviewedMarketingPost } from '@/lib/types/marketingWorkspace';
+import type { MarketingPost } from '@/lib/types/posts';
+import { CampaignBriefForm } from './CampaignBriefForm';
+import { MarketingScheduleTab } from './MarketingScheduleTab';
+import { CampaignPerformanceTab } from './CampaignPerformanceTab';
+
+export type MarketingWorkflowSection = 'campaigns' | 'composer' | 'approvals' | 'schedule' | 'performance' | 'profiles';
+interface Props { section: MarketingWorkflowSection; onNavigate: (section: string, postId?: string) => void; }
+type Ask = (title: string, message: string, action: () => Promise<unknown>) => void;
+export function MarketingWorkspace({ section, onNavigate }: Props) {
+  const [view, setView] = useState<MarketingWorkspaceView | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+  const [editing, setEditing] = useState<MarketingCampaign | 'new' | null>(null);
+  const [accountId, setAccountId] = useState('');
+  const [approval, setApproval] = useState<{ title: string; message: string; action: () => Promise<unknown> } | null>(null);
+  const { session } = useAppSecurity();
+  const load = useCallback(async () => { try { setView(await marketingWorkspaceClient.read()); setError(''); } catch (e) { setError((e as Error).message); } }, []);
+  useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
+  const act = async (action: string, input: object): Promise<boolean> => {
+    if (!view || busy) return false;
+    setBusy(true); setError(''); setNotice('');
+    try { setView(await marketingWorkspaceClient.act(view.revision, action, input)); setNotice('Đã cập nhật'); return true; }
+    catch (e) { setError((e as Error).message); return false; }
+    finally { setBusy(false); }
+  };
+  const confirm: Ask = (title, message, action) => setApproval({ title, message, action });
+  const upload = async (postId: string, file: File | null) => {
+    if (!view || busy) return;
+    setBusy(true); setError('');
+    try {
+      const image = file ? await prepareUploadImage(file) : undefined;
+      const response = await dashboardRequest(`/api/marketing/workspace/image?postId=${encodeURIComponent(postId)}&revision=${view.revision}`, { method: file ? 'PUT' : 'DELETE', body: image });
+      setView(await response.json()); setNotice('Đã cập nhật ảnh. Review và duyệt lại trước khi đăng.');
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  };
+  if (!view) return <div className="mw-root">{error ? <div role="alert" className="mw-error">{error}<button className="btn btn-outline btn-sm" onClick={() => void load()}>Thử tải lại</button></div> : <p role="status">Đang tải Marketing…</p>}</div>;
+  const campaigns = view.workspace.campaigns;
+  const campaign = campaigns.find(item => item.id === campaignId) ?? campaigns[0];
+  const filtered = view.workspace.reviews.filter(item => section === 'approvals' || item.campaignId === campaign?.id);
+  const selectedAccountId = accountId || view.accounts[0]?.id || '';
+  return <div className="mw-root">
+    {error && <div className="mw-error" role="alert">{error} <button className="btn btn-text btn-sm" onClick={() => void load()}>Tải dữ liệu mới</button></div>}
+    <p className="mw-status" aria-live="polite">{busy ? 'Đang xử lý yêu cầu…' : notice}</p>
+    <fieldset className="mw-body" disabled={busy}>
+      {editing ? <CampaignBriefForm key={editing === 'new' ? 'new' : editing.id} view={view} initial={editing === 'new' ? undefined : editing} owner={session.userId || session.username} act={act} onClose={() => setEditing(null)} /> : <>
+      {section === 'campaigns' && <>
+        <div className="mw-section-head"><div><h2>Chiến dịch của shop</h2><p>Từ brief đến bài đã duyệt và lịch đăng, trong cùng một luồng.</p></div><button className="btn btn-primary" onClick={() => setEditing('new')}>Tạo chiến dịch</button></div>
+        {!campaigns.length && <div className="mw-empty"><h3>Bắt đầu bằng một brief rõ ràng</h3><p>Chọn sản phẩm, đối tượng, thông điệp và tài khoản đăng. AI sẽ viết và rà lại trước khi bạn duyệt.</p><button className="btn btn-outline" onClick={() => setEditing('new')}>Tạo brief đầu tiên</button></div>}
+        <div className="mw-list">{campaigns.map(item => { const account = view.accounts.find(a => a.id === item.accountId)!; const count = view.workspace.reviews.filter(post => post.campaignId === item.id).length; return <article className="mw-item" key={item.id}><div className="mw-section-head"><div><span className="mw-muted">{MARKETING_GOALS[item.goal as keyof typeof MARKETING_GOALS]} · {item.profile.name || account.name}{account.mock && ' · Dữ liệu mẫu'}</span><h3>{item.name}</h3><p>{item.message}</p></div><span className={`mw-chip ${item.approvedAt ? 'approved' : ''}`}>{item.approvedAt ? 'Brief đã duyệt' : 'Brief nháp'}</span></div><p className="mw-muted">{item.audience || 'Chưa chọn đối tượng'} · {count} bài · Phiên bản {item.version}</p><div className="mw-actions"><button className="btn btn-outline btn-sm" onClick={() => setEditing(item)}>Xem / chỉnh brief</button>{!item.approvedAt && <button className="btn btn-outline btn-sm" onClick={() => confirm('Duyệt brief chiến dịch?', 'Xác nhận sản phẩm, giá, chính sách, đối tượng và ưu đãi trong brief này. Thao tác này chưa đăng bài.', () => act('approveCampaign', { id: item.id }))}>Duyệt brief</button>}<button className="btn btn-primary btn-sm" onClick={() => { setCampaignId(item.id); onNavigate('composer'); }}>Mở soạn nội dung</button></div></article>; })}</div>
+      </>}
+      {(section === 'composer' || section === 'approvals') && <>
+        <div className="mw-section-head"><div><h2>{section === 'composer' ? 'Soạn và rà soát nội dung' : 'Chủ shop duyệt nội dung'}</h2><p>{section === 'composer' ? 'Content viết → Review đối chiếu, sửa → bạn xem và duyệt.' : 'Đã Review không đồng nghĩa đã được duyệt đăng.'}</p></div><button className="btn btn-outline btn-sm" onClick={() => { if (document.querySelector('.mw-root [data-unsaved="true"]')) { setError('Lưu hoặc hủy bài đang chỉnh trước khi tạo chiến dịch.'); return; } onNavigate('campaigns'); setEditing('new'); }}>Tạo chiến dịch</button></div>
+        {section === 'composer' && (campaign ? <section className="mw-summary"><label>Chiến dịch<select value={campaign.id} onChange={event => { if (document.querySelector('.mw-root [data-unsaved="true"]')) setError('Lưu hoặc hủy bài đang chỉnh trước khi đổi chiến dịch.'); else setCampaignId(event.target.value); }}>{campaigns.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><h3>{campaign.message || campaign.name}</h3><p>{campaign.audience} · {campaign.format} · {campaign.profile.name || view.accounts.find(account => account.id === campaign.accountId)?.name}</p><p>Giọng: {campaign.tone || campaign.profile.tone} · CTA: {campaign.cta}</p><p>{campaign.offer.kind === 'none' ? 'Không áp dụng ưu đãi' : `${campaign.offer.details} · ${campaign.offer.conditions}`}</p><div className="mw-actions"><button className="btn btn-outline btn-sm" onClick={() => setEditing(campaign)}>Chỉnh brief</button><button className="btn btn-primary" disabled={!campaign.approvedAt} onClick={() => act('generate', { campaignId: campaign.id })}>Soạn và Review bài</button></div>{!campaign.approvedAt && <p className="mw-muted">Duyệt brief trong Chiến dịch trước khi tạo bài.</p>}</section> : <p className="mw-empty">Chưa có chiến dịch. Tạo brief để bắt đầu.</p>)}
+        <div className="mw-list">{filtered.map(meta => { const post = view.posts.find(item => item.id === meta.postId); return post && <MarketingDraft key={`${post.id}:${post.updatedAt}:${meta.reviewedAt}:${post.image?.updatedAt}`} post={post} meta={meta} view={view} act={act} confirm={confirm} upload={upload} onComments={id => onNavigate('comments', id)} />; })}</div>
+        {!filtered.length && <p className="mw-empty">Chưa có bài trong mục này.</p>}
+      </>}
+      {section === 'schedule' && <MarketingScheduleTab view={view} act={act} confirm={confirm} />}
+      {section === 'profiles' && <><div className="mw-section-head"><div><h2>Hồ sơ từng tài khoản</h2><p>Cùng nền tảng, mỗi Page vẫn có đối tượng và giọng riêng. Chỉnh hồ sơ sẽ yêu cầu duyệt lại brief liên quan.</p></div></div><label className="mw-account-picker">Tài khoản<select value={selectedAccountId} onChange={event => { if (document.querySelector('.mw-root [data-unsaved="true"]')) setError('Lưu hoặc hủy hồ sơ đang chỉnh trước khi đổi tài khoản.'); else setAccountId(event.target.value); }}>{view.accounts.map(account => <option value={account.id} key={account.id}>{view.workspace.profiles[account.id]?.name || account.name}</option>)}</select></label><MarketingProfileForm key={`${selectedAccountId}:${view.revision}`} initial={view.workspace.profiles[selectedAccountId] ?? { ...emptyMarketingProfile(), name: view.accounts.find(account => account.id === selectedAccountId)?.name ?? '' }} onSave={profile => confirm('Áp dụng hồ sơ kênh?', 'Brief liên quan sẽ quay về chờ duyệt. Bài và lịch không tự thay nội dung theo hồ sơ mới.', () => act('profile', { accountId: selectedAccountId, profile }))} /></>}
+      {section === 'performance' && <><div className="mw-section-head"><div><h2>Kết quả theo chiến dịch</h2><p>Hoạt động Facebook và kết quả mẫu được hiển thị riêng; chưa quy đổi tương tác thành doanh thu.</p></div></div><div className="mw-list">{campaigns.map(item => { const reviews = view.workspace.reviews.filter(review => review.campaignId === item.id); const mock = view.accounts.find(account => account.id === item.accountId)?.mock; return <article className="mw-item" key={item.id}><h3>{item.name}{mock && <span className="mw-chip">Kênh mẫu</span>}</h3><p>{reviews.length} bài · {reviews.filter(review => review.approvedAt).length} bài đã duyệt · {reviews.filter(review => review.publication === 'published').length} bài {mock ? 'hoàn tất mẫu' : 'đã đăng'}</p></article>; })}</div><CampaignPerformanceTab /></>}
+      </>}
+    </fieldset>
+    <ConfirmDialog open={!!approval} title={approval?.title ?? ''} message={approval?.message} busy={busy} confirmLabel="Xác nhận" onClose={() => setApproval(null)} onConfirm={async () => { const action = approval?.action; if (action) await action(); setApproval(null); }} />
+  </div>;
+}
+
+function MarketingDraft({ post, meta, view, act, confirm, upload, onComments }: { post: MarketingPost; meta: ReviewedMarketingPost; view: MarketingWorkspaceView; act: (action: string, input: object) => Promise<boolean>; confirm: Ask; upload: (id: string, file: File | null) => Promise<void>; onComments: (id: string) => void }) {
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState({ title: post.title, content: post.content, hashtags: post.hashtags.join(' '), imageIdea: post.imageIdea });
+  const account = view.accounts.find(item => item.id === meta.accountId)!;
+  const campaign = view.workspace.campaigns.find(item => item.id === meta.campaignId)!;
+  const valid = campaign.approvedAt && meta.campaignVersion === campaign.version;
+  return <article className="mw-item mw-draft"><div className="mw-section-head"><div><span className="mw-muted">{campaign.name} · {account.platform}{account.mock && ' · Kênh mẫu'}</span><h3>{post.title}</h3></div><span className={`mw-chip ${meta.approvedAt ? 'approved' : ''}`}>{!valid ? 'Brief cần duyệt lại' : !meta.reviewHash ? 'Cần Review lại' : meta.approvedAt ? 'Chủ shop đã duyệt' : 'Review xong · chờ duyệt'}</span></div>
+    {edit ? <form data-unsaved="true" onSubmit={async event => { event.preventDefault(); if (await act('editPost', { postId: post.id, patch: { ...form, hashtags: form.hashtags.split(/\s+/).filter(Boolean) } })) setEdit(false); }}><label>Tiêu đề<input required maxLength={200} value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} /></label><label>Nội dung<textarea aria-label="Nội dung" required rows={8} maxLength={5000} value={form.content} onChange={event => setForm({ ...form, content: event.target.value })} /></label><label>Hashtag<input value={form.hashtags} onChange={event => setForm({ ...form, hashtags: event.target.value })} /></label><label>Ý tưởng hình ảnh<textarea rows={2} value={form.imageIdea} onChange={event => setForm({ ...form, imageIdea: event.target.value })} /></label><div className="mw-actions"><button type="button" className="btn btn-outline btn-sm" onClick={() => { setForm({ title: post.title, content: post.content, hashtags: post.hashtags.join(" "), imageIdea: post.imageIdea }); setEdit(false); }}>Hủy sửa</button><button type="submit" className="btn btn-primary btn-sm">Lưu và yêu cầu Review lại</button></div></form> : <><div className="mw-copy">{post.content}</div><p className="mw-muted">{post.hashtags.join(' ')}</p>{post.image && <img className="mw-post-image" src={`/api/posts/${post.id}/image?v=${post.image.updatedAt}`} alt={post.title} />}<p className="mw-muted">Ý tưởng ảnh: {post.imageIdea}</p></>}
+    {meta.publication === 'draft' && <div className="mw-image-controls"><label>Ảnh đính kèm<input type="file" accept="image/jpeg,image/png,image/webp" disabled={edit} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void upload(post.id, file); }} /></label>{post.image && <button className="btn btn-text btn-sm" disabled={edit} onClick={() => confirm('Gỡ ảnh khỏi bài?', 'Bài sẽ cần Review và duyệt lại.', () => upload(post.id, null))}>Gỡ ảnh</button>}</div>}
+    <details className="mw-comparison"><summary>Xem bản gốc và phần Review chỉnh sửa</summary><p className="mw-copy">{meta.original.content}</p><ul>{meta.changes.map((change, i) => <li key={i}>{change}</li>)}</ul></details>
+    <div className="mw-actions">{meta.publication === 'draft' && <><button className="btn btn-outline btn-sm" disabled={edit} onClick={() => setEdit(true)}>Chỉnh bài</button><button className="btn btn-outline btn-sm" disabled={edit || !valid} onClick={() => act('review', { postId: post.id })}>Review lại</button>{!meta.approvedAt && <button className="btn btn-primary btn-sm" disabled={edit || !meta.reviewHash || !valid} onClick={() => confirm('Duyệt phiên bản bài này?', 'Xác nhận nội dung và hình ảnh đang hiển thị. Duyệt bài chưa đăng hoặc kích hoạt lịch.', () => act('approvePost', { postId: post.id }))}>Duyệt bài</button>}{meta.approvedAt && <button className="btn btn-primary btn-sm" disabled={edit || !valid} onClick={() => confirm(account.mock ? 'Hoàn tất trên kênh mẫu?' : 'Đăng thật lên Facebook?', account.mock ? 'Mô phỏng bước đăng bằng nội dung đã duyệt; không gửi tới nền tảng.' : 'Nội dung đã duyệt sẽ được đăng lên Fanpage Facebook được kết nối.', () => act('publish', { postId: post.id }))}>{account.mock ? 'Chạy bước đăng mẫu' : 'Đăng Facebook'}</button>}</>}
+      {meta.publication === 'published' && (account.mock ? <span className="mw-chip">Đã hoàn tất mẫu</span> : <><a className="btn btn-outline btn-sm" href={meta.externalUrl} target="_blank" rel="noreferrer">Xem bài Facebook</a><button className="btn btn-outline btn-sm" onClick={() => onComments(meta.externalId!)}>Mở bình luận</button></>)}
+      {(meta.publication === 'unknown' || meta.publication === 'publishing') && <p className="mw-error">{meta.publication === 'unknown' ? 'Chưa rõ kết quả gửi. Kiểm tra tài khoản trước khi xử lý lại.' : 'Đang gửi bài. Không bấm đăng lại.'}</p>}
+    </div>
+  </article>;
+}
+function MarketingProfileForm({ initial, onSave }: { initial: MarketingProfile; onSave: (profile: MarketingProfile) => void }) {
+  const [profile, setProfile] = useState(initial);
+  const labels: Record<keyof MarketingProfile, string> = { name: 'Tên tài khoản', purpose: 'Vai trò của kênh', audience: 'Đối tượng chính', pain: 'Nhu cầu / rào cản', address: 'Cách xưng hô', tone: 'Giọng văn', approach: 'Cách tiếp cận', format: 'Định dạng ưu tiên', cta: 'CTA mặc định', avoid: 'Từ / tuyên bố cần tránh', examples: 'Ví dụ đúng giọng đã được duyệt' };
+  return <form className="mw-editor" data-unsaved={JSON.stringify(profile) !== JSON.stringify(initial)} onSubmit={event => { event.preventDefault(); onSave(profile); }}><div className="mw-form-grid">{(Object.keys(labels) as (keyof MarketingProfile)[]).map(key => <label key={key}>{labels[key]}<textarea rows={2} required={key === 'name' || key === 'tone'} maxLength={1500} value={profile[key]} onChange={event => setProfile({ ...profile, [key]: event.target.value })} /></label>)}</div><div className="mw-summary"><h3>Cấu hình sẽ áp dụng</h3><p>{profile.address} · {profile.tone}</p><p>{profile.audience || 'Đối tượng theo brief'} · {profile.approach || 'Cách tiếp cận theo brief'}</p><p>Thứ tự: quy tắc AI → nền tảng → hồ sơ tài khoản → brief. Quyền đăng và dữ kiện không được ghi đè bằng văn phong.</p></div><div className="mw-actions"><button className="btn btn-outline" type="button" onClick={() => setProfile(initial)}>Hủy thay đổi</button><button className="btn btn-primary" type="submit">Xem và xác nhận hồ sơ</button></div></form>;
+}

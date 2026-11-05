@@ -1,6 +1,8 @@
 import { InvalidAiKnowledge } from '@/lib/services/aiKnowledge';
 import { GeminiNotConfigured, GeminiUnavailable } from '@/lib/services/gemini';
 import { MessengerSendError } from '@/lib/services/messengerSend';
+import { AppSecurityError, securityErrorResponse } from '@/lib/services/appSecurity';
+import { MarketingWorkflowError } from '@/lib/services/marketingBrief';
 
 export class MarketingNotConfigured extends Error {}
 export class InvalidMarketingRequest extends Error {}
@@ -33,6 +35,8 @@ export async function readMarketingJson(request: Request): Promise<Record<string
 
 /** Đổi lỗi thành response, không đưa chi tiết lỗi database ra ngoài. */
 export function marketingErrorResponse(error: unknown): Response {
+  if (error instanceof AppSecurityError) return securityErrorResponse(error);
+  if (error instanceof MarketingWorkflowError) return Response.json({ error: error.message }, { status: error.status });
   if (error instanceof InvalidMarketingRequest || error instanceof InvalidAiKnowledge) {
     return Response.json({ error: error.message }, { status: 400 });
   }

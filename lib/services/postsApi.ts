@@ -1,5 +1,6 @@
-import { legacyAccessError } from '@/lib/services/appSecurity';
+import { AppSecurityError, legacyAccessError, securityErrorResponse } from '@/lib/services/appSecurity';
 import { InvalidPostRequest } from '@/lib/services/aiPost';
+import { MarketingWorkflowError } from '@/lib/services/marketingBrief';
 import { FacebookNotConfigured, FacebookPublishFailed } from '@/lib/services/facebookPage';
 import { ImageGenerationFailed, InvalidPostImage } from '@/lib/services/postImages';
 import { PostLocked, PostNotFound, PostsDatabaseNotConfigured } from '@/lib/services/postsPostgres';
@@ -10,6 +11,8 @@ export function requireDashboardKey(request: Request): Response | null {
 
 /** Đổi lỗi thành response, không đưa chi tiết lỗi database (có thể chứa thông tin kết nối) ra ngoài. */
 export function postsErrorResponse(error: unknown): Response {
+  if (error instanceof AppSecurityError) return securityErrorResponse(error);
+  if (error instanceof MarketingWorkflowError) return Response.json({ error: error.message }, { status: error.status });
   if (error instanceof InvalidPostRequest || error instanceof InvalidPostImage) {
     return Response.json({ error: error.message }, { status: 400 });
   }

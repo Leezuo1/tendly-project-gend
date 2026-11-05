@@ -14,6 +14,7 @@ import { AI_ROLES, AI_PLATFORMS, AI_RULE_FIELDS, ROLE_PLATFORMS, defaultAiRules,
   defaultAiConfiguration, readAiConfiguration, saveAiConfiguration,
   type AiConfiguration, type AiPlatform, type AiProfile, type AiRoleId } from '@/lib/services/aiConfiguration';
 import type { MarketingPost } from '@/lib/types/posts';
+import type { MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
 import type { LiveSessionListItem } from '@/lib/types/live';
 import styles from './ai-configuration.module.css';
 
@@ -34,6 +35,7 @@ export function AiConfigShell() {
   const [error, setError] = useState('');
   const [pages, setPages] = useState<ConnectedPage[] | null>(null);
   const [posts, setPosts] = useState<MarketingPost[] | null>(null);
+  const [marketing, setMarketing] = useState<MarketingWorkspaceView | null>(null);
   const [sessions, setSessions] = useState<LiveSessionListItem[] | null>(null);
   const [usageErrors, setUsageErrors] = useState<string[]>([]);
   const { session } = useAppSecurity();
@@ -56,6 +58,7 @@ export function AiConfigShell() {
   const loadUsage = useCallback(async () => {
     const result = await Promise.allSettled([
       dashboardRequest('/api/settings/channels').then(response => response.json()), postsClient.list(), liveClient.sessions(),
+      dashboardRequest('/api/marketing/workspace').then(response => response.json() as Promise<MarketingWorkspaceView>),
     ]);
     const errors: string[] = [];
     const channels = result[0];
@@ -68,6 +71,8 @@ export function AiConfigShell() {
     else { setPosts(null); errors.push('Chưa tải được bài viết.'); }
     if (result[2].status === 'fulfilled') setSessions(result[2].value);
     else { setSessions(null); errors.push('Chưa tải được phiên livestream.'); }
+    if (result[3].status === 'fulfilled') setMarketing(result[3].value);
+    else { setMarketing(null); errors.push('Chưa tải được chiến dịch Marketing.'); }
     setUsageErrors(errors);
   }, []);
   useEffect(() => { const timer = setTimeout(() => void loadUsage(), 0); return () => clearTimeout(timer); }, [loadUsage]);
@@ -121,10 +126,13 @@ export function AiConfigShell() {
     if (id === 'content' || id === 'review') {
       const items = posts?.filter(post => id === 'content' || post.status === 'draft');
       return <><h3>{id === 'content' ? 'Campaign & nền tảng đăng bài' : 'Campaign & bước duyệt bài'}</h3>
-        <p>Chưa có campaign được gán.</p>
+        {marketing?.workspace?.campaigns.length ? marketing.workspace.campaigns.filter(campaign => id === 'content' || marketing.workspace.reviews.some(review => review.campaignId === campaign.id)).map(campaign => {
+          const account = marketing.accounts.find(item => item.id === campaign.accountId);
+          return <p key={campaign.id}>{campaign.name} · {account?.platform}{account?.mock ? ' (mẫu)' : ''} · {campaign.approvedAt ? 'Brief đã duyệt' : 'Brief nháp'}</p>;
+        }) : <p>{marketing ? 'Chưa có chiến dịch.' : 'Chưa tải được danh sách chiến dịch.'}</p>}
         {items ? <><p>{id === 'content' ? 'Bài viết đã lưu' : 'Bước kiểm tra trước khi chủ shop duyệt'}: {items.length} bài{items.length > 0 && ` · ${[...new Set(items.map(post => post.channel))].map(channel => channel === 'facebook' ? 'Facebook' : channel === 'tiktok' ? 'TikTok' : 'Email').join(', ')}`}</p>
           {items.slice(0, 3).map(post => <p key={post.id}>{post.title} · {post.channel} · {post.status === 'draft' ? 'Bản nháp' : 'Đã đăng'}</p>)}</> : <p>Chưa tải được danh sách bài viết.</p>}
-        <Link href={`/marketing?tab=${id === 'content' ? 'composer' : 'queue'}`} className="btn btn-outline btn-sm">{id === 'content' ? 'Mở soạn nội dung' : 'Mở hàng chờ duyệt'}</Link></>;
+        <Link href={`/marketing?tab=${id === 'content' ? 'composer' : 'approvals'}`} className="btn btn-outline btn-sm">{id === 'content' ? 'Mở soạn nội dung' : 'Mở duyệt nội dung'}</Link></>;
     }
     if (id === 'sourcing') return <><h3>Nguồn dữ liệu tìm kiếm</h3><p>TikTok: thu thập bài theo từ khóa. Google: tìm đầu mối nhà cung cấp.</p><p>Tiêu chí hiện tại: {config.profiles.sourcing.rules.category} · {config.profiles.sourcing.rules.region}</p><Link href="/smart-sourcing" className="btn btn-outline btn-sm">Mở Smart Sourcing</Link></>;
     const active = sessions?.filter(item => item.status === 'live');

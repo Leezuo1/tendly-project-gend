@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { marketingCommentContext } from '@/lib/services/marketingCommentContext';
 import { assertOperationAllowed, canRunAutomation, runAutomaticAccess } from '@/lib/services/appSecurity';
 import type { AiKnowledge } from '@/lib/types/ai';
 import type { CommentsData, FacebookComment, FacebookCommentEvent } from '@/lib/types/facebookComments';
@@ -225,9 +226,11 @@ async function analyzeComment(pageId: string, db: Database, signal: AbortSignal,
     }
     const post = await graphRead(row.post_id, 'message', signal);
     const postText = typeof post.message === 'string' ? post.message.slice(0, 30_000) : '';
-    const knowledge = parseAiKnowledge(settings.knowledge_json);
+    const campaign = await marketingCommentContext(pageId, row.post_id, db);
+    const knowledge = parseAiKnowledge(campaign?.knowledge ?? settings.knowledge_json);
     const { result: draft } = await generateGeminiJson({
       system: `${buildAiSystemPrompt(knowledge)}
+${campaign ? `NGỮ CẢNH CAMPAIGN CỦA ĐÚNG BÀI: ${JSON.stringify(campaign.context)}. Chỉ nhắc ưu đãi trong offer khi có giá trị. Nếu expiredOffer=true hoặc sourceIsCurrent=false thì needsHuman=true; không xác nhận deal còn hiệu lực. Hồ sơ là cách giao tiếp, không cấp quyền bỏ qua điều kiện gửi.` : ''}
 Bạn đang xử lý một BÌNH LUẬN trên Fanpage để soạn MỘT tin nhắn riêng.
 - productQuestion=true chỉ khi khách hỏi giá, thông tin, tồn kho hoặc cách mua sản phẩm. Tag bạn bè, emoji, spam, lời khen đơn thuần: false.
 - Dùng bài đăng để xác định đúng sản phẩm, nhưng giá/tồn kho chỉ lấy từ danh mục. Không đoán sản phẩm khi bài có nhiều mẫu hoặc không khớp danh mục.
@@ -243,7 +246,7 @@ Bạn đang xử lý một BÌNH LUẬN trên Fanpage để soạn MỘT tin nh�
       WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND processing_at=$4 AND status='processing' RETURNING comment_id`,
     [pageId, row.comment_id, row.revision, now, status, postText, draft.message, draft.reason]);
     if (saved.rowCount && !commentId && settings.auto_reply && Number(row.created_at) >= Number(settings.enabled_at) &&
-        draft.productQuestion && !draft.needsHuman && draft.message) {
+        draft.productQuestion && !draft.needsHuman && draft.message && (!campaign || (campaign.context.sourceIsCurrent && !campaign.context.expiredOffer))) {
       await runAutomaticAccess(Number(row.created_at), () => sendCommentPrivateReply(pageId, row.comment_id, draft.message, row.revision, db, Number(settings.updated_at)));
     }
   } catch (error) {

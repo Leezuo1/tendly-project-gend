@@ -11,6 +11,7 @@ import { PostImageField, SavedPostImage, type ImageBusy } from './PostImageField
 
 interface PostComposerTabProps {
   onToast: (msg: string) => void;
+  archiveOnly?: boolean;
 }
 
 const BRAND_STORAGE = 'tendly.brandVoice';
@@ -39,7 +40,7 @@ function readBrandVoice() {
   }
 }
 
-export function PostComposerTab({ onToast }: PostComposerTabProps) {
+export function PostComposerTab({ onToast, archiveOnly = false }: PostComposerTabProps) {
   // ---- form ----
   const [channel, setChannel] = useState<PostChannel>('facebook');
   const [goal, setGoal] = useState<PostGoal>('new-product');
@@ -270,7 +271,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
         </div>
       )}
 
-      <form className="card" onSubmit={onGenerate}>
+      {!archiveOnly && <form className="card" onSubmit={onGenerate}>
         <div className="card-head">
           <h2>✨ Soạn bài với AI</h2>
           <span className="hint">AI viết dựa trên sản phẩm &amp; FAQ trong FAQ & sản phẩm</span>
@@ -380,7 +381,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
             {generating ? <><span className="pc-spinner" /> AI đang viết...</> : '✨ Tạo bài với AI'}
           </button>
         </div>
-      </form>
+      </form>}
 
       {drafts.length > 0 && draftMeta && (
         <div className="card">

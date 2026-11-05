@@ -3,6 +3,8 @@ import { composePostMessage, InvalidPostRequest } from '@/lib/services/aiPost';
 import { publishToFacebookPage } from '@/lib/services/facebookPage';
 import { postsErrorResponse, readJson, requireDashboardKey } from '@/lib/services/postsApi';
 import { getPost, getPostImage, markPublished, PostLocked } from '@/lib/services/postsPostgres';
+import { managedMarketingPost, publishMarketingPost } from '@/lib/services/marketingWorkspace';
+import { MarketingWorkflowError } from '@/lib/services/marketingBrief';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -18,6 +20,11 @@ export const POST = withAppAccess(async function POST(request: Request, { params
     const { id } = await params;
     const body = await readJson(request) as { mode?: unknown };
     if (body?.mode !== 'page' && body?.mode !== 'manual') throw new InvalidPostRequest('Cách đăng không hợp lệ.');
+    const pageId = process.env.PAGE_ID?.trim();
+    if (pageId && await managedMarketingPost(pageId, id)) {
+      if (body.mode !== 'page') throw new MarketingWorkflowError('Bài theo campaign cần được duyệt và đăng từ Marketing.');
+      return Response.json({ post: await publishMarketingPost(pageId, id) });
+    }
 
     const post = await getPost(id);
     if (post.status !== 'draft') throw new PostLocked('Bài viết đã được đăng trước đó.');
