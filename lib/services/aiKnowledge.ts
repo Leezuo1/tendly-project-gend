@@ -4,33 +4,33 @@ export class InvalidAiKnowledge extends Error {}
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new InvalidAiKnowledge('Dữ liệu Cấu hình AI không hợp lệ.');
+    throw new InvalidAiKnowledge('Dữ liệu FAQ & sản phẩm không hợp lệ.');
   }
   return value as Record<string, unknown>;
 }
 
 function text(value: unknown, max = 8000): string {
   if (typeof value !== 'string' || value.length > max) {
-    throw new InvalidAiKnowledge('Nội dung Cấu hình AI không hợp lệ hoặc quá dài.');
+    throw new InvalidAiKnowledge('Nội dung FAQ & sản phẩm không hợp lệ hoặc quá dài.');
   }
   return value.trim();
 }
 
 function number(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw new InvalidAiKnowledge('Giá, tồn kho hoặc thời gian trong Cấu hình AI không hợp lệ.');
+    throw new InvalidAiKnowledge('Giá, tồn kho hoặc thời gian trong FAQ & sản phẩm không hợp lệ.');
   }
   return value;
 }
 
 function boolean(value: unknown): boolean {
-  if (typeof value !== 'boolean') throw new InvalidAiKnowledge('Trạng thái Cấu hình AI không hợp lệ.');
+  if (typeof value !== 'boolean') throw new InvalidAiKnowledge('Trạng thái FAQ & sản phẩm không hợp lệ.');
   return value;
 }
 
 function list(value: unknown, max: number): unknown[] {
   if (!Array.isArray(value) || value.length > max) {
-    throw new InvalidAiKnowledge('Danh sách Cấu hình AI không hợp lệ hoặc quá lớn.');
+    throw new InvalidAiKnowledge('Danh sách FAQ & sản phẩm không hợp lệ hoặc quá lớn.');
   }
   return value;
 }
@@ -99,5 +99,5 @@ export function buildAiSystemPrompt(knowledge: AiKnowledge): string {
 }
 
 export function knowledgeSummary(knowledge: AiKnowledge): string {
-  return `Cấu hình AI · ${knowledge.products.length} sản phẩm · ${knowledge.faqs.length} FAQ đang bật · ${knowledge.emailTriggers.length} kịch bản email đang bật`;
+  return `FAQ & sản phẩm · ${knowledge.products.length} sản phẩm · ${knowledge.faqs.length} FAQ đang bật · ${knowledge.emailTriggers.length} kịch bản email đang bật`;
 }

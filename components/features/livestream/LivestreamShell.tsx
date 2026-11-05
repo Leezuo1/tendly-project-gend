@@ -303,7 +303,7 @@ export function LivestreamShell() {
                   <input className="pc-input" placeholder="Tên phiên (tuỳ chọn)" value={title} onChange={(e) => setTitle(e.target.value)} />
                   <button className="btn btn-primary" disabled={starting}>{starting ? 'Đang bắt đầu...' : 'Bắt đầu'}</button>
                 </div>
-                <p className="hint">Phiên dùng sản phẩm, giá, tồn kho và FAQ trong Cấu hình AI tại thời điểm bắt đầu.</p>
+                <p className="hint">Phiên dùng sản phẩm, giá, tồn kho và FAQ trong FAQ & sản phẩm tại thời điểm bắt đầu.</p>
               </form>
 
               <div className="card">

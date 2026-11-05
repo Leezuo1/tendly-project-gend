@@ -139,7 +139,7 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
           Đồng bộ dữ liệu sản phẩm để AI sẵn sàng hỗ trợ khách.</p>
         <div className="fc-empty-actions">
           <Link className="btn btn-primary btn-sm" href="/cai-dat?tab=channels">Kiểm tra kết nối Fanpage →</Link>
-          <Link className="btn btn-outline btn-sm" href="/cau-hinh-ai">Cài đặt dữ liệu AI</Link>
+          <Link className="btn btn-outline btn-sm" href="/cai-dat?tab=faq">Cài đặt dữ liệu AI</Link>
         </div>
       </div> : <div className="fc-workspace">
         <div className="card fc-list" aria-label="Bình luận theo người dùng">

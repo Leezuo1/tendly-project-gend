@@ -58,7 +58,7 @@ export async function readFacebookComments(pageId: string, db: Database = getMes
 
 export async function saveCommentSettings(pageId: string, autoReply: boolean, knowledge: AiKnowledge,
   db: Database = getMessengerPool()) {
-  if (autoReply && !knowledge.products.length) throw new InvalidMarketingRequest('Cần có sản phẩm trong Cấu hình AI trước khi bật tự gửi.');
+  if (autoReply && !knowledge.products.length) throw new InvalidMarketingRequest('Cần có sản phẩm trong FAQ & sản phẩm trước khi bật tự gửi.');
   await db.query(`INSERT INTO facebook_comment_settings(page_id,auto_reply,knowledge_json,updated_at,enabled_at)
     VALUES($1,$2,$3::jsonb,$4,$4) ON CONFLICT(page_id) DO UPDATE SET
     auto_reply=EXCLUDED.auto_reply,knowledge_json=EXCLUDED.knowledge_json,

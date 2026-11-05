@@ -113,7 +113,7 @@ export function buildPostPrompt(request: PostGenerationRequest, knowledge: AiKno
     .filter((p) => request.productIds.includes(p.id))
     .map(({ sku, name, material, category, colors, sizes, qty, price }) => ({ sku, name, material, category, colors, sizes, qty, price }));
   if (products.length !== request.productIds.length) {
-    throw new InvalidPostRequest('Có sản phẩm đã chọn không còn trong Cấu hình AI. Vui lòng chọn lại.');
+    throw new InvalidPostRequest('Có sản phẩm đã chọn không còn trong FAQ & sản phẩm. Vui lòng chọn lại.');
   }
   const system = `${POST_SYSTEM_PROMPT}\n\nQUY TẮC KÊNH:\n${CHANNEL_RULES[request.channel]}`;
   const user = JSON.stringify({

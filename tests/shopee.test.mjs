@@ -140,7 +140,7 @@ test('callback rejects forged state, wrong shop and main account, then persists 
   assert.equal(calls.length, 0);
   const response = await callback('shop_id=456');
   assert.equal(response.status, 303);
-  assert.match(response.headers.get('location'), /cau-hinh-ai\?tab=products/);
+  assert.match(response.headers.get('location'), /cai-dat\?tab=products/);
   assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
   const status = await f.load('app/api/shopee/route.ts').GET(f.request('/api/shopee'));
   const data = await status.json();

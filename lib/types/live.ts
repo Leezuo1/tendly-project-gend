@@ -191,7 +191,7 @@ export interface LiveSnapshot {
   /** Có khi phiên đã kết thúc. */
   summary: LiveSummary | null;
   /** Sản phẩm của phiên (để chọn mẫu đang lên sóng). */
-  /** price = giá đang áp dụng (đã tính flash sale), basePrice = giá gốc trong Cấu hình AI. */
+  /** price = giá đang áp dụng (đã tính flash sale), basePrice = giá gốc trong FAQ & sản phẩm. */
   products: { sku: string; name: string; price: number; basePrice: number; flashPrice: number | null; stock: number }[];
 }
 

@@ -20,7 +20,7 @@ export const GET = withAppAccess(async function GET(request: Request) {
 });
 
 /**
- * Bắt đầu phiên: { platform: 'facebook', sourceKind: 'auto'|'live_video'|'post', sourceId?, title, knowledge } (knowledge = Cấu hình AI).
+ * Bắt đầu phiên: { platform: 'facebook', sourceKind: 'auto'|'live_video'|'post', sourceId?, title, knowledge } (knowledge = FAQ & sản phẩm).
  * sourceKind 'auto': tạo phiên trước, Tendly tự nhận video Live khi người bán bật stream trên Facebook.
  */
 export const POST = withAppAccess(async function POST(request: Request) {

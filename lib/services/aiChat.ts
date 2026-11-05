@@ -4,7 +4,7 @@ import { readDb } from '@/lib/services/mockDb';
 import type { AiChatReply, AiKnowledge, AiSessionMessage } from '@/lib/types/ai';
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
 
-/** Đọc lại mỗi lần hỏi để áp dụng ngay thay đổi đã lưu trong Cấu hình AI. */
+/** Đọc lại mỗi lần hỏi để áp dụng ngay thay đổi đã lưu trong FAQ & sản phẩm. */
 export function currentAiKnowledge(): AiKnowledge {
   const db = readDb();
   return structuredClone({

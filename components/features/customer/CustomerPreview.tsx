@@ -19,7 +19,7 @@ export function CustomerPreview({ note, onReset, resetLabel = 'Làm mới', vari
         <span>{note}</span>
         <span className="note-actions">
           {onReset && <button className="note-btn" onClick={onReset}>↻ {resetLabel}</button>}
-          <Link className="note-btn" href="/cau-hinh-ai">← Trang quản trị</Link>
+          <Link className="note-btn" href="/cai-dat?tab=faq">← Trang quản trị</Link>
         </span>
       </div>
       {variant === 'widget' && (

@@ -1,6 +1,6 @@
 import type { EmailTrigger, Faq, Product, ProductSource, Shop } from './admin';
 
-/** Dữ liệu đã lưu ở Cấu hình AI, không bao gồm hồ sơ hoặc lịch sử khách hàng. */
+/** Dữ liệu đã lưu ở FAQ & sản phẩm, không bao gồm hồ sơ hoặc lịch sử khách hàng. */
 export interface AiKnowledge {
   shop: Pick<Shop, 'name' | 'email' | 'phone'>;
   productSource: Pick<ProductSource, 'name' | 'connected' | 'lastSyncedAt'>;

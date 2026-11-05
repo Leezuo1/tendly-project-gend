@@ -5,16 +5,24 @@ import { ChannelsTab } from './ChannelsTab';
 import { PlanCard } from './PlanCard';
 import { ShopInfoCard } from './ShopInfoCard';
 import { TeamCard } from './TeamCard';
+import { ProductsTab } from '@/components/features/ai-config/ProductsTab';
+import { FaqTab } from '@/components/features/ai-config/FaqTab';
+import { EmailTab } from '@/components/features/ai-config/EmailTab';
 
-const TABS = [{ key: 'account', label: 'Tài khoản & nhân viên' }, { key: 'channels', label: 'Tích hợp kênh' }] as const;
+const TABS = [
+  { key: 'account', label: 'Tài khoản & nhân viên' }, { key: 'channels', label: 'Tích hợp kênh' },
+  { key: 'products', label: 'Nguồn sản phẩm' }, { key: 'faq', label: 'FAQ' }, { key: 'email', label: 'Email tự động' },
+] as const;
 type TabKey = (typeof TABS)[number]['key'];
 export function SettingsShell() {
   const [tab, setTab] = useTabParam<TabKey>(TABS.map((t) => t.key), 'account');
-  return <>
-    <div className="page-head"><div><h1>Cài đặt</h1><p>Quản lý thông tin shop, nhân viên và các kênh đang kết nối.</p></div></div>
+  const content = { account: <><ShopInfoCard /><PlanCard /><TeamCard /></>, channels: <ChannelsTab />,
+    products: <ProductsTab />, faq: <FaqTab />, email: <EmailTab /> };
+  return <div className="settings-workspace">
+    <div className="page-head"><div><h1>Cài đặt</h1><p>Quản lý shop, kênh kết nối, sản phẩm và nội dung hỗ trợ khách hàng.</p></div></div>
     <Tabs tabs={[...TABS]} active={tab} onChange={setTab} />
     <div className="tab-panel" key={tab}>
-      {tab === 'account' ? <><ShopInfoCard /><PlanCard /><TeamCard /></> : <ChannelsTab />}
+      {content[tab]}
     </div>
-  </>;
+  </div>;
 }

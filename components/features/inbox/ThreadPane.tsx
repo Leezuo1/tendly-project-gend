@@ -272,7 +272,7 @@ export function ThreadPane({
                 onClick={handleAskGemini}
                 disabled={isThinkingAi || !conversation.isUnreplied}
                 style={{ fontSize: 11.5, padding: '4px 10px', gap: 6, borderRadius: 8 }}
-                title="Tạo câu trả lời từ dữ liệu Cấu hình AI đã lưu"
+                title="Tạo câu trả lời từ dữ liệu FAQ & sản phẩm đã lưu"
               >
                 {isThinkingAi ? '⏳ Đang phân tích...' : '✨ Tạo câu trả lời AI'}
               </button>

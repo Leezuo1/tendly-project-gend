@@ -23,8 +23,8 @@ export function prepareSourcingSearch(input: Record<string, unknown>, now = new 
     market: 'VN' as const,
     keywords: [...seedKeywords[industry]],
     period: { from: new Date(now.getTime() - 7 * 86400_000).toISOString(), to: now.toISOString() },
-    collectionReady: false,
-    message: 'Đã chuẩn bị từ khóa đầu vào. Chưa cấu hình nguồn thu thập; chưa gọi Apify hoặc phân tích xu hướng.',
+    collectionStarted: false,
+    message: 'Đã chuẩn bị từ khóa đầu vào. API kế hoạch chưa khởi chạy Apify hoặc phân tích xu hướng.',
   };
 }
 

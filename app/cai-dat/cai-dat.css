@@ -101,3 +101,9 @@
 .admin-root .settings-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .admin-root .settings-fields:disabled input,
 .admin-root .settings-fields:disabled select { color: var(--ink); opacity: 1; cursor: default; }
+
+@media (max-width: 880px) {
+  .admin-root .settings-workspace > .tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0 6px; overflow: visible; margin-top: 8px; }
+  .admin-root .settings-workspace > .tabs .tab-btn { grid-column: span 2; min-width: 0; min-height: 48px; padding: 10px 4px; font-size: 12px; white-space: normal; text-align: center; }
+  .admin-root .settings-workspace > .tabs .tab-btn:nth-child(-n+2) { grid-column: span 3; }
+}

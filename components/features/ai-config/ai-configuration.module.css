@@ -1,0 +1,85 @@
+:global(.admin-root) .root { max-width: 1240px; margin-inline: auto; }
+.root .headerActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.root .headerActions button:disabled { opacity: .55; }
+.root .fieldset { border: 0; min-width: 0; }
+.root .loading, .root .error { padding: 16px 0; font-size: 14px; }
+.root .error { color: var(--coral-deep); }
+.root .error button { margin-left: 12px; }
+/* Existing shell + 252px role list + remaining editor; 24px between the two columns. */
+.root .workspace { display: grid; grid-template-columns: 252px minmax(0, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
+.root .roles { min-width: 0; }
+.root .roles h2 { font-size: 15px; font-weight: 600; }
+.root .roles > p { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+.root .roleList { display: grid; gap: 6px; margin-top: 18px; }
+.root .roleButton { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--ink); text-align: left; }
+.root .roleButton svg { flex: none; margin-top: 2px; color: var(--ink-soft); }
+.root .roleButton strong { display: block; font-size: 13px; font-weight: 550; }
+.root .roleButton small { display: block; font-size: 11px; color: var(--ink-soft); margin-top: 4px; line-height: 1.5; }
+.root .roleButton:hover { background: var(--sand); }
+.root .roleButton.selected { background: var(--coral-soft); border-color: var(--line); }
+.root .roleButton.selected svg { color: var(--coral-deep); }
+.root .workflow { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--line); }
+.root .workflow h3, .root .guard h3, .root .channelRules h3 { font-size: 13px; font-weight: 600; }
+.root .workflow p, .root .guard p, .root .channelRules p { font-size: 12px; color: var(--ink-soft); line-height: 1.7; margin-top: 8px; }
+.root .workflow a, .root .knowledgeList a, .root .footnote a { color: var(--coral-deep); text-decoration: underline; text-underline-offset: 3px; }
+.root .workflow a { display: inline-block; margin-top: 10px; font-size: 12px; }
+.root .editor { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); min-width: 0; }
+.root .editorHead { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
+.root .editorHead h2 { font-size: 19px; font-weight: 600; line-height: 1.5; }
+.root .editorHead p { color: var(--ink-soft); font-size: 12px; line-height: 1.6; margin-top: 5px; max-width: 55ch; }
+.root .formBody { display: grid; gap: 20px; padding: 24px; }
+.root label:not(:global(.switch)), .root .sources legend { font-size: 13px; font-weight: 550; color: var(--ink); }
+.root .formBody > label, .root .pair > label, .root .channelForm > label { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.root .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.root input:not([type='checkbox']), .root select, .root textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 5px; background: var(--canvas); color: var(--ink); padding: 10px 12px; font: inherit; font-size: 13px; font-weight: 400; line-height: 1.65; }
+.root input:not([type='checkbox']), .root select { min-height: 44px; }
+.root textarea { resize: vertical; }
+.root input::placeholder, .root textarea::placeholder { color: var(--ink-soft); opacity: 1; }
+.root input[type='checkbox'] { accent-color: var(--coral-deep); width: 16px; height: 16px; flex: none; }
+.root .sources { border: 0; min-width: 0; }
+.root .sources > div { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 8px; }
+.root .sources label { display: flex; align-items: center; gap: 8px; min-height: 40px; font-weight: 400; }
+.root .sources p, .root .optional { font-size: 12px; font-weight: 400; color: var(--ink-soft); line-height: 1.7; }
+.root .guard { padding-top: 18px; border-top: 1px solid var(--line); }
+.root .saveBar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; padding: 18px 0 4px; border-top: 1px solid var(--line); }
+.root .saveBar p { font-size: 12px; color: var(--ink-soft); }
+.root .saveBar button:disabled { opacity: .55; }
+.root .knowledge, .root .channels { padding-top: 24px; }
+.root .sectionIntro h2 { font-size: 19px; line-height: 1.5; font-weight: 600; }
+.root .sectionIntro p { font-size: 13px; color: var(--ink-soft); line-height: 1.7; margin-top: 8px; max-width: 75ch; }
+.root .knowledgeList { margin-top: 24px; }
+.root .knowledgeList > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 180px) 150px; gap: 24px; align-items: center; padding: 22px 0; border-top: 1px solid var(--line); }
+.root .knowledgeList h3 { font-size: 14px; font-weight: 600; }
+.root .knowledgeList p { font-size: 12px; color: var(--ink-soft); margin-top: 5px; }
+.root .knowledgeList span { font-size: 12px; overflow-wrap: anywhere; }
+.root .knowledgeList a { font-size: 13px; justify-self: end; }
+.root .footnote { color: var(--ink-soft); font-size: 12px; line-height: 1.8; margin-top: 20px; max-width: 80ch; }
+.root .channelGrid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 36px; margin-top: 24px; }
+.root .channelForm { display: grid; gap: 20px; }
+.root .channelRules { align-self: start; background: var(--sand); padding: 22px; border-radius: 8px; }
+.root .channelRules ol { padding-left: 20px; margin-top: 12px; font-size: 13px; line-height: 2; }
+.root .switchRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.root .switchRow strong { font-size: 13px; font-weight: 550; }
+.root .switchRow p { font-size: 12px; margin-top: 5px; color: var(--ink-soft); }
+@media (max-width: 1100px) {
+  .root .workspace { grid-template-columns: 220px minmax(0, 1fr); gap: 18px; }
+  .root .pair, .root .channelGrid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 880px) {
+  .root { min-width: 0; }
+  .root > :global(.tabs) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .root > :global(.tabs) > button { min-width: 0; min-height: 48px; padding: 8px 4px; font-size: 12px; white-space: normal; }
+  .root .workspace { grid-template-columns: minmax(0, 1fr); margin-top: 20px; }
+  .root .roles > p, .root .workflow { display: none; }
+  .root .roleList { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+  .root .roleButton { gap: 8px; padding: 12px 8px; }
+  .root .roleButton strong { font-size: 12px; }
+  .root .roleButton small { font-size: 10px; }
+  .root .editorHead { padding: 18px 16px; gap: 12px; }
+  .root .editorHead h2, .root .sectionIntro h2 { font-size: 17px; }
+  .root .formBody { padding: 18px 16px; }
+  .root .knowledgeList > div { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 18px 0; }
+  .root .knowledgeList a { justify-self: start; min-height: 44px; display: flex; align-items: center; }
+  .root .saveBar { flex-wrap: wrap; }
+  .root input:not([type='checkbox']), .root select, .root textarea { font-size: 16px; }
+}

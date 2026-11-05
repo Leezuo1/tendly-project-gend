@@ -305,7 +305,7 @@ function ProductsTab({ snapshot, apply, notify, live }: TabProps) {
       {snapshot.queue[0] && snapshot.queue[0].remaining > 0 && (
         <div className="lm-hint">👉 Nên giới thiệu tiếp <b>{snapshot.queue[0].name}</b>: {snapshot.queue[0].recommendation}</div>
       )}
-      {!products.length && <div className="lm-empty">Chưa có sản phẩm. Thêm sản phẩm trong Cấu hình AI trước khi bắt đầu phiên.</div>}
+      {!products.length && <div className="lm-empty">Chưa có sản phẩm. Thêm sản phẩm trong FAQ & sản phẩm trước khi bắt đầu phiên.</div>}
       {products.map((p) => (
         <div key={p.sku} className={`lm-product level-${p.level}${p.sku === session.onAirSku ? ' onair' : ''}`}>
           <div className="lm-row">

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { IconCart, IconSearch, IconSpark, IconRefresh } from '@/components/ui/Icons';
+import { IconCart, IconSearch, IconRefresh } from '@/components/ui/Icons';
 import { sourcingDemos, type SourcingProduct } from '@/lib/data/smartSourcing';
 import { useMockOnboarding } from '@/lib/hooks/useMockOnboarding';
 import styles from './sourcing.module.css';
@@ -14,8 +14,7 @@ const number = new Intl.NumberFormat('vi-VN');
 export function SmartSourcing() {
   const { ready, workspace } = useMockOnboarding();
   return <div className={styles.root}>
-    <header className="page-head"><div><p className={styles.eyebrow}>TỪ XU HƯỚNG ĐẾN CƠ HỘI</p><h1>Smart Sourcing</h1><p>Lắng nghe thị trường, tìm ý tưởng mới cho shop của bạn.</p></div><span className={styles.demoBadge}>Bản demo</span></header>
-    <div className={styles.notice}><IconSpark aria-hidden="true" /><p>Trải nghiệm bằng dữ liệu mẫu. Từ khóa, lượt thảo luận, giá và nhà cung cấp đều minh họa cho luồng hoạt động; chưa thu thập dữ liệu mạng xã hội thật.</p></div>
+    <header className="page-head"><div><p className={styles.eyebrow}>TỪ XU HƯỚNG ĐẾN CƠ HỘI</p><h1>Smart Sourcing</h1><p>Lắng nghe thị trường, tìm ý tưởng mới cho shop của bạn.</p></div></header>
     {!ready ? <p role="status">Đang đọc ngành hàng của shop…</p> : !workspace ? <section className={`card ${styles.empty}`}><IconSearch aria-hidden="true" /><h2>Shop của bạn kinh doanh ngành gì?</h2><p>Thêm tên shop và ngành hàng trong Cài đặt để bắt đầu khám phá.</p><Button href="/cai-dat">Thiết lập thông tin shop →</Button></section>
       : !Object.hasOwn(sourcingDemos, workspace.industry) ? <section className={`card ${styles.empty}`}><h2>Chưa có dữ liệu mẫu cho ngành này</h2><p>Chọn một ngành có sẵn trong Cài đặt để trải nghiệm demo.</p><Button href="/cai-dat">Chọn ngành hàng →</Button></section>
         : <SourcingFlow key={workspace.industry} industry={workspace.industry} shopName={workspace.name} />}

@@ -2,6 +2,13 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### FAQ và cấu hình vai trò AI
+
+- **Cài đặt** có các tab Nguồn sản phẩm (`/cai-dat?tab=products`), FAQ (`/cai-dat?tab=faq`) và Email tự động (`/cai-dat?tab=email`). Link cũ `/faq` và `/cau-hinh-ai?tab=products|faq|email` chuyển đến tab tương ứng trong Cài đặt; callback Shopee cũng về tab Nguồn sản phẩm. Dữ liệu hiện có được giữ nguyên.
+- `/cau-hinh-ai` là màn hình mới với năm vai trò Content, Chat, Review, Smart Sourcing và Livestream. Có mục tiêu, văn phong, input/output, nguồn tri thức, chỉ dẫn bổ sung, trạng thái và mức tự động hóa cho từng vai trò; thêm tab Tri thức chung và Gán Fanpage.
+- Đây là **bản thiết lập prototype**, lưu trên trình duyệt theo tài khoản. Các lựa chọn vai trò và Page minh họa chưa được áp dụng vào prompt/backend, chưa kết nối Page thật và không bật/tắt gửi tin hiện hành. Công tắc Messenger thật vẫn ở Hộp thoại. Lưu lỗi phải báo lỗi; không thay dữ liệu cũ bằng cấu hình mặc định khi đọc thất bại.
+- Kiểm tra cấu hình: `node --test tests/ai-configuration.test.mjs`. Tri thức sản phẩm/FAQ vẫn dùng luồng hiện tại; chưa bổ sung USP/keyword hoặc chuyển nguồn tri thức chung lên server trong bước này.
+
 ### Bảo vệ dữ liệu & tài khoản quản trị
 
 - Chạy `node scripts/setup-app-security.mjs` để tạo tài khoản quản trị riêng. Script giữ nguyên cấu hình đang có, thêm `APP_ADMIN_USERNAME` và `APP_ADMIN_PASSWORD_HASH` vào `.env.local`; thông tin đăng nhập được lưu trong `.env.security-admin.local` (Git bỏ qua). Không đưa file này hoặc mật khẩu lên Git. Nếu đã cấu hình hash thì script không đổi thông tin đăng nhập.
@@ -17,7 +24,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 Kiểm tra quyền: `node --test tests/app-security.test.mjs` dùng PostgreSQL giả lập PGlite, thử tất cả handler API, phiên cũ/giả mạo, bật khóa giữa lúc gửi, quyền admin, logout/đổi mật khẩu, rate limit và lỗi DB. Các test nghiệp vụ khác dùng fixture tách quyền truy cập để tiếp tục kiểm tra luồng xử lý cũ.
 
-Kết nối một shop Shopee thật, cấu hình callback và đồng bộ sản phẩm: [hướng dẫn Shopee demo](docs/shopee-demo.md). Nút đồng bộ ở Cấu hình AI gọi API thật; lựa chọn Shopee trong onboarding vẫn là mô phỏng.
+Kết nối một shop Shopee thật, cấu hình callback và đồng bộ sản phẩm: [hướng dẫn Shopee demo](docs/shopee-demo.md). Nút đồng bộ ở FAQ & sản phẩm gọi API thật; lựa chọn Shopee trong onboarding vẫn là mô phỏng.
 
 ### Đăng ký và đăng nhập
 
@@ -35,7 +42,9 @@ Tên shop, ngành hàng, múi giờ, biểu tượng và màu nền ở `/tao-sh
 
 Mở **Smart Sourcing** (`/smart-sourcing`) từ sidebar → **Phân tích xu hướng mẫu** → chọn từ khóa → **Tìm nguồn hàng** trên sản phẩm. Demo có bộ mẫu riêng cho cả 7 ngành setup, mô phỏng tín hiệu Facebook/TikTok/sàn TMĐT, sản phẩm liên quan và nguồn cung. Đổi ngành trong Cài đặt sẽ đổi bộ mẫu và xóa kết quả phân tích cũ trên màn hình. Chưa setup thì trang hướng dẫn vào Cài đặt để bổ sung.
 
-Từ khóa, mức tăng, lượt thảo luận, giá, số lượng tối thiểu và nhà cung cấp đều là dữ liệu minh họa, không phải khảo sát hay báo giá thật. **Tra cứu nguồn tương tự** mở tìm kiếm Google, chưa xác minh/liên hệ nhà cung cấp hoặc đặt hàng. Không thêm API, crawler, đồng bộ nền tảng hay phụ thuộc mới; dữ liệu setup vẫn chỉ lưu trên trình duyệt.
+Từ khóa, mức tăng, lượt thảo luận, giá, số lượng tối thiểu và nhà cung cấp trên giao diện demo đều là dữ liệu minh họa, không phải khảo sát hay báo giá thật. **Tra cứu nguồn tương tự** mở tìm kiếm Google, chưa xác minh/liên hệ nhà cung cấp hoặc đặt hàng. Dữ liệu setup mẫu vẫn chỉ lưu trên trình duyệt.
+
+Backend Apify riêng đã có cho `clockworks/tiktok-scraper` và `apify/google-search-scraper`, chưa nối vào giao diện demo. Cần `APIFY_API_TOKEN`, `DATABASE_URL` và chạy `npm run db:migrate`. API khởi tạo trả ID để kiểm tra tiến trình và lưu kết quả vào Postgres. Xem cấu hình, endpoint và giới hạn tại [Smart_Sourcing.md](Smart_Sourcing.md). Chưa xác nhận kết nối provider thật.
 
 Kiểm tra: `node --test tests/mock-onboarding.test.mjs tests/ai-chat.test.mjs tests/smart-sourcing.test.mjs`.
 
@@ -84,7 +93,7 @@ Trang Cài đặt bỏ banner khôi phục và thông tin mẫu. Nút bút chì 
 
 Dashboard `/tong-quan` lấy số hội thoại đang chờ, tin đến/tin gửi hôm nay, 10 tin khách gần đây và thống kê hội thoại 7 ngày từ PostgreSQL qua `/api/dashboard`, cập nhật khoảng 2 giây khi tab đang mở. Tổng quan và Hộp thoại dùng phiên đăng nhập app và công tắc bảo vệ dữ liệu; không nhập hay lưu mã truy cập trong trình duyệt. Các số liệu email, đơn hàng và cảm xúc chưa có nguồn lưu thật được để trống. Tên chủ shop đọc từ thành viên chủ shop đã lưu trong cấu hình trình duyệt, bỏ qua tên mẫu; chưa có backend tài khoản nên chưa có tên thì để trống.
 
-Trong `/cau-hinh-ai`, nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình email tự động. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email đang bật được cung cấp cho Gemini. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng này.
+Trong Cài đặt (`/cai-dat`), nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình email tự động tại các tab tương ứng. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email đang bật được cung cấp cho Gemini. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng này.
 
 Sản phẩm là nguồn cho giá, chất liệu, size, màu và tổng tồn kho. FAQ là nguồn cho chính sách shop. Mẫu email chỉ cung cấp thông tin về kịch bản, không chứng minh khách đủ điều kiện nhận ưu đãi hay email đã được gửi. Chỉ dẫn yêu cầu AI báo thiếu dữ liệu thay vì đoán thông tin hoặc tự xác nhận đã tạo đơn/gửi email. Việc gửi email thực tế không nằm trong tính năng này.
 
@@ -94,7 +103,7 @@ Cấu hình hiện dùng mock DB tại `localStorage` của trình duyệt, chư
 
 ## Cảm xúc và hàng chờ trả lời
 
-Khi khách nhắn tin ở Hộp thoại, Gemini phân tích cảm xúc (tích cực, trung lập, lo lắng, thất vọng, tức giận), mức ưu tiên (cao, bình thường, thấp), lý do và nhu cầu nhân viên hỗ trợ; sau đó tạo câu trả lời theo cảm xúc và nguồn Cấu hình AI trong cùng một lượt. API yêu cầu [kết quả có cấu trúc](https://ai.google.dev/gemini-api/docs/generate-content/structured-output) và kiểm tra nhãn trước khi cập nhật UI. Mỗi lượt dùng tối đa 10 tin trước đó làm ngữ cảnh. Kết quả cảm xúc, ưu tiên và phong cách giao tiếp quan sát được được lưu theo tin nhắn trong PostgreSQL để xem diễn biến cả cuộc trò chuyện.
+Khi khách nhắn tin ở Hộp thoại, Gemini phân tích cảm xúc (tích cực, trung lập, lo lắng, thất vọng, tức giận), mức ưu tiên (cao, bình thường, thấp), lý do và nhu cầu nhân viên hỗ trợ; sau đó tạo câu trả lời theo cảm xúc và nguồn FAQ & sản phẩm trong cùng một lượt. API yêu cầu [kết quả có cấu trúc](https://ai.google.dev/gemini-api/docs/generate-content/structured-output) và kiểm tra nhãn trước khi cập nhật UI. Mỗi lượt dùng tối đa 10 tin trước đó làm ngữ cảnh. Kết quả cảm xúc, ưu tiên và phong cách giao tiếp quan sát được được lưu theo tin nhắn trong PostgreSQL để xem diễn biến cả cuộc trò chuyện.
 
 Tin khách chưa xem được tô nổi bật, có nhãn **Tin mới** và đứng đầu danh sách theo thời gian mới nhất; mở hội thoại sẽ bỏ đánh dấu. Tiếp theo là hội thoại chưa trả lời, sắp theo điểm ưu tiên AI; cùng điểm thì khách chờ lâu hơn đứng trước. Khi trang hội thoại đang mở và đã kết nối, AI tự phân tích tin đang chờ, cập nhật nhãn cảm xúc, mức ưu tiên và tạo gợi ý, tối đa hai hội thoại cùng lúc. Shop duyệt và gửi gợi ý qua Send API. Lỗi AI giữ tin ở trạng thái chờ và có nút thử lại; không gọi lại liên tục mỗi lần polling. Kết quả chậm không ghi đè câu hỏi mới hay mở lại hội thoại đã trả lời.
 
@@ -147,11 +156,11 @@ Mỗi lần polling chỉ lấy hồ sơ tối đa ba khách; lease trong databa
 
 Hội thoại thật chỉ gửi với tư cách Shop. Gửi text qua `/api/messenger/send` tới Send API; tiêu chuẩn RESPONSE trong 24 giờ từ tin khách gần nhất. Tin không được đánh dấu đã gửi nếu Meta từ chối. Chống gửi lặp cùng request ID bằng bảng outbound; timeout/HTTP 5xx/kết quả không rõ không tự gửi lại. Client giữ request ID khi lỗi không rõ, người dùng cần kiểm tra Messenger trước khi chủ động gửi một yêu cầu mới. Nếu Meta nhận tin nhưng lưu message bị lỗi, UI báo đã gửi và chờ webhook echo để đồng bộ. Webhook echo và bản gửi dashboard có cùng message ID nên không tạo bản thứ hai. [Meta Send API](https://www.postman.com/meta/messenger-platform-api/documentation/iyp204x/messenger-platform-api)
 
-Nút **AI tự động trả lời** trong cột Hàng chờ mặc định tắt, độc lập với AI bình luận Facebook. Chạy `npm run db:migrate` (migration `011-messenger-ai.sql`). Khi bật, Cấu hình AI hiện tại được lưu lên máy chủ; tin Messenger mới được webhook phân tích và tự trả lời dù đóng trang. Bật lại sau khi cập nhật sản phẩm/FAQ để cập nhật nguồn tri thức. Không tự gửi bù tin cũ khi bật.
+Nút **AI tự động trả lời** trong cột Hàng chờ mặc định tắt, độc lập với AI bình luận Facebook. Chạy `npm run db:migrate` (migration `011-messenger-ai.sql`). Khi bật, FAQ & sản phẩm hiện tại được lưu lên máy chủ; tin Messenger mới được webhook phân tích và tự trả lời dù đóng trang. Bật lại sau khi cập nhật sản phẩm/FAQ để cập nhật nguồn tri thức. Không tự gửi bù tin cũ khi bật.
 
 AI chỉ tự gửi khi phân tích xác nhận đủ căn cứ từ nguồn tri thức và không cần người thật; thiếu cờ xác nhận, có tệp chưa đọc, lỗi AI hoặc thiếu dữ liệu đều giữ lại cho shop. Hội thoại có nhãn **Chờ xác nhận**, đứng trước tin mới/khẩn cấp và giữ chặn tự gửi cả khi bật lại AI hoặc khách nhắn tiếp, cho đến khi shop trả lời thủ công. Phân tích lại không tự bỏ chặn. Timeout/kết quả gửi chưa rõ không tự gửi lại. Việc đánh giá đủ căn cứ do model thực hiện, không bảo đảm loại bỏ mọi sai sót của AI.
 
-Khi chưa bật lần nào, AI dùng Cấu hình AI trong trình duyệt để phân tích khi mở trang; nút **Phân tích AI** vẫn chạy lại thủ công. Phân tích được lưu PostgreSQL và khôi phục khi mở lại. Xử lý nền dùng `after()` trong giới hạn thời gian của webhook, chưa có worker/scheduler riêng; nếu tiến trình bị dừng, mở inbox để tiếp tục các tin chưa xử lý. Đánh dấu đã xem vẫn lưu trong phiên trình duyệt.
+Khi chưa bật lần nào, AI dùng FAQ & sản phẩm trong trình duyệt để phân tích khi mở trang; nút **Phân tích AI** vẫn chạy lại thủ công. Phân tích được lưu PostgreSQL và khôi phục khi mở lại. Xử lý nền dùng `after()` trong giới hạn thời gian của webhook, chưa có worker/scheduler riêng; nếu tiến trình bị dừng, mở inbox để tiếp tục các tin chưa xử lý. Đánh dấu đã xem vẫn lưu trong phiên trình duyệt.
 
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 
@@ -161,7 +170,7 @@ Test đồng bộ dùng PostgreSQL WASM (PGlite) để chạy SQL đọc inbox/p
 
 Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, tối đa 5 sản phẩm và ghi chú (khuyến mãi, sự kiện). Gemini viết 1–3 phương án gồm tiêu đề, nội dung, hashtag và gợi ý ảnh/kịch bản video. Bài AI viết chỉ là bản nháp: chủ shop sửa trực tiếp rồi **Lưu nháp**, **Sao chép** hoặc **Lưu & đăng Fanpage**.
 
-- Nguồn dữ liệu là Cấu hình AI (giống `/api/chat`): chỉ gửi sản phẩm được chọn và FAQ đang bật. Chỉ dẫn yêu cầu không bịa giá, khuyến mãi, phí ship; sản phẩm hết hàng không được quảng bá như còn hàng. Ghi chú của chủ shop là dữ liệu, không thay được quy tắc.
+- Nguồn dữ liệu là FAQ & sản phẩm (giống `/api/chat`): chỉ gửi sản phẩm được chọn và FAQ đang bật. Chỉ dẫn yêu cầu không bịa giá, khuyến mãi, phí ship; sản phẩm hết hàng không được quảng bá như còn hàng. Ghi chú của chủ shop là dữ liệu, không thay được quy tắc.
 - Bài viết lưu trong bảng `marketing_posts` (`db/migrations/002-marketing-posts.sql`). `npm run db:migrate` giờ áp dụng mọi file trong `db/migrations` theo thứ tự tên. Chưa có `DATABASE_URL` thì AI vẫn soạn được, chỉ không lưu/đăng.
 - Đăng Fanpage dùng Graph API `POST /{PAGE_ID}/feed` (v26.0) với `PAGE_ID` + `PAGE_ACCESS_TOKEN`; token cần quyền `pages_manage_posts`. Token gửi trong body, không đặt trên URL. TikTok/Email chưa có API đăng: sao chép nội dung rồi bấm **Đánh dấu đã đăng**. Bài đã đăng thì không sửa được; xoá trong Tendly không xoá bài trên Fanpage.
 - Mọi API /api/posts/* dùng phiên đăng nhập app và công tắc bảo vệ; user bị khóa không thể tạo/lưu/đăng bài. Admin vẫn sử dụng được. Không nhập hoặc gửi DASHBOARD_KEY từ trình duyệt.

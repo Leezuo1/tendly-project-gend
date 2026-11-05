@@ -86,7 +86,7 @@ export const postsClient = {
   generate: (req: PostGenerationRequest) =>
     call<{ drafts: GeneratedPostDraft[]; model: string }>('/api/posts/generate', {
       method: 'POST',
-      // Đọc lại Cấu hình AI mỗi lần tạo để dùng đúng giá/tồn kho/FAQ vừa lưu.
+      // Đọc lại FAQ & sản phẩm mỗi lần tạo để dùng đúng giá/tồn kho/FAQ vừa lưu.
       body: JSON.stringify({ request: req, knowledge: currentAiKnowledge() }),
     }),
   list: () => call<{ posts: MarketingPost[]; facebookReady: boolean }>('/api/posts'),

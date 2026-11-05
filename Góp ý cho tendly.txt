@@ -1,0 +1,35 @@
+Trang cấu hình AI phải bao gồm kiểm soát và thiết lập cho các con AI:
+1 AI soạn nội dung
+1 AI chat
+1 AI kiểm tra nội dung
+1 AI smart sourcing
+1 AI Livestream
+Chuẩn hóa
+
+Tập trung vào phần prototype, tập trung show cho ban giám khảo thấy được hệ thống của mình vận hành như thế nào và hệ thống phải thực sự có chiều sâu chứ không chỉ đơn giản là build cho có, tính năng có thể không triển khai được nhưng phải có prototype để ban giám khảo hình dung được
+
+Thêm thông tin rõ ràng về sản phẩm: vì mỗi sản phẩm, mỗi ngành hàng là khác nhau (thêm về sản phẩm, mô tả, tính năng, keyword, USP, sản phẩm liên quan)
+
+Thêm màn hình tích hợp fanpage vào con AI (tức là mỗi trang 1 con Ai tự chọn)
+Bật tắt mode cho riêng từng hội thoại (muốn tắt chung thì tắt ở phần tích hợp AI)
+
+Trang cấu hình AI phải cấu hình AI rõ ràng cho từng con, mục tiêu của nó là gì, văn phong như thế nào, input, output như thế nào
+
+Thêm tính năng gắn thẻ theo ngữ cảnh
+
+Xây dựng campaign để viết bài
+	+ Xây dựng trụ cột nội dung (plan viết bài bao gồm heading, dàn ý chi tiết, ...)
+	+ Phải có bước phê duyệt (flow sẽ đi từ kế hoạch viết bài -> bài viết -> lịch đăng bài)
+	+ Lịch đăng bài phải chia ra theo nhiều lại (đăng nhiều loại, đăng vào dịp nhất định)
+	+ Viết bài phải phù hợp với từng nền tảng mxh đăng
+
+Xây dựng quy trình bán hàng tự động
+	+ Tự động hóa quy trình giữa customer care và marketing
+	+ Giảm thiểu sự tham gia của con người ở các quy trình
+=> Xây dựng theo kiểu shop bán hàng không cần nhân viên (hoặc chỉ cần nhân viên đóng hàng)
+
+AI Content Agent đi theo flow từ thông tin chung -> yêu cầu chung về heading và dàn ý -> yêu cầu chung về bài viết
+
+Xây dựng AI đi seeding dựa theo keyword, tệp data phù hợp với keyword đó
+
+Tìm được cách lách luật giữa các nền tảng (facebook, zalo chặn nhắn tin sau khi tin nhắn đã gửi quá 24h) => tùy chọn, nếu làm được sẽ được đánh giá cao

@@ -26,7 +26,7 @@ export const liveClient = {
   /** Video Live / bài đăng của Fanpage để chọn nguồn, kèm nền tảng sắp hỗ trợ. */
   sources: () => dashboardRequest('/api/live/sources').then(json<{ sources: LiveSourceOption[]; upcoming: string[] }>),
   sessions: () => dashboardRequest('/api/live/sessions').then(json<{ sessions: LiveSessionListItem[] }>).then((r) => r.sessions),
-  /** Gửi kèm Cấu hình AI (sản phẩm, giá, tồn kho, FAQ) làm danh mục cố định của phiên. */
+  /** Gửi kèm FAQ & sản phẩm (sản phẩm, giá, tồn kho, FAQ) làm danh mục cố định của phiên. */
   start: (input: StartLiveInput) => post('/api/live/sessions', { ...input, knowledge: currentAiKnowledge() })
     .then(json<{ session: LiveSession }>).then((r) => r.session),
   snapshot: (id: string) => dashboardRequest(session(id)).then(json<LiveSnapshot>),

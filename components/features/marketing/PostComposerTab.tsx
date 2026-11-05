@@ -66,7 +66,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
   const [needKey, setNeedKey] = useState<'NEED_DASHBOARD_KEY' | 'NO_DASHBOARD_KEY' | null>(null);
   const [keyInput, setKeyInput] = useState('');
 
-  // sản phẩm lấy từ Cấu hình AI (mock DB trên trình duyệt), đọc sau khi hydrate
+  // sản phẩm lấy từ FAQ & sản phẩm (mock DB trên trình duyệt), đọc sau khi hydrate
   const dbVersion = useMockDbVersion();
   const products = useMemo(() => (dbVersion < 0 ? [] : snapshot.products()), [dbVersion]);
   const shownProducts = useMemo(() => {
@@ -273,7 +273,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
       <form className="card" onSubmit={onGenerate}>
         <div className="card-head">
           <h2>✨ Soạn bài với AI</h2>
-          <span className="hint">AI viết dựa trên sản phẩm &amp; FAQ trong Cấu hình AI</span>
+          <span className="hint">AI viết dựa trên sản phẩm &amp; FAQ trong FAQ & sản phẩm</span>
         </div>
 
 

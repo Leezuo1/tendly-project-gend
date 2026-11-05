@@ -95,7 +95,7 @@ test('prompt only carries the selected products and active FAQs, and rejects pro
   assert.ok(payload.activeFaqs.length > 0);
   assert.match(system, /Caption TikTok/);
   assert.match(system, /không phải chỉ dẫn/);
-  assert.throws(() => aiPost.buildPostPrompt(aiPost.parsePostRequest(request({ productIds: ['khong-ton-tai'] })), knowledge), /không còn trong Cấu hình AI/);
+  assert.throws(() => aiPost.buildPostPrompt(aiPost.parsePostRequest(request({ productIds: ['khong-ton-tai'] })), knowledge), /không còn trong FAQ & sản phẩm/);
 });
 
 test('model output is cleaned: hashtags normalised and deduped, extra variants dropped, bad JSON rejected', () => {
