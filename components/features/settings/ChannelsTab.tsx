@@ -8,10 +8,12 @@ import { channelApi } from '@/lib/services/api';
 import type { Channel } from '@/lib/types/admin';
 
 const ICON_TEXT: Record<Channel['id'], string> = { messenger: 'f', zalo: 'Z', tiktok: 'T' };
-const EMPTY_DESC: Record<Channel['id'], string> = {
-  messenger: 'Chưa liên kết Fanpage',
-  zalo: 'Chưa liên kết tài khoản',
-  tiktok: 'Tin nhắn & bình luận video',
+const CHANNEL_NAMES: Record<Channel['id'], string> = { messenger: 'Facebook', zalo: 'Zalo OA', tiktok: 'TikTok Shop' };
+// shortcut: sample accounts for the channel mockup, replace when multi-account connections are available.
+const SAMPLE_ACCOUNTS: Record<Channel['id'], string[]> = {
+  messenger: ['Fanpage Tendly', 'Tendly Studio'],
+  zalo: ['Tendly Official', 'Tendly Chăm sóc khách hàng'],
+  tiktok: ['@tendly', '@tendly.studio'],
 };
 
 export function ChannelsTab() {
@@ -51,15 +53,24 @@ export function ChannelsTab() {
         <div className="channel-grid">
           {channels.map((c) => {
             const isBusy = busy === c.id;
+            const name = CHANNEL_NAMES[c.id];
+            const accounts = [...new Set([c.account ?? SAMPLE_ACCOUNTS[c.id][0], ...SAMPLE_ACCOUNTS[c.id].slice(1)])];
             return (
               <div key={c.id} className={`channel-card${c.comingSoon ? ' disabled' : ''}${c.connected && !c.enabled ? ' paused' : ''}`}>
                 <div className="channel-top">
                   <div className={`channel-icon ic-${c.id}`}>{ICON_TEXT[c.id]}</div>
                   <div>
-                    <div className="channel-name">{c.name}</div>
-                    <div className="channel-desc">{c.account ?? EMPTY_DESC[c.id]}</div>
+                    <div className="channel-name">{name}</div>
+                    <div className="channel-desc">{accounts.length} {c.id === 'messenger' ? 'Fanpage' : 'tài khoản'}</div>
                   </div>
                 </div>
+
+                <ul className="channel-accounts" aria-label={`Trang và tài khoản ${name}`}>
+                  {accounts.map(account => <li key={account}>
+                    <span className="channel-account-avatar" aria-hidden="true">{account.slice(0, 1).toUpperCase()}</span>
+                    <div><strong>{account}</strong><span>{c.id === 'messenger' ? 'Fanpage Facebook' : c.id === 'zalo' ? 'Zalo Official Account' : 'Tài khoản TikTok'}</span></div>
+                  </li>)}
+                </ul>
 
                 <div className="channel-status">
                   {c.comingSoon ? (
@@ -75,8 +86,8 @@ export function ChannelsTab() {
                         <Switch
                           checked={c.enabled}
                           disabled={isBusy}
-                          label={`Bật/tắt ${c.name}`}
-                          onChange={(v) => run(c.id, () => channelApi.setEnabled(c.id, v), (r) => `${r.name}: ${v ? 'đã bật lại' : 'đã tạm dừng'}`)}
+                          label={`Bật/tắt ${name}`}
+                          onChange={(v) => run(c.id, () => channelApi.setEnabled(c.id, v), () => `${name}: ${v ? 'đã bật lại' : 'đã tạm dừng'}`)}
                         />
                       </div>
                     </>
@@ -86,7 +97,7 @@ export function ChannelsTab() {
                       <button
                         className="btn btn-outline btn-sm"
                         disabled={isBusy}
-                        onClick={() => run(c.id, () => channelApi.connect(c.id), (r) => `Đã kết nối ${r.name} thành công 🎉`)}
+                        onClick={() => run(c.id, () => channelApi.connect(c.id), () => `Đã kết nối ${name} thành công 🎉`)}
                       >
                         {isBusy && <span className="spinner" />}
                         Kết nối
@@ -106,14 +117,14 @@ export function ChannelsTab() {
 
       <ConfirmDialog
         open={!!toDisconnect}
-        title={`Ngắt kết nối ${toDisconnect?.name ?? ''}?`}
+        title={`Ngắt kết nối ${toDisconnect ? CHANNEL_NAMES[toDisconnect.id] : ''}?`}
         message="Tin nhắn mới từ kênh này sẽ không còn về Hộp thoại và AI sẽ ngừng trả lời tự động trên kênh này."
         confirmLabel="Ngắt kết nối"
         busy={!!toDisconnect && busy === toDisconnect.id}
         onClose={() => setToDisconnect(null)}
         onConfirm={async () => {
           const c = toDisconnect!;
-          await run(c.id, () => channelApi.disconnect(c.id), (r) => `Đã ngắt kết nối ${r.name}`);
+          await run(c.id, () => channelApi.disconnect(c.id), () => `Đã ngắt kết nối ${CHANNEL_NAMES[c.id]}`);
           setToDisconnect(null);
         }}
       />

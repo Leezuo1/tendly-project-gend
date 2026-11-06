@@ -22,6 +22,7 @@ export const POST = withAppAccess(async function POST(request: Request) {
     if (!conversation || !conversation.messages.length) throw new InvalidMarketingRequest('Không tìm thấy hội thoại của khách này.');
     const prompt = buildRemarketingPrompt(conversation, knowledge);
     const { result } = await generateGeminiJson({
+      role: 'content', platform: 'facebook',
       system: prompt.system, user: prompt.user, schema: REMARKETING_RESPONSE_SCHEMA,
       temperature: 0.7, maxOutputTokens: 1024, parse: parseRemarketingOutput,
     });

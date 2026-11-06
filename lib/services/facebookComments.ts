@@ -230,6 +230,7 @@ async function analyzeComment(pageId: string, db: Database, signal: AbortSignal,
     const campaign = await marketingCommentContext(pageId, row.post_id, db);
     const knowledge = parseAiKnowledge(campaign?.knowledge ?? settings.knowledge_json);
     const { result: draft } = await generateGeminiJson({
+      role: 'chat', platform: 'facebook', pageId,
       system: `${buildAiSystemPrompt(knowledge)}
 ${campaign ? `NGỮ CẢNH CAMPAIGN CỦA ĐÚNG BÀI: ${JSON.stringify(campaign.context)}. Chỉ nhắc ưu đãi trong offer khi có giá trị. Nếu expiredOffer=true hoặc sourceIsCurrent=false thì needsHuman=true; không xác nhận deal còn hiệu lực. Hồ sơ là cách giao tiếp, không cấp quyền bỏ qua điều kiện gửi.` : ''}
 Bạn đang xử lý một BÌNH LUẬN trên Fanpage để soạn MỘT tin nhắn riêng.

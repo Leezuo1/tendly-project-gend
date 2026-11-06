@@ -2,6 +2,7 @@ import { withAppAccess } from '@/lib/services/appSecurity';
 import { NextResponse } from 'next/server';
 import { buildAiSystemPrompt, InvalidAiKnowledge, knowledgeSummary, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { AI_RESPONSE_SCHEMA, EMOTION_RESPONSE_PROMPT, parseAiChatOutput, parseSessionContext } from '@/lib/services/aiAnalysis';
+import { globalAiSystemPrompt } from '@/lib/services/aiGlobalSettings';
 
 export const runtime = 'nodejs';
 
@@ -48,7 +49,10 @@ export const POST = withAppAccess(async function POST(request: Request) {
   }
 
   // Chỉ server quyết định chỉ dẫn; không chấp nhận systemPrompt tùy ý từ khách.
-  const systemInstruction = `${EMOTION_RESPONSE_PROMPT}\n\n${buildAiSystemPrompt(knowledge)}`;
+  let policy;
+  try { policy = await globalAiSystemPrompt('chat'); }
+  catch { return NextResponse.json({ error: 'Chưa tải được cấu hình AI chung. Vui lòng thử lại.' }, { status: 503 }); }
+  const systemInstruction = `${policy}\n\n${EMOTION_RESPONSE_PROMPT}\n\n${buildAiSystemPrompt(knowledge)}`;
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : CANDIDATE_MODELS;
 
   for (const model of models) {

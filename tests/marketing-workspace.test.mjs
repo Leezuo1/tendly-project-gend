@@ -16,6 +16,8 @@ async function fixture() {
   mem.public.none(readFileSync('db/migrations/015-marketing-workspace.sql', 'utf8'));
   mem.public.none(readFileSync('db/migrations/014-sourcing.sql', 'utf8'));
   mem.public.none(readFileSync('db/migrations/019-sourcing-workflow.sql', 'utf8'));
+  mem.public.none(readFileSync('db/migrations/020-ai-global-settings.sql', 'utf8'));
+  mem.public.none(readFileSync('db/migrations/021-ai-page-settings.sql', 'utf8'));
   mem.public.none('CREATE TABLE messenger_ai_settings(page_id TEXT PRIMARY KEY,knowledge_json JSONB,approved_at BIGINT,updated_at BIGINT)');
   const pg = mem.adapters.createPg();
   const pool = new pg.Pool();
@@ -114,6 +116,19 @@ test('campaign → Review → owner approval → mock publication never calls Fa
   assert.equal(meta.publication, 'published');
   assert.equal(f.publishes(), 0);
   await assert.rejects(() => f.act('publish', { postId: meta.postId }), /không gửi lại/);
+});
+
+test('changing global AI rules invalidates a previously approved post before publication', async () => {
+  const f = await fixture();
+  await f.act('campaign', { brief: f.brief, knowledge: f.knowledge, configuration: f.config });
+  const campaign = (await f.state()).workspace.campaigns[0];
+  await f.act('approveCampaign', { id: campaign.id });
+  await f.act('generate', { campaignId: campaign.id, plan: await f.plan(campaign.id) });
+  const postId = (await f.state()).workspace.reviews[0].postId;
+  await f.act('approvePost', { postId });
+  await f.pool.query('UPDATE ai_global_settings SET revision=revision+1 WHERE id=1');
+  await assert.rejects(f.act('publish', { postId }), /Review/);
+  assert.equal(f.publishes(), 0);
 });
 
 test('editing or changing Page profile invalidates approval and stale writes are rejected', async () => {

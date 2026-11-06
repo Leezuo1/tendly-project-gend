@@ -6,7 +6,7 @@ import { publishToFacebookPage } from '@/lib/services/facebookPage';
 import { composePostMessage, parsePostEdit } from '@/lib/services/aiPost';
 import { assertOperationAllowed, runAutomaticAccess } from '@/lib/services/appSecurity';
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
-import { parseAiConfiguration } from '@/lib/services/aiConfiguration';
+import { readPageProfile } from '@/lib/services/aiGlobalSettings';
 import { generateReviewedMarketing } from '@/lib/services/aiPostReview';
 import { marketingReviewCatalog, requireFreshReviewEvidence } from '@/lib/services/marketingReviewSources';
 import { blockingIssue } from '@/lib/services/reviewEvidence';
@@ -214,7 +214,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       const campaign: MarketingCampaign = { ...emptyCampaignBrief(pageId), id: randomUUID(), version: 1,
         name: `Ý tưởng: ${item.title}`.slice(0, 150), message: item.title.slice(0, 500),
         notes: `Nguồn khảo sát: ${item.url}\nChưa xác nhận sản phẩm đang bán, giá bán, tồn kho hoặc chất lượng nguồn hàng.`.slice(0, 1500),
-        approvedAt: null, approvedBy: '', knowledge: parseAiKnowledge(input.knowledge), configuration: parseAiConfiguration(input.configuration),
+        approvedAt: null, approvedBy: '', knowledge: parseAiKnowledge(input.knowledge), configuration: (await readPageProfile(pageId, db)).configuration,
         profile: state.profiles[pageId] ?? emptyMarketingProfile(), sourcing: { runId: String(input.runId), itemKey: String(input.itemKey) } };
       state.campaigns.unshift(campaign);
     } else if (action === 'profile') {
@@ -232,7 +232,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       const previous = input.id ? findCampaign(state, input.id) : undefined;
       if (!previous && state.campaigns.length >= 50) throw new MarketingWorkflowError('Tối đa 50 chiến dịch.');
       const campaign: MarketingCampaign = { ...brief, ...(previous?.sourcing ? { sourcing: previous.sourcing } : {}), id: previous?.id ?? randomUUID(), version: (previous?.version ?? 0) + 1, approvedAt: null, approvedBy: '', knowledge,
-        configuration: parseAiConfiguration(input.configuration), profile: state.profiles[brief.accountId] ?? { ...emptyMarketingProfile(), name: accounts.find(item => item.id === brief.accountId)!.name, tone: '', address: '', cta: '' } };
+        configuration: (await readPageProfile(pageId, db)).configuration, profile: state.profiles[brief.accountId] ?? { ...emptyMarketingProfile(), name: accounts.find(item => item.id === brief.accountId)!.name, tone: '', address: '', cta: '' } };
       state.campaigns = [campaign, ...state.campaigns.filter(item => item.id !== campaign.id)];
       if (previous) invalidatePostSchedules(state, state.reviews.filter(review => review.campaignId === campaign.id).map(review => review.postId));
     } else if (action === 'approveCampaign') {

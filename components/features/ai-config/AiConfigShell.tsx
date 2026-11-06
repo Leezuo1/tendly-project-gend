@@ -10,8 +10,9 @@ import { useTabParam } from '@/lib/hooks/useTabParam';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { dashboardRequest, postsClient } from '@/lib/services/postsClient';
 import { liveClient } from '@/lib/services/liveClient';
+import { readPageAiProfile, savePageAiProfile, type PageAiProfile } from '@/lib/services/aiSettingsClient';
 import { AI_ROLES, AI_PLATFORMS, AI_RULE_FIELDS, ROLE_PLATFORMS, defaultAiRules, effectiveAiRules,
-  defaultAiConfiguration, readAiConfiguration, saveAiConfiguration,
+  defaultAiConfiguration,
   type AiConfiguration, type AiPlatform, type AiProfile, type AiRoleId } from '@/lib/services/aiConfiguration';
 import type { MarketingPost } from '@/lib/types/posts';
 import type { MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
@@ -33,6 +34,8 @@ export function AiConfigShell() {
   const [saved, setSaved] = useState('');
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState<PageAiProfile | null>(null);
+  const [saving, setSaving] = useState(false);
   const [posts, setPosts] = useState<MarketingPost[] | null>(null);
   const [marketing, setMarketing] = useState<MarketingWorkspaceView | null>(null);
   const [sessions, setSessions] = useState<LiveSessionListItem[] | null>(null);
@@ -47,13 +50,15 @@ export function AiConfigShell() {
   const dirty = ready && JSON.stringify(config) !== saved;
   const role = AI_ROLES.find(item => item.id === selected)!;
 
-  const load = useCallback(() => {
-    try {
-      const value = readAiConfiguration(owner);
-      setConfig(value); setSaved(JSON.stringify(value)); setReady(true); setError('');
-    } catch { setError('Chưa đọc được thiết lập đã lưu. Kiểm tra quyền lưu trữ và thử lại. Dữ liệu cũ vẫn được giữ.'); }
-  }, [owner]);
-  useEffect(() => { if (owner) { const timer = setTimeout(load, 0); return () => clearTimeout(timer); } }, [load, owner]);
+  const apply = (value: PageAiProfile, persisted = true) => {
+    setPage(value); setConfig(value.configuration); setSaved(persisted ? JSON.stringify(value.configuration) : ''); setReady(true); setError('');
+  };
+  const load = useCallback(async () => {
+    // Chưa lưu lên server (revision 0) thì coi là nháp để người dùng bấm Lưu một lần.
+    try { const value = await readPageAiProfile(session.pageId, owner); apply(value, !!value.revision); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa đọc được thiết lập AI của Page. Vui lòng thử lại.'); }
+  }, [owner, session.pageId]);
+  useEffect(() => { if (owner) { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); } }, [load, owner]);
   const loadUsage = useCallback(async () => {
     const result = await Promise.allSettled([
       postsClient.list(), liveClient.sessions(),
@@ -84,12 +89,13 @@ export function AiConfigShell() {
     else updateProfile(selected, { platformRules: { ...profile.platformRules, [currentPlatform]: { enabled: true, values: { ...override?.values, [key]: value } } } });
   }
   function selectAi(id: AiRoleId) { setPlatform('default'); setTab('settings', { ai: id }); }
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    try {
-      const value = saveAiConfiguration(config, owner);
-      setConfig(value); setSaved(JSON.stringify(value)); setError(''); toast('Đã lưu thiết lập AI');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa lưu được thiết lập. Vui lòng thử lại.'); }
+    if (!page || saving) return;
+    setSaving(true);
+    try { apply(await savePageAiProfile(page, config)); toast('Đã lưu thiết lập AI cho Page'); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa lưu được thiết lập. Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   }
   function template() {
     const values = defaultAiRules(selected);
@@ -116,16 +122,16 @@ export function AiConfigShell() {
   };
 
   return <div className={styles.root}>
-    <div className="page-head"><div><h1>Cấu hình AI</h1><p>Quản lý nơi sử dụng và cách từng AI hỗ trợ shop.</p></div>{!(tab === 'settings' && selected === 'chat') && <button className="btn btn-primary" form="ai-profile-settings" type="submit" disabled={!ready || !dirty}>Lưu thiết lập</button>}</div>
+    <div className="page-head"><div><h1>Cấu hình AI</h1><p>Cá nhân hóa từng AI cho Page của shop{page ? ` · Page ${page.pageId} (${AI_PLATFORMS[page.platform]})` : ''}. Thiết lập chung của Tendly luôn được áp dụng trước.</p></div>{tab === 'settings' && selected !== 'chat' && <button className="btn btn-primary" form="ai-profile-settings" type="submit" disabled={saving || !ready || !dirty}>Lưu thiết lập</button>}</div>
     <Tabs tabs={[...TABS]} active={tab} onChange={value => setTab(value, { ai: selected })} />
-    {error && <div className={styles.error} role="alert">{error} {!ready && <button type="button" className="btn btn-outline btn-sm" onClick={load}>Thử lại</button>}</div>}
+    {error && <div className={styles.error} role="alert">{error} <button type="button" className="btn btn-outline btn-sm" onClick={() => void load()}>Tải lại thiết lập</button></div>}
     {!ready && !error && <p className={styles.loading} role="status">Đang tải thiết lập…</p>}
-    <form id="ai-profile-settings" onSubmit={save}><fieldset className={styles.fieldset}>
+    <form id="ai-profile-settings" onSubmit={save}><fieldset className={styles.fieldset} disabled={saving}>
       {tab === 'manage' ? <div className={styles.management}>
         {usageErrors.length > 0 && <div className={styles.usageError} role="status">{usageErrors.join(' ')} <button className="btn btn-text btn-sm" type="button" onClick={() => void loadUsage()}>Tải lại</button></div>}
         {ORDER.map(id => id === 'chat' ? (ready || error) && <CustomerCareSettings key={id} mode="manage" initialProfile={config.profiles.chat} /> : ready && <section key={id} className={styles.aiRow}>
           <header className={styles.rowHead}><div><h2>{LABELS[id]}</h2><p>{AI_ROLES.find(item => item.id === id)!.description}</p></div>
-            <div className={styles.statusControl}><span>{config.profiles[id].enabled ? 'Đã bật' : 'Đang tắt'}</span><Switch checked={config.profiles[id].enabled} label={`Bật ${LABELS[id]}`} onChange={enabled => updateProfile(id, { enabled })} /></div></header>
+            <div className={styles.statusControl}><span>{config.profiles[id].enabled ? 'Đã bật' : 'Đang tắt'}</span></div></header>
           <div className={styles.usage}>{usage(id)}</div>
           {detail === id && <div className={styles.detail}><h3>Nhiệm vụ & kết quả</h3><p>{AI_ROLES.find(item => item.id === id)!.goal}</p><p>{AI_ROLES.find(item => item.id === id)!.output}</p></div>}
           <footer className={styles.rowActions}><button type="button" className="btn btn-outline btn-sm" aria-expanded={detail === id} onClick={() => setDetail(detail === id ? null : id)}>{detail === id ? 'Thu gọn' : 'Mở chi tiết'}</button><button type="button" className="btn btn-primary btn-sm" onClick={() => selectAi(id)}>Chỉnh quy tắc</button></footer>
@@ -135,6 +141,8 @@ export function AiConfigShell() {
           {selected !== 'chat' && ROLE_PLATFORMS[selected].length > 0 && <div><label htmlFor="ai-platform">Bộ quy tắc</label><select id="ai-platform" value={currentPlatform ?? 'default'} onChange={event => setPlatform(event.target.value as AiPlatform | 'default')}><option value="default">Quy tắc mặc định</option>{ROLE_PLATFORMS[selected].map(item => <option key={item} value={item}>{AI_PLATFORMS[item]}</option>)}</select></div>}</div>
         {selected === 'chat' ? (ready || error) && <CustomerCareSettings mode="settings" initialProfile={config.profiles.chat} /> : ready && <section className={styles.editor} aria-labelledby="rules-heading"><header className={styles.editorHead}><div><h2 id="rules-heading">{LABELS[selected]} · {currentPlatform ? AI_PLATFORMS[currentPlatform] : 'Quy tắc mặc định'}</h2><p>{role.description}</p></div></header>
           <div className={styles.formBody}>
+            {!currentPlatform && <><div className={styles.switchRow}><div><strong>Bật {LABELS[selected]}</strong><p>Thay đổi trạng thái rồi chọn “Lưu thiết lập” để áp dụng.</p></div><Switch checked={profile.enabled} label={`Bật ${LABELS[selected]}`} onChange={enabled => updateProfile(selected, { enabled })} /></div>
+              {(['goal', 'input', 'output', 'instructions'] as const).map(key => <div className={styles.ruleField} key={key}><label htmlFor={`profile-${key}`}>{{ goal: 'Nhiệm vụ', input: 'Dữ liệu đầu vào', output: 'Kết quả đầu ra', instructions: 'Chỉ dẫn bổ sung' }[key]}</label><textarea id={`profile-${key}`} rows={3} maxLength={key === 'instructions' ? 2000 : 1500} required={key !== 'instructions'} value={profile[key]} onChange={event => updateProfile(selected, { [key]: event.target.value })} /></div>)}</>}
             {currentPlatform && <div className={styles.switchRow}><div><strong>Tùy chỉnh cho nền tảng này</strong><p>Các mục chưa tùy chỉnh sẽ dùng quy tắc mặc định.</p></div><Switch checked={override?.enabled ?? false} label="Tùy chỉnh cho nền tảng này" onChange={enabled => updateProfile(selected, { platformRules: { ...profile.platformRules, [currentPlatform]: { enabled, values: override?.values ?? {} } } })} /></div>}
             <div className={styles.templateRow}><p>Bắt đầu với mẫu có sẵn, rồi chỉnh theo shop.</p><button type="button" className="btn btn-outline btn-sm" disabled={!!currentPlatform && !override?.enabled} onClick={template}>Dùng mẫu gợi ý</button></div>
             {AI_RULE_FIELDS[selected].map(field => {
@@ -154,7 +162,7 @@ export function AiConfigShell() {
           </div>
         </section>}
       </div>}
-      {!(tab === 'settings' && selected === 'chat') && <footer className={styles.saveBar}><p aria-live="polite">{dirty ? 'Có thay đổi chưa lưu' : config.updatedAt ? 'Đã lưu thiết lập' : 'Chưa có thay đổi'}</p><button className="btn btn-primary" type="submit" disabled={!ready || !dirty}>Lưu thiết lập</button></footer>}
+      {tab === 'settings' && selected !== 'chat' && <footer className={styles.saveBar}><p aria-live="polite">{saving ? 'Đang lưu…' : dirty ? 'Có thay đổi chưa lưu' : page?.revision ? 'Đã lưu thiết lập' : 'Chưa có thay đổi'}</p><button className="btn btn-primary" type="submit" disabled={saving || !ready || !dirty}>Lưu thiết lập</button></footer>}
     </fieldset></form>
   </div>;
 }

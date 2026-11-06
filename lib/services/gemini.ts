@@ -1,4 +1,6 @@
 /** Gọi Gemini generateContent với kết quả JSON có cấu trúc (cùng cách gọi với app/api/chat). */
+import { globalAiSystemPrompt } from '@/lib/services/aiGlobalSettings';
+import type { AiRoleId } from '@/lib/services/aiConfiguration';
 
 export const GEMINI_CANDIDATE_MODELS = [
   'gemini-3.5-flash-lite',
@@ -15,6 +17,11 @@ interface GeminiResponse {
 }
 
 interface GenerateJsonOptions<T> {
+  role: AiRoleId;
+  platform?: string;
+  pageId?: string;
+  /** false khi nơi gọi đã tự nhúng hồ sơ shop (bản đã duyệt của campaign, hồ sơ AI Chat). */
+  includeShop?: boolean;
   signal?: AbortSignal;
   system: string;
   user: string;
@@ -28,6 +35,7 @@ interface GenerateJsonOptions<T> {
 export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Promise<{ result: T; model: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiNotConfigured('Chưa cấu hình GEMINI_API_KEY trên máy chủ.');
+  const system = `${await globalAiSystemPrompt(options.role, options.platform, options.pageId, options.includeShop)}\n\n${options.system}`;
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : GEMINI_CANDIDATE_MODELS;
 
   for (const model of models) {
@@ -40,7 +48,7 @@ export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Pr
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(40_000)]) : AbortSignal.timeout(40_000),
           body: JSON.stringify({
-            system_instruction: { parts: [{ text: options.system }] },
+            system_instruction: { parts: [{ text: system }] },
             contents: [{ role: 'user', parts: [{ text: options.user }] }],
             generationConfig: {
               temperature: options.temperature ?? 0.8,

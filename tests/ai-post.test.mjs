@@ -18,6 +18,7 @@ const originalEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]))
 function loadModules() {
   const cache = new Map();
   const load = (relative) => {
+    if (relative === 'lib/services/aiGlobalSettings.ts') return { globalAiSystemPrompt: async () => 'Quy tắc chung từ server kiểm thử.' };
     if (relative.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     const filename = path.join(root, relative);
     if (cache.has(filename)) return cache.get(filename).exports;
@@ -117,7 +118,7 @@ test('generate route sends structured request to Gemini and returns drafts witho
   const sent = [];
   globalThis.fetch = async (url, options) => {
     const body = JSON.parse(options.body); sent.push({ url, body });
-    if (body.system_instruction.parts[0].text.startsWith('Bạn là AI Review')) {
+    if (body.system_instruction.parts[0].text.includes('Bạn là AI Review')) {
       const input = JSON.parse(body.contents[0].parts[0].text);
       return geminiReply(input.variants.map(({ draftId, draft }) => {
         const finalDraft = { ...draft, content: draft.content.replace('259.000đ', '221.000đ') };

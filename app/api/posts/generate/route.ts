@@ -40,6 +40,7 @@ export const POST = withAppAccess(async function POST(request: Request) {
   try {
     const deadline = AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]);
     const { result, model } = originals ? { result: originals, model: 'retry-review' } : await generateGeminiJson({
+      role: 'content', platform: postRequest.channel,
       system: prompt.system,
       user: prompt.user,
       schema: POST_RESPONSE_SCHEMA,

@@ -354,6 +354,7 @@ export async function enrichWithAi(pageId: string, sessionId: string, db: Databa
       calls++;
       await bumpAiCalls(db, sessionId);
       const { result } = await generateGeminiJson({
+        role: 'livestream', platform: row.platform,
         signal, temperature: 0, maxOutputTokens: 1500, schema: CLASSIFY_SCHEMA,
         system: `Bạn phân loại bình luận livestream bán hàng tiếng Việt.
 - intent là một trong: ${AI_INTENTS.join(', ')}. price=hỏi giá; stock=hỏi còn hàng; view=xin xem mẫu; size_advice=hỏi tư vấn size theo dáng người; shipping=hỏi ship/COD; return=đổi trả; complaint=phàn nàn; question=câu hỏi khác về sản phẩm; other=không cần trả lời.
@@ -406,6 +407,7 @@ export async function enrichWithAi(pageId: string, sessionId: string, db: Databa
       await bumpAiCalls(db, sessionId);
       const product = productOf(products, group.sku);
       const { result } = await generateGeminiJson({
+        role: 'livestream', platform: row.platform,
         signal, temperature: 0.4, maxOutputTokens: 600, schema: REPLY_SCHEMA,
         system: `Bạn là nhân viên shop đang trực livestream, soạn MỘT tin nhắn riêng tiếng Việt (tối đa 60 từ) trả lời chung cho nhóm khách hỏi cùng ý.
 - Chỉ dùng dữ liệu SẢN PHẨM và FAQ được cung cấp; không bịa giá, giảm giá, phí ship hay chính sách.
@@ -782,6 +784,7 @@ export async function endSession(pageId: string, sessionId: string, db: Database
       await bumpAiCalls(db, sessionId);
       const month = new Date(now).toLocaleString('vi-VN', { month: 'long', timeZone: 'Asia/Ho_Chi_Minh' });
       const { result } = await generateGeminiJson({
+        role: 'livestream', platform: snapshot.session.platform,
         signal: AbortSignal.timeout(25_000), temperature: 0.3, maxOutputTokens: 1500, schema: ADVICE_SCHEMA,
         system: `Bạn là cố vấn nhập hàng cho shop thời trang nhỏ, viết tiếng Việt ngắn gọn.
 - Với mỗi SKU trong dữ liệu, chọn action: restock (nên nhập thêm), keep (giữ mức nhập), reduce (hạn chế nhập), kèm reason 1 câu dựa trên số liệu (lượt hỏi, lượt chốt, tồn kho) và mùa hiện tại.

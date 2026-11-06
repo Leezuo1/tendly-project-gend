@@ -22,6 +22,7 @@ const structuredReply = (reply = 'Phản hồi kiểm thử.', analysis = defaul
 function loadModules() {
   const cache = new Map();
   const load = (relative) => {
+    if (relative === 'lib/services/aiGlobalSettings.ts') return { globalAiSystemPrompt: async () => 'Quy tắc chung từ server kiểm thử.' };
     if (relative.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     const filename = path.join(root, relative);
     if (cache.has(filename)) return cache.get(filename).exports;

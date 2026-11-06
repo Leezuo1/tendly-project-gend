@@ -51,7 +51,7 @@ ${JSON.stringify({ rules: careRules(profile, page), page, goal: profile.goal, in
 
 export async function generateCareReply(knowledge: AiKnowledge, profile: AiProfile, page: CarePageProfile | null,
   message: string, context: AiSessionMessage[] = [], sources?: CareSourceContext) {
-  const { result, model } = await generateGeminiJson({ system: buildCustomerCarePrompt(knowledge, profile, page, sources),
+  const { result, model } = await generateGeminiJson({ role: 'chat', platform: 'facebook', includeShop: false, system: buildCustomerCarePrompt(knowledge, profile, page, sources),
     user: JSON.stringify({ sessionContext: profile.sources.includes('conversation') ? context : [], latestCustomerMessage: message }),
     schema: AI_RESPONSE_SCHEMA, temperature: 0.1, maxOutputTokens: 1500, signal: AbortSignal.timeout(30_000), parse: parseAiChatOutput });
   if (result.analysis.priority === 'high' || result.reply.length > 2000) result.analysis.canAutoReply = false;
