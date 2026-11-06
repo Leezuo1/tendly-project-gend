@@ -24,6 +24,8 @@ export interface MarketingCampaign extends CampaignBrief {
   knowledge: AiKnowledge; configuration: AiConfiguration; profile: MarketingProfile;
 }
 export interface ReviewedMarketingPost {
+  plan?: MarketingPlanBinding;
+  outlineSnapshot?: { title: string; outline: string; pillar: string };
   postId: string; campaignId: string; campaignVersion: number; accountId: string;
   original: GeneratedPostDraft; changes: string[]; reviewHash: string; reviewedAt: number;
   review?: PostReviewResult;
@@ -42,9 +44,18 @@ export interface MarketingSchedule {
   slots: MarketingScheduleSlot[];
 }
 export interface MarketingWorkspace {
+  contentPlans?: MarketingContentPlan[];
   reviewAttempts?: ReviewAttempt[];
   profiles: Record<string, MarketingProfile>; campaigns: MarketingCampaign[];
   reviews: ReviewedMarketingPost[]; schedules: MarketingSchedule[];
+}
+export interface MarketingPlanBinding { id: string; version: number; itemId: string; }
+export interface MarketingPlanItem { id: string; pillarIndex: number; title: string; outline: string; }
+export interface MarketingContentPlan {
+  id: string; campaignId: string; campaignVersion: number; version: number;
+  contentModel: string;
+  pillars: { name: string; objective: string }[]; items: MarketingPlanItem[];
+  review?: PostReviewResult; approvedAt: number | null; approvedBy: string;
 }
 export interface MarketingWorkspaceView {
   revision: number; workspace: MarketingWorkspace; posts: MarketingPost[]; accounts: MarketingAccount[];

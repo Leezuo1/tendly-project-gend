@@ -309,13 +309,23 @@ Lát cắt đầu tiên nên làm: **một shop → một campaign được duy�
 - Kiểm tra trình duyệt ở 390, 768 và 1440 px; nhãn form, thao tác bàn phím, trạng thái tải/trống/lỗi và độ dài nội dung thật.
 - Chạy kiểm thử phù hợp, ESLint và build. Kiểm thử với dữ liệu chặn/mô phỏng không được báo là đã đăng Facebook hoặc đã xác thực provider thật.
 
-## 11. Chưa làm trong đợt này
+## 11. Bổ sung trụ cột, heading/dàn ý và popup chi tiết
+
+Luồng bắt buộc: brief được duyệt → Content đề xuất trụ cột và heading/dàn ý từng bài → Review đối chiếu → shop chỉnh và duyệt kế hoạch → Content viết theo dàn ý đã duyệt → Review bài → shop duyệt bài → duyệt/kích hoạt lịch. Ba chấp thuận kế hoạch, bài và lịch độc lập.
+
+- Kế hoạch lưu trên server theo Page/campaign và phiên bản brief, gồm trụ cột, mục tiêu, tiêu đề và dàn ý chi tiết từng bài. Cấu trúc phù hợp kênh, không áp H1/H2 hoặc tối thiểu 800 từ cho bài mạng xã hội.
+- Sửa kế hoạch hủy Review/chấp thuận của kế hoạch đó, hủy chấp thuận bài phụ thuộc và tạm dừng lịch. Đổi brief/hồ sơ kênh khiến kế hoạch cũ hết hiệu lực. Bài cũ giữ nguyên nội dung; cần gắn dàn ý hiện hành và Review lại trước khi duyệt/đăng.
+- AI viết lại tạo phương án riêng để xem, không ghi đè phần đang sửa. Duyệt phương án kế hoạch mới thay thế chấp thuận kế hoạch cũ cùng campaign.
+- Popup tự mở sau khi lập dàn ý hoặc viết bài, mở lại từ danh sách: hai tab Dàn ý / Bài viết, nội dung trái, AI Review phải; điện thoại một cột. Hiện nhận xét, thay đổi, thiếu căn cứ và nguồn thực sự đã dùng. Nút đóng, chỉnh, viết lại/Review và duyệt đúng bước; đóng giữ nháp đã lưu.
+- Tái sử dụng document workspace, API và Review hiện có. Không thêm phụ thuộc. Kiểm thử mock không chứng minh Gemini/Meta thật.
+
+## 12. Chưa làm trong đợt này
 
 Chưa làm tự chạy quảng cáo, quản lý ngân sách, tự tối ưu campaign hoặc tự sửa lịch không qua duyệt, tích hợp đăng thêm nền tảng, crawler feedback, cấp voucher thật, vận đơn/đổi trả/hoàn tiền, loyalty/CRM giao dịch hoặc báo cáo doanh thu quy thuộc campaign khi chưa có dữ liệu đơn hàng. Lịch đăng có phê duyệt nằm trong phạm vi kế hoạch này.
 
 Các nhánh đó có thể dùng lại brief và liên kết campaign sau này; không thêm bảng/cấu hình dự phòng cho chúng ở bước đầu.
 
-## 12. Kế hoạch liên quan và ranh giới dùng chung
+## 13. Kế hoạch liên quan và ranh giới dùng chung
 
 Content nằm trong kế hoạch Marketing này. Bốn vai trò còn lại:
 
@@ -329,3 +339,14 @@ Content nằm trong kế hoạch Marketing này. Bốn vai trò còn lại:
 Hồ sơ shop/Page, tri thức xác nhận, quy tắc hiệu lực và bản ghi chấp thuận là dữ liệu dùng chung, không tạo năm bản sao. Mỗi plan sở hữu giao diện/luồng nghiệp vụ của vai trò mình. Review không sở hữu lịch đăng; Care không tạo kho campaign; Live không thay hệ thống kho; Sourcing không tự nhập kết quả vào danh mục bán.
 
 Thứ tự chung: chuẩn hóa dữ liệu/quyền và hồ sơ Page → nối cấu hình Content/Care/Review vào backend → hoàn thành lát cắt campaign/bài/duyệt/lịch/bình luận → bổ sung ngữ cảnh phiên Live và nối Sourcing với nguồn thực. Các phần UI độc lập có thể làm sớm, nhưng không báo hoàn tất nghiệp vụ trước khi luồng dữ liệu/phê duyệt tương ứng chạy được.
+
+## 14. Phạm vi bổ sung kế hoạch nội dung 06/11/2026
+
+- `marketingContentPlan.ts` lập kế hoạch bằng Content (Facebook gọi Gemini; kênh mẫu dùng dữ liệu mẫu), parse số lượng/trụ cột/heading/dàn ý, rồi Review theo nguồn chọn riêng. Mặc định 3 trụ cột/3 dàn ý, giới hạn 1–3 trụ cột/1–6 dàn ý, tối đa 100 phương án trong workspace. Lỗi Review giữ dàn ý gốc trên server, thử lại không cần lập kế hoạch lại.
+- Thêm `contentPlans` trong document workspace hiện có, không migration/dependency mới. `generatePlan`, `editPlan`, `reviewPlan`, `approvePlan` dùng quyền Page, revision và transaction của API workspace. Deadline chung lập kế hoạch + Review tối đa 50 giây; không queue nền.
+- Duyệt toàn bộ kế hoạch chấp thuận dàn ý sau Review đang xem, thay thế kế hoạch được duyệt trước đó của campaign. Sửa kế hoạch tăng phiên bản, xóa Review/chấp thuận và hủy duyệt bài phụ thuộc, tạm dừng lịch. Đổi brief/hồ sơ làm kế hoạch cũ hết hiệu lực. Bài đã có vẫn giữ nội dung và snapshot dàn ý đã dùng.
+- Bài mới, lượt Review/thử lại và áp dụng đề xuất gắn plan ID/version/item ID. Content nhận dàn ý đã duyệt; Review nhận nguồn định hướng dàn ý cùng nguồn dữ kiện độc lập. Dàn ý không được dùng để hợp thức hóa giá hoặc URL thiếu nguồn. Các gate duyệt bài, lịch và đăng kiểm tra lại binding và căn cứ. Bài campaign cũ không bị xóa nhưng phải gắn dàn ý hiện hành qua Review → áp dụng → duyệt lại trước khi đăng.
+- `MarketingContentPlanPanel` và `MarketingDraft` có popup Dàn ý/Bài viết, Review bên cạnh, nguồn/thay đổi/thiếu căn cứ, chỉnh và duyệt đúng bước. Tạo kế hoạch/bài tự mở popup; đóng giữ phần đang chỉnh trong phiên giao diện, nháp đã lưu tải lại được. AI viết lại tạo phương án mới, không ghi đè bản đang dùng. Bản sửa bài sau Review chỉ thay nội dung khi shop áp dụng.
+- Duyệt kế hoạch, bài và lịch vẫn tách riêng. Đây chưa phải kịch bản demo hoàn chỉnh giữa cả năm AI, chưa xác minh chất lượng Gemini hoặc đăng Meta thật.
+
+Nghiệm thu local: **236 test qua**, production build/TypeScript qua, ESLint các file thay đổi không có lỗi (còn cảnh báo `<img>` của phần ảnh bài viết), `git diff --check` qua. Backend kiểm tra chặn viết trước duyệt kế hoạch, truyền đúng dàn ý, invalidation bài/lịch, đề xuất cũ, lỗi/thử lại và nguồn đổi trong khi Review. Trình duyệt dùng API giả lập kiểm tra popup tự mở sau tạo, duyệt kế hoạch → viết bài, hai tab, giữ phần đang sửa khi đóng/mở, duyệt bài và bàn phím; 390/768/1440px không thấy tràn ngang. Chưa chạy các thao tác này với Gemini/Meta hoặc dữ liệu production thật.

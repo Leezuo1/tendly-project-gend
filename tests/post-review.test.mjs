@@ -67,6 +67,13 @@ test('price corrections require a factual source that actually contains the repl
   assert.equal(parse([e.sources.find(s => s.kind === 'product').id])[0].status, 'corrected');
 });
 
+test('approved outlines guide structure but cannot prove new prices or links', () => {
+  const f = fixture(), original = draft('Áo cotton'), e = evidence(f, original);
+  e.sources.push({ id: 'outline', kind: 'brief', origin: 'content-plan', scope: e.scope, version: '1', confirmedAt: 1, validFrom: null, validUntil: null, data: { outline: 'Giá 999.000đ, mua https://unknown.example/buy' } });
+  assert.ok(f.validateReviewedDraft(draft('Giá 999.000đ'), e, 'facebook').some(i => i.type === 'unsupported_claim'));
+  assert.ok(f.validateReviewedDraft(draft('Mua https://unknown.example/buy'), e, 'facebook').some(i => i.type === 'scope'));
+});
+
 test('conflicting product prices and FAQ require confirmation, not convenient source selection', () => {
   const f = fixture(), catalog = f.knowledgeReviewSources(knowledge, 'shop:111', 'campaign', '1', 1);
   catalog.push(...f.knowledgeReviewSources({ ...knowledge, products: [{ ...p, price: 300000 }], faqs: [{ ...knowledge.faqs[0], answer: 'Ship 50.000đ' }] }, 'shop:111', 'page', '2', 2));

@@ -135,11 +135,17 @@ Lát cắt đầu tiên: một bài Facebook, nguồn sản phẩm hiện có, s
 - Đánh giá trực tiếp trên bộ mẫu đầu vào đã xác nhận: lỗi được sửa, lỗi bị bỏ sót và dữ kiện mới Reviewer tự thêm. Thử model thật là phép đo riêng, không suy từ unit test rằng chất lượng đã đạt.
 - ESLint/build và test tạo bài hiện có phải qua; kiểm tra không ảnh hưởng luồng ảnh/lưu/đăng cũ ngoài các gate được triển khai có chủ đích.
 
-## 11. Ngoài phạm vi
+## 11. Bổ sung Review dàn ý và popup Marketing
+
+Review kiểm tra cả heading/dàn ý trước khi shop duyệt kế hoạch, rồi đối chiếu bài viết với đúng dàn ý đã duyệt. Review tự chọn thông tin cần thiết từ nguồn đúng Page/campaign, không bắt buộc cùng bộ nguồn với Content. Dàn ý là định hướng cấu trúc, không tự trở thành bằng chứng cho giá/công dụng/chính sách.
+
+Popup hai tab Dàn ý / Bài viết, nội dung và AI Review song song trên desktop, xếp dọc trên mobile; tự mở sau tạo, mở lại từ danh sách. Hiển thị kết quả thực tế, sửa đổi, lỗi/thiếu nguồn và căn cứ; không dựng số tiêu chí đạt giả hoặc ép heading SEO/800 từ cho Facebook. AI viết lại tạo đề xuất riêng, shop chủ động áp dụng; duyệt kế hoạch, bài và lịch riêng biệt. Sửa dàn ý làm mất hiệu lực chấp thuận phụ thuộc.
+
+## 12. Ngoài phạm vi
 
 Chưa review toàn bộ CSKH/Live/Sourcing, kiểm duyệt video/ảnh thật, tự tạo ảnh, tự duyệt đăng, tự sửa lịch, huấn luyện model hoặc lặp tự sửa vô hạn. Không cam kết Review loại bỏ mọi lỗi hoặc chứng nhận tuân thủ nền tảng.
 
-## 12. Phạm vi triển khai 06/11/2026
+## 13. Phạm vi triển khai 06/11/2026
 
 - `reviewEvidence.ts` chọn sản phẩm liên quan, trường giá/tồn khi cần, FAQ phù hợp, brief/giọng/quy tắc và ưu đãi/bằng chứng được nhắc; loại nguồn khác scope. Content và Review có context khác nhau. `marketingReviewSources.ts` bổ sung tri thức Page đã xác nhận, phát hiện mâu thuẫn sản phẩm/chính sách thay vì tự chọn nguồn thuận tiện; chưa tra cứu web hoặc nguồn ngoài tùy ý.
 - `aiPostReview.ts` có schema trạng thái/ID, thay đổi từng trường với before/after/lý do/tham chiếu nguồn, issues và bản cuối nullable. Code kiểm tra ID/số phương án, trường bắt buộc, tham chiếu có thật, thay đổi khớp bản gốc/cuối, URL, số tiền VND biểu diễn rõ, SKU có nhãn, tồn chưa biết và hiệu lực ưu đãi. Đây là kiểm tra có giới hạn; chưa xác minh mọi tuyên bố tự do về công dụng/chất lượng.
@@ -152,3 +158,5 @@ Chưa review toàn bộ CSKH/Live/Sourcing, kiểm duyệt video/ảnh thật, t
 Kiểm tra provider thật và chất lượng sửa/bỏ sót trên bộ mẫu xác nhận là bước riêng, chưa thực hiện trong lần triển khai này. Ảnh/video thật, tra cứu nguồn tự do, catalog server riêng và publish gate cho công cụ bài cũ nằm ngoài phần bổ sung này; campaign dùng cơ chế duyệt/đăng server hiện có.
 
 Nghiệm thu local 06/11/2026: toàn bộ **230 test qua**, production build/TypeScript qua; ESLint phần thay đổi không có lỗi (còn cảnh báo `<img>` hiện có), `git diff --check` qua. Backend kiểm tra chọn nguồn, mâu thuẫn, ID/schema, dẫn nguồn sửa giá, kết quả một phần, lỗi/thử lại, nguồn đổi trước đăng và ứng viên cũ không ghi đè bài. Trình duyệt dùng API giả lập đã kiểm tra trước/sau, nguồn, Review lại → chờ áp dụng → xác nhận áp dụng, phục hồi lỗi sau reload và chặn áp dụng khi form chưa lưu ở 1440px/390px, không thấy tràn ngang. Chưa dùng kết quả giả lập này để kết luận chất lượng Gemini thật.
+
+Bổ sung kế hoạch nội dung cùng ngày: Review được tái sử dụng cho các heading/dàn ý, có nguồn trụ cột định hướng và nguồn dữ kiện độc lập; dàn ý không chứng minh giá/URL. Binding kế hoạch được kiểm tra lại khi viết/Review/áp dụng/duyệt/lịch/đăng. Popup Dàn ý/Bài viết hiển thị nhận xét, vấn đề, sửa đổi và nguồn; giữ snapshot dàn ý đã dùng cho bài. Kết quả hiện tại **236 test qua**, build/TypeScript và ESLint phần thay đổi qua (cảnh báo ảnh hiện có); UI dùng API giả lập kiểm tra 390/768/1440px, đóng/mở giữ chỉnh sửa và thao tác bàn phím. Chi tiết ở [phạm vi bổ sung Marketing](marketing-redesign-plan.md#14-phạm-vi-bổ-sung-kế-hoạch-nội-dung-06112026). Chưa xác minh Gemini/Meta thật.

@@ -64,7 +64,7 @@ export const reviewMoneyAmounts = (text: string) => [...text.matchAll(/\b(\d+(?:
 export function validateReviewedDraft(draft: GeneratedPostDraft, evidence: ReviewEvidence, channel: string): ReviewIssue[] {
   const issues = evidenceConflicts(evidence), text = draftText([draft]), normalized = normalize(text);
   const targetAt = evidence.targetAt ?? evidence.checkedAt;
-  const facts = evidence.sources.map(source => JSON.stringify(source.data)).join('\n');
+  const facts = evidence.sources.filter(source => source.origin !== 'content-plan').map(source => JSON.stringify(source.data)).join('\n');
   const allowedUrls = new Set(urls(facts));
   if (urls(text).some(url => !allowedUrls.has(url))) issues.push(blockingIssue('scope', 'Bản sửa chứa URL ngoài căn cứ được phép.', [], 'content'));
   const allowedMoney = new Set([...reviewMoneyAmounts(facts), ...evidence.sources.filter(s => s.kind === 'product' && typeof s.data.price === 'number').map(s => Number(s.data.price))]);

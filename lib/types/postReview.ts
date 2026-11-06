@@ -1,4 +1,5 @@
 import type { GeneratedPostDraft } from './posts';
+import type { MarketingPlanBinding } from './marketingWorkspace';
 
 export type ReviewField = keyof GeneratedPostDraft;
 export type ReviewStatus = 'unchanged' | 'corrected' | 'needs_input' | 'blocked' | 'failed';
@@ -25,6 +26,7 @@ export interface PostReviewResult {
   contentModel: string; reviewModel: string; error?: string;
 }
 export interface ReviewAttempt extends PostReviewResult {
+  plan?: MarketingPlanBinding;
   id: string; campaignId: string; campaignVersion: number; accountId: string;
   targetPostId?: string; basePostHash?: string; createdAt: number;
   appliedAt?: number; discardedAt?: number;

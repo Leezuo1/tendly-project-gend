@@ -8,7 +8,8 @@ function SourceFacts({ source }: { source: ReviewSource }) {
   const d = source.data;
   const text = (key: string) => typeof d[key] === 'string' ? d[key] as string : '';
   return <li>
-    <b>{KIND[source.kind]}{d.sku ? ` · ${d.sku}` : ''}</b><span className="mw-muted"> · {source.origin === 'page-knowledge' ? 'Tri thức Page đã xác nhận' : source.origin === 'request-input' ? 'Dữ liệu đầu vào lần tạo' : 'Brief / dữ liệu chiến dịch đã duyệt'}</span>
+    <b>{KIND[source.kind]}{d.sku ? ` · ${d.sku}` : ''}</b><span className="mw-muted"> · {source.origin === 'content-plan' ? 'Trụ cột / dàn ý định hướng' : source.origin === 'page-knowledge' ? 'Tri thức Page đã xác nhận' : source.origin === 'request-input' ? 'Dữ liệu đầu vào lần tạo' : 'Brief / dữ liệu chiến dịch đã duyệt'}</span>
+    {source.origin === 'content-plan' && <p>Dàn ý định hướng cấu trúc; không chứng minh dữ kiện sản phẩm hoặc chính sách.</p>}
     {text('name') && <p>{text('name')}</p>}
     {typeof d.price === 'number' && <p>Giá: {new Intl.NumberFormat('vi-VN').format(d.price)}đ</p>}
     {'qty' in d && <p>Tồn: {d.stockKnown === false ? 'Chưa xác nhận' : String(d.qty)}</p>}
@@ -32,4 +33,16 @@ export function ReviewDetails({ review }: { review: PostReviewResult }) {
     <details><summary>Căn cứ đã dùng ({review.evidence.sources.length})</summary><ul className="mw-review-sources">{review.evidence.sources.map(source => <SourceFacts key={source.id} source={source} />)}</ul></details>
     <p className="mw-muted">Review đối chiếu văn bản với các nguồn trên; ảnh/video đính kèm cần shop kiểm tra trước khi duyệt.</p>
   </details>;
+}
+
+export function ReviewSummary({ review }: { review: PostReviewResult }) {
+  const issues = review.variants.flatMap(v => v.issues);
+  const changes = review.variants.flatMap(v => v.changes);
+  return <div className="mw-review-summary">
+    <h4>Nhận xét tổng quan</h4>
+    <p>{review.status === 'completed' ? 'Review đã hoàn tất đối chiếu với căn cứ được chọn. Shop cần xem nội dung và xác nhận trước khi sử dụng.' : review.status === 'failed' ? 'Review chưa hoàn tất. Giữ bản gốc và thử Review lại.' : 'Có nội dung cần chỉnh hoặc bổ sung căn cứ trước khi duyệt.'}</p>
+    {changes.length > 0 && <><h4>Đã chỉnh sửa ({changes.length})</h4><ul>{changes.map((change, i) => <li key={i}>{change.reason}</li>)}</ul></>}
+    {issues.length > 0 && <><h4>Cần xử lý / lưu ý ({issues.length})</h4><ul>{issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul></>}
+    {!issues.length && review.status === 'completed' && <p className="mw-muted">Không có vấn đề còn lại được ghi nhận trong lượt Review này. Chấp thuận đăng vẫn thuộc shop.</p>}
+  </div>;
 }

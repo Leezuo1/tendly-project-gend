@@ -2,6 +2,8 @@
 
 Kế hoạch chi tiết chỉnh sửa Marketing theo brief chiến dịch: [marketing-redesign-plan.md](marketing-redesign-plan.md).
 
+Cập nhật 06/11/2026: Marketing đã bổ sung bước trụ cột → heading/dàn ý → Review và duyệt kế hoạch trước khi viết bài, cùng popup Dàn ý/Bài viết có AI Review. Bản kế hoạch gốc dưới đây giữ định hướng demo; mặc định hiện tạo 3 dàn ý, có thể tạo thêm phương án để trình diễn. Phạm vi và kiểm chứng hiện hành xem mục 11, 14 trong [kế hoạch Marketing](marketing-redesign-plan.md).
+
 Các kế hoạch theo vai trò: [Customer Care / AI Chat](customer-care-redesign-plan.md), [AI Review](review-redesign-plan.md), [Livestream](livestream-redesign-plan.md), [Smart Sourcing](smart-sourcing-redesign-plan.md). Content thuộc kế hoạch Marketing; các plan này cập nhật chi tiết theo các thảo luận tiếp theo.
 
 Ngày lập: 05/11/2026. Cơ sở: `Góp ý cho tendly.txt` và đối chiếu source hiện tại. Đây là đề xuất để chốt hướng; chưa triển khai các thay đổi mô tả bên dưới.
