@@ -51,6 +51,15 @@ export const ROLE_PLATFORMS: Record<AiRoleId, AiPlatform[]> = {
   chat: ['facebook', 'instagram', 'zalo'], content: ['facebook', 'instagram', 'tiktok'],
   review: ['facebook', 'instagram', 'tiktok'], sourcing: [], livestream: ['facebook', 'tiktok'],
 };
+/** Thiết lập nền do admin đặt (lưu trên server); chi tiết vận hành nằm ở AiProfile của shop. */
+export const GLOBAL_AI_FIELDS = {
+  description: 'Mô tả chung', domain: 'Lĩnh vực', role: 'Vai trò',
+  rules: 'Quy định, nguyên tắc & quy chuẩn', forbidden: 'Từ cấm dùng',
+} as const;
+export type GlobalAiField = keyof typeof GLOBAL_AI_FIELDS;
+export type GlobalAiBasics = Record<GlobalAiField, string>;
+export interface GlobalAiProfile { base: GlobalAiBasics; platforms: Partial<Record<AiPlatform, Partial<GlobalAiBasics>>> }
+export interface GlobalAiConfiguration { version: 2; profiles: Record<AiRoleId, GlobalAiProfile> }
 export interface AiRuleField { key: string; label: string; value: string; type?: 'number' | 'check'; }
 export const AI_RULE_FIELDS: Record<AiRoleId, AiRuleField[]> = {
   chat: [

@@ -6,13 +6,17 @@ import { MarketingWorkflowError } from '@/lib/services/marketingBrief';
 import { knowledgeReviewSources, reviewHash } from '@/lib/services/reviewEvidence';
 import type { MarketingAccount, MarketingCampaign } from '@/lib/types/marketingWorkspace';
 import type { ReviewEvidence, ReviewSource } from '@/lib/types/postReview';
+import { effectiveGlobalAi, readAiGlobalSettings } from '@/lib/services/aiGlobalSettings';
 
 export async function marketingReviewCatalog(pageId: string, campaign: MarketingCampaign, account: MarketingAccount, db: Pick<Pool, 'query'> = getMessengerPool()): Promise<ReviewSource[]> {
   if (!account.mock && account.id !== pageId) throw new MarketingWorkflowError('Nguồn Review không thuộc Page được cấp quyền.', 403);
   const scope = JSON.stringify([pageId, account.id, campaign.id]);
   const platform = account.platform === 'shopee' ? undefined : account.platform;
   const base = { scope, origin: 'campaign', version: `${campaign.id}:${campaign.version}`, confirmedAt: campaign.approvedAt, validFrom: null, validUntil: null };
+  const global = await readAiGlobalSettings(db);
   const sources: ReviewSource[] = [
+    { ...base, id: 'system:ai-policy', kind: 'voice', origin: 'system', version: String(global.revision), confirmedAt: global.updatedAt || null,
+      data: { content: effectiveGlobalAi(global.configuration.profiles.content, platform), review: effectiveGlobalAi(global.configuration.profiles.review, platform) } },
     ...knowledgeReviewSources(campaign.knowledge, scope, 'campaign', base.version, campaign.approvedAt),
     { ...base, id: 'campaign:brief', kind: 'brief', data: { goal: campaign.goal, audience: campaign.audience, pain: campaign.pain, message: campaign.message, benefits: campaign.benefits, barriers: campaign.barriers, cta: campaign.cta, link: campaign.link, notes: campaign.notes, format: campaign.format } },
     { ...base, id: 'campaign:voice', kind: 'voice', data: { address: campaign.profile.address, tone: campaign.tone || campaign.profile.tone, avoid: campaign.profile.avoid, rules: effectiveAiRules(campaign.configuration.profiles.review, platform) } },
@@ -30,6 +34,9 @@ export async function marketingReviewCatalog(pageId: string, campaign: Marketing
 
 export function requireFreshReviewEvidence(evidence: ReviewEvidence | undefined, catalog: ReviewSource[]) {
   if (!evidence) throw new MarketingWorkflowError('Chạy Review lại để lưu căn cứ và phiên bản nguồn.', 409);
+  if (catalog.some(source => source.id === 'system:ai-policy' && source.version !== '0') && !evidence.sources.some(source => source.id === 'system:ai-policy')) {
+    throw new MarketingWorkflowError('Quy tắc AI chung đã thay đổi. Review và duyệt lại trước khi đăng.', 409);
+  }
   const current = evidence.sources.map(source => {
     const found = catalog.find(item => item.id === source.id && item.scope === evidence.scope);
     if (!found) throw new MarketingWorkflowError('Nguồn Review không còn thuộc phạm vi được phép. Review lại trước khi duyệt/đăng.', 409);

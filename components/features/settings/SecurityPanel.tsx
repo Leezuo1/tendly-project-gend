@@ -2,12 +2,17 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
+import { useTabParam } from '@/lib/hooks/useTabParam';
+import { Tabs } from '@/components/ui/Tabs';
+import { GlobalAiSettings } from '@/components/features/ai-config/GlobalAiSettings';
 import styles from '@/components/shared/security.module.css';
 
 export function SecurityPanel() {
   const { session, refresh } = useAppSecurity();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [tab, setTab] = useTabParam(['security', 'settings'] as const, 'security');
+  if (session.role !== 'admin') return <p role="alert">Chỉ quản trị viên được truy cập trang này.</p>;
   async function toggle() {
     if (busy) return;
     setBusy(true); setError('');
@@ -21,11 +26,14 @@ export function SecurityPanel() {
     finally { setBusy(false); }
   }
   return <div className={styles.root}><div className="page-head"><div><h1>Quản trị bảo mật</h1><p>Đăng nhập với vai trò quản trị · {session.username}</p></div></div>
+    <Tabs tabs={[{ key: 'security', label: 'Bảo mật & truy cập' }, { key: 'settings', label: 'Cấu hình AI chung' }]} active={tab} onChange={setTab} />
+    {tab === 'settings' ? <GlobalAiSettings /> : <>
     <section className="card"><div className={styles.toggleRow}><div><h2>Bảo vệ dữ liệu app</h2><p className={styles.description}>Quản lý quyền sử dụng dữ liệu của tài khoản thường.</p></div><button type="button" role="switch" aria-label="Bảo vệ dữ liệu app" aria-checked={session.protectionEnabled} disabled={busy} className={styles.toggle} onClick={() => void toggle()}><span /></button></div>
       <p className={styles.metadata}>Công tắc áp dụng cho toàn app và được lưu trên server. Quản trị viên vẫn có quyền thao tác khi khóa. Khi bật bảo vệ, tác vụ tự động gửi tin cũng tạm dừng; webhook tiếp tục nhận và lưu tin khách.</p>
       <p className={styles.metadata}>Cập nhật: {session.updatedAt ? new Date(session.updatedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—'} · {session.updatedBy || 'Hệ thống'}</p>
       {busy && <p role="status" className={styles.metadata}>Đang lưu trạng thái…</p>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
     </section><div className={styles.banner}><strong>Lưu ý khi mở quyền sử dụng</strong><p>Tắt bảo vệ cho phép tài khoản demo thực hiện các chức năng với Page đang cấu hình. Tin đã được Meta nhận trước khi bật khóa không thể thu hồi bằng công tắc.</p><Link href="/tong-quan">Vào ứng dụng →</Link></div>
+    </>}
   </div>;
 }

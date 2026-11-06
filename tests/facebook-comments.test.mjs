@@ -24,6 +24,7 @@ after(async () => { await ready; await db.close(); });
 function loader(overrides = {}) {
   const cache = new Map();
   const load = (file) => {
+    if (file === 'lib/services/aiGlobalSettings.ts') return { globalAiSystemPrompt: async () => 'Quy tắc chung từ server kiểm thử.' };
     if (file.replaceAll('\\', '/').endsWith('lib/services/appSecurity.ts')) return businessSecurity;
     if (overrides[file]) return overrides[file];
     if (cache.has(file)) return cache.get(file).exports;

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMockOnboarding } from '@/lib/hooks/useMockOnboarding';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { dashboardRequest } from '@/lib/services/postsClient';
-import { readAiConfiguration } from '@/lib/services/aiConfiguration';
+import { readPageAiProfile } from '@/lib/services/aiSettingsClient';
 import { currentAiKnowledge } from '@/lib/services/aiChat';
 import { productApi } from '@/lib/services/api';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
@@ -25,21 +25,24 @@ export function SmartSourcing() {
   return <div className={styles.root}>
     <header className="page-head"><div><h1>Smart Sourcing</h1><p>Khám phá sản phẩm, đối chiếu bằng chứng và lưu nguồn đáng xem xét.</p></div></header>
     {!ready ? <p role="status">Đang đọc thông tin shop…</p> : !workspace ? <section className="card"><h2>Bắt đầu từ ngành hàng của shop</h2><Link href="/cai-dat">Thiết lập thông tin shop →</Link></section>
-      : <SourcingFlow key={`${session.userId || session.username}:${workspace.industry}`} industry={workspace.industry} shopName={workspace.name} owner={session.userId || session.username} />}
+      : <SourcingFlow key={`${session.userId || session.username}:${workspace.industry}`} industry={workspace.industry} shopName={workspace.name} owner={session.userId || session.username} pageId={session.pageId} />}
   </div>;
 }
 
-function SourcingFlow({ industry, shopName, owner }: { industry: string; shopName: string; owner: string }) {
+function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string; shopName: string; owner: string; pageId: string | null }) {
   const [view, setView] = useState<Workspace>({ requests: [], decisions: [] });
   const [selectedId, setSelectedId] = useState('');
-  const [criteria, setCriteria] = useState<SourcingCriteria>(() => {
-    const defaults = defaultSourcingCriteria(industry);
-    try {
-      const rules = readAiConfiguration(owner).profiles.sourcing.rules;
+  const [criteria, setCriteria] = useState<SourcingCriteria>(() => defaultSourcingCriteria(industry));
+  useEffect(() => {
+    let active = true;
+    // Điền sẵn giá/MOQ/khu vực từ cấu hình AI Smart Sourcing của Page; lỗi thì giữ mặc định.
+    readPageAiProfile(pageId, owner).then(({ configuration }) => {
+      const rules = configuration.profiles.sourcing.rules;
       const optional = (value: string) => value.trim() && Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : null;
-      return { ...defaults, minPrice: optional(rules.minPrice || ''), maxPrice: optional(rules.maxPrice || ''), maxMoq: optional(rules.moq || ''), region: rules.region || defaults.region };
-    } catch { return defaults; }
-  });
+      if (active) setCriteria(current => ({ ...current, minPrice: optional(rules.minPrice || ''), maxPrice: optional(rules.maxPrice || ''), maxMoq: optional(rules.moq || ''), region: rules.region || current.region }));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [pageId, owner]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -183,7 +186,7 @@ function Transfer({ item, runId, kind, industry, owner, busy, work, onClose, onD
         onDone('Đã thêm sản phẩm mới. Nhập tồn kho và kiểm tra thông tin trong FAQ & sản phẩm.');
       } else {
         const view = await marketingWorkspaceClient.read();
-        await marketingWorkspaceClient.act(view.revision, 'sourcingIdea', { runId, itemKey: item.key, confirmed: true, knowledge: currentAiKnowledge(), configuration: readAiConfiguration(owner) });
+        await marketingWorkspaceClient.act(view.revision, 'sourcingIdea', { runId, itemKey: item.key, confirmed: true, knowledge: currentAiKnowledge() });
         onDone('Đã tạo brief nháp trong Marketing → Chiến dịch.');
       }
     }); }}>

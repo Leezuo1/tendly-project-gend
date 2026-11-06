@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { currentAiKnowledge } from '@/lib/services/aiChat';
-import { readAiConfiguration } from '@/lib/services/aiConfiguration';
 import { emptyCampaignBrief, MARKETING_GOALS } from '@/lib/services/marketingBrief';
 import type { CampaignBrief, MarketingCampaign, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
 import type { Product } from '@/lib/types/admin';
@@ -39,10 +38,8 @@ export function CampaignBriefForm({ view, initial, owner, act, onClose }: Props)
   const asLocal = (value: string) => value ? new Date(Date.parse(value) + 7 * 3600000).toISOString().slice(0, 16) : '';
   return <><form className="mw-editor" data-unsaved={dirty} onSubmit={async event => {
     event.preventDefault();
-    let configuration;
-    try { configuration = readAiConfiguration(owner); }
-    catch { setError('Chưa đọc được cấu hình AI. Kiểm tra lại tại Cấu hình AI.'); return; }
-    if (await act('campaign', { id: initial?.id, brief: form, knowledge: currentAiKnowledge(), configuration })) { setDirty(false); onClose(); }
+    // Server tự chép cấu hình AI của Page vào campaign; client không gửi cấu hình.
+    if (await act('campaign', { id: initial?.id, brief: form, knowledge: currentAiKnowledge() })) { setDirty(false); onClose(); }
   }}>
     <div className="mw-section-head"><div><h2>{initial ? 'Chỉnh brief chiến dịch' : 'Chiến dịch mới'}</h2><p>Sản phẩm và quy tắc kênh được dùng chung cho Content và Review.</p></div><button className="btn btn-outline btn-sm" type="button" onClick={() => { if (dirty) setDiscard(true); else onClose(); }}>Đóng</button></div>
     {error && <p className="mw-error" role="alert">{error}</p>}

@@ -16,7 +16,7 @@ const ready = (async () => {
 })();
 const query = async (sql, values) => { const result = await db.query(sql, values); return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length }; };
 const pool = { query, connect: async () => ({ query, release() {} }) };
-const envKeys = ['APP_ADMIN_USERNAME', 'APP_ADMIN_PASSWORD_HASH', 'INBOX_ACCESS_KEY', 'DASHBOARD_KEY', 'PAGE_ID', 'PAGE_ACCESS_TOKEN', 'META_GRAPH_VERSION', 'DATABASE_URL', 'CRON_SECRET'];
+const envKeys = ['APP_ADMIN_USERNAME', 'APP_ADMIN_PASSWORD_HASH', 'INBOX_ACCESS_KEY', 'DASHBOARD_KEY', 'PAGE_ID', 'PAGE_ACCESS_TOKEN', 'META_GRAPH_VERSION', 'DATABASE_URL', 'CRON_SECRET', 'GEMINI_API_KEY', 'GEMINI_MODEL'];
 const originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 const salt = 'a'.repeat(32);
@@ -30,6 +30,8 @@ async function fixture() {
   await query("DELETE FROM app_users WHERE id<>'demo'");
   await query("UPDATE app_users SET page_id='111' WHERE id='demo'");
   await query("UPDATE app_security_settings SET protection_enabled=true,revision=1,updated_at=1,updated_by='system',automatic_after=1 WHERE id=1");
+  await query('DELETE FROM ai_page_profiles');
+  await query("UPDATE ai_global_settings SET document=NULL,revision=0,updated_at=0,updated_by='' WHERE id=1");
   Object.assign(process.env, { APP_ADMIN_USERNAME: 'owner-test', APP_ADMIN_PASSWORD_HASH: adminHash, INBOX_ACCESS_KEY: 'old-inbox-secret-at-least-24-characters',
     DASHBOARD_KEY: 'old-dashboard-secret', DATABASE_URL: 'postgresql://test-only', PAGE_ID: '111', PAGE_ACCESS_TOKEN: 'test-page-token', META_GRAPH_VERSION: 'v26.0' });
   const cache = new Map();
@@ -48,7 +50,7 @@ async function fixture() {
     return loaded.exports;
   };
   const security = load('lib/services/appSecurity.ts');
-  const req = (method = 'GET', cookie = '', body, extra = {}) => new Request('https://test.example/api/test', {
+  const req = (method = 'GET', cookie = '', body, extra = {}, query = '') => new Request('https://test.example/api/test' + query, {
     method, headers: { cookie, origin: 'https://test.example', 'Content-Type': 'application/json', ...extra }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const login = async role => {
@@ -119,6 +121,75 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
     }
   }
   assert.ok(checked >= 40); assert.equal(providerCalls, 0);
+});
+
+test('AI global configuration is admin-only, revision-checked, and applied by the server to model calls', async () => {
+  const f = await fixture(), admin = await f.login('admin'), user = await f.login('user');
+  await f.security.changeProtection(f.req('PATCH', admin), false, 1, pool);
+  const route = f.load('app/api/admin/ai-settings/route.ts');
+  assert.equal((await route.GET(f.req('GET', user))).status, 403);
+  assert.equal((await route.PUT(f.req('PUT', user, { role: 'admin' }))).status, 403);
+  const initial = await (await route.GET(f.req('GET', admin))).json();
+  assert.equal(initial.revision, 0);
+  const configuration = initial.configuration;
+  assert.deepEqual(Object.keys(configuration.profiles.content.base), ['description', 'domain', 'role', 'rules', 'forbidden']);
+  configuration.profiles.content.base.rules = 'GLOBAL-CONTENT-RULE';
+  configuration.profiles.content.platforms.facebook = { forbidden: 'GLOBAL-FACEBOOK-BANNED' };
+  const body = { configuration, revision: 0 };
+  assert.equal((await route.PUT(f.req('PUT', admin, body, { origin: 'https://foreign.example' }))).status, 403);
+  assert.equal((await route.PUT(f.req('PUT', admin, { ...body, configuration: {} }))).status, 400);
+  assert.equal((await route.PUT(f.req('PUT', admin, { ...body, configuration: { ...configuration, version: 1 } }))).status, 400);
+  const saved = await route.PUT(f.req('PUT', admin, body));
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).revision, 1);
+  assert.equal((await route.PUT(f.req('PUT', admin, body))).status, 409);
+  const persisted = await (await route.GET(f.req('GET', admin))).json();
+  assert.equal(persisted.configuration.profiles.content.base.rules, 'GLOBAL-CONTENT-RULE');
+  const global = f.load('lib/services/aiGlobalSettings.ts');
+  process.env.GEMINI_API_KEY = 'test-key'; process.env.GEMINI_MODEL = 'test-model';
+  let system;
+  globalThis.fetch = async (_url, options) => {
+    system = JSON.parse(options.body).system_instruction.parts[0].text;
+    return Response.json({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] });
+  };
+  await f.load('lib/services/gemini.ts').generateGeminiJson({ role: 'content', platform: 'facebook', system: 'PRIVATE-SHOP-INPUT', user: 'Hello', schema: {}, parse: JSON.parse });
+  assert.ok(system.includes('GLOBAL-CONTENT-RULE') && system.includes('GLOBAL-FACEBOOK-BANNED') && system.includes('PRIVATE-SHOP-INPUT'));
+  assert.ok(!(await global.globalAiSystemPrompt('chat', 'facebook')).includes('GLOBAL-CONTENT-RULE'));
+  await assert.rejects(global.readAiGlobalSettings({ query: async () => { throw new Error('unavailable'); } }));
+});
+
+test('shop personalizes each AI per Page on the server; prompt layers Global → Platform → Page; Pages are isolated', async () => {
+  const f = await fixture(), admin = await f.login('admin'), user = await f.login('user');
+  await f.security.changeProtection(f.req('PATCH', admin), false, 1, pool);
+  const global = f.load('lib/services/aiGlobalSettings.ts'), route = f.load('app/api/ai-settings/route.ts');
+  const profile = { base: { description: 'G', domain: 'G', role: 'G', rules: 'G', forbidden: 'a' }, platforms: { facebook: { rules: 'P', forbidden: 'b' } } };
+  assert.deepEqual(global.effectiveGlobalAi(profile, 'facebook'), { description: 'G', domain: 'G', role: 'G', rules: 'P', forbidden: 'a, b' });
+  assert.equal((await route.GET(f.req('GET', ''))).status, 401);
+  const get = pageId => route.GET(f.req('GET', user, undefined, {}, '?pageId=' + pageId));
+  const put = body => route.PUT(f.req('PUT', user, body));
+  const initial = await (await get('111')).json();
+  assert.equal(initial.revision, 0); assert.equal(initial.platform, 'facebook');
+  const configuration = initial.configuration;
+  configuration.profiles.content.instructions = 'SHOP-PAGE-INSTRUCTION';
+  configuration.profiles.content.platformRules.facebook = { enabled: true, values: { cta: 'SHOP-FB-CTA' } };
+  assert.equal((await get('222')).status, 403);
+  assert.equal((await put({ pageId: '222', configuration, revision: 0 })).status, 403);
+  assert.equal((await put({ pageId: '111', configuration: {}, revision: 0 })).status, 400);
+  assert.equal((await put({ pageId: '111', configuration, revision: 0 })).status, 200);
+  assert.equal((await put({ pageId: '111', configuration, revision: 0 })).status, 409);
+  assert.equal((await (await get('111')).json()).configuration.profiles.content.instructions, 'SHOP-PAGE-INSTRUCTION');
+  const other = f.load('lib/services/aiConfiguration.ts').defaultAiConfiguration();
+  other.profiles.content.instructions = 'OTHER-PAGE';
+  await query("INSERT INTO ai_page_profiles(page_id,shop_id,platform,document,updated_at,updated_by) VALUES('222','other','tiktok',$1::jsonb,1,'x')", [JSON.stringify(other)]);
+  process.env.GEMINI_API_KEY = 'test-key'; process.env.GEMINI_MODEL = 'test-model';
+  let system;
+  globalThis.fetch = async (_url, options) => { system = JSON.parse(options.body).system_instruction.parts[0].text; return Response.json({ candidates: [{ content: { parts: [{ text: '{}' }] } }] }); };
+  const gemini = f.load('lib/services/gemini.ts');
+  await gemini.generateGeminiJson({ role: 'content', system: 's', user: 'u', schema: {}, parse: JSON.parse });
+  assert.ok(system.indexOf('THIẾT LẬP CHUNG') < system.indexOf('SHOP-PAGE-INSTRUCTION'));
+  assert.ok(system.includes('SHOP-FB-CTA') && !system.includes('OTHER-PAGE'));
+  await gemini.generateGeminiJson({ role: 'content', includeShop: false, system: 's', user: 'u', schema: {}, parse: JSON.parse });
+  assert.ok(!system.includes('SHOP-PAGE-INSTRUCTION'));
 });
 
 test('scheduler rejects app cookies, legacy keys and a missing/wrong cron secret', async () => {
