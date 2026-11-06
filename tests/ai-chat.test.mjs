@@ -73,6 +73,16 @@ function fixture() {
   };
 }
 
+test('sourced product import rejects duplicate SKU and preserves unknown stock and retail price', async () => {
+  const f = fixture();
+  const input = { sku: 'SOURCE-01', name: 'Áo từ nguồn khảo sát', material: '', emoji: '', category: 'Áo', colors: [], sizes: [], qty: 999, stockKnown: true, price: 150000, sourceUrl: 'https://example.com/ao' };
+  const saved = await f.api.productApi.importSourced(input);
+  assert.equal(saved.qty, 0); assert.equal(saved.stockKnown, false); assert.equal(saved.price, 150000);
+  await assert.rejects(f.api.productApi.importSourced({ ...input, sku: 'source-01', price: 1 }), /SKU đã tồn tại/);
+  const rows = await f.api.productApi.list();
+  assert.equal(rows.filter(p => p.id === saved.id).length, 1); assert.equal(rows.find(p => p.id === saved.id).price, 150000);
+});
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
   delete globalThis.window;

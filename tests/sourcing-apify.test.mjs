@@ -7,7 +7,7 @@ import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
 const db = new PGlite();
-const ready = db.exec(readFileSync('db/migrations/014-sourcing.sql', 'utf8'));
+const ready = (async () => { for (const file of ['014-sourcing.sql', '019-sourcing-workflow.sql']) await db.exec(readFileSync(`db/migrations/${file}`, 'utf8')); })();
 const query = async (sql, values) => {
   const result = await db.query(sql, values);
   return { rows: result.rows, rowCount: result.rows.length || result.affectedRows || 0 };
@@ -22,7 +22,7 @@ afterEach(() => {
 
 async function fixture() {
   await ready;
-  await db.exec('TRUNCATE sourcing_runs,sourcing_start_limits');
+  await db.exec('TRUNCATE sourcing_runs,sourcing_start_limits CASCADE');
   process.env.APIFY_API_TOKEN = 'test-token-do-not-expose';
   const cache = new Map();
   const load = file => {
@@ -35,7 +35,7 @@ async function fixture() {
     new Function('require', 'module', 'exports', compiled)(name => name.startsWith('@/') ? load(`${name.slice(2)}.ts`) : require(name), loaded, loaded.exports);
     return loaded.exports;
   };
-  return { ...load('lib/services/sourcingApify.ts'), ...load('lib/services/sourcingRuns.ts') };
+  return { ...load('lib/services/sourcingApify.ts'), ...load('lib/services/sourcingRuns.ts'), ...load('lib/services/sourcingWorkflow.ts'), ...load('lib/services/sourcingCriteria.ts') };
 }
 const json = value => Response.json(value);
 const industry = { industry: 'Thời trang & phụ kiện' };
@@ -60,6 +60,56 @@ test('builds bounded Actor inputs and rejects invalid search products before spe
   for (const product of ['', 'a', 'x'.repeat(121), 'https://example.com', 'áo site:example.com', 'áo\nsite:test']) {
     assert.throws(() => f.sourcingRequest('suppliers', { product }));
   }
+});
+
+test('request preview persists criteria without spending; approval binds one run and retries preserve unknown', async () => {
+  const f = await fixture(); let calls = 0;
+  globalThis.fetch = async () => { calls++; throw new Error('lost response'); };
+  const criteria = { ...f.defaultSourcingCriteria(industry.industry), product: 'Áo polo', keywords: ['áo polo cotton'], maxMoq: 50 };
+  const id = await f.prepareSourcingRequest('owner', criteria);
+  let workspace = await f.sourcingWorkspace('owner');
+  assert.equal(calls, 0); assert.deepEqual(workspace.requests[0].plan.queries, criteria.keywords);
+  assert.equal(workspace.requests[0].plan.maxChargeUsd, 0.5);
+  assert.deepEqual((await f.sourcingWorkspace('other')).requests, []);
+  await assert.rejects(f.runSourcingRequest('other', id, 1, true), error => error.status === 404);
+  await assert.rejects(f.runSourcingRequest('owner', id, 1, false), /Xác nhận/);
+  await assert.rejects(f.runSourcingRequest('owner', id, 0, true), error => error.status === 409);
+  assert.equal(calls, 0);
+  const run = await f.runSourcingRequest('owner', id, 1, true);
+  assert.equal(run.status, 'unknown'); assert.equal(calls, 1);
+  workspace = await f.sourcingWorkspace('owner');
+  assert.equal(workspace.requests[0].run.id, run.id); assert.ok(workspace.requests[0].approvedAt);
+  delete process.env.APIFY_API_TOKEN;
+  assert.equal((await f.runSourcingRequest('owner', id, 1, true)).id, run.id);
+  assert.equal(calls, 1);
+  await assert.rejects(f.prepareSourcingRequest('owner', criteria, id, 2), error => error.status === 409);
+});
+
+test('criteria validation and comparison preserve unknown money, units and MOQ', async () => {
+  const f = await fixture(), criteria = { ...f.defaultSourcingCriteria(industry.industry), minPrice: 100, maxPrice: 200, maxMoq: 10 };
+  for (const input of [{ keywords: ['  '] }, { keywords: ['áo\nsite:test'] }, { minPrice: 300 }, { maxMoq: -1 }, { resultLimit: 21 }]) assert.throws(() => f.parseSourcingCriteria({ ...criteria, ...input }));
+  const item = { title: 'Áo cotton', text: '', price: 0, currency: null, unit: null, moq: null, region: null };
+  const comparison = f.compareSourcingItem(item, criteria);
+  assert.deepEqual(comparison.mismatched, []); assert.equal(comparison.missing.length, 3);
+  assert.ok(!comparison.matched.includes('Khoảng giá'));
+  assert.ok(f.compareSourcingItem({ ...item, price: 500, currency: 'VND', unit: 'sản phẩm', moq: 5 }, criteria).mismatched.includes('Giá ngoài khoảng yêu cầu'));
+});
+
+test('shortlist decisions require an owned completed result and survive workspace reload', async () => {
+  const f = await fixture();
+  const id = await f.prepareSourcingRequest('owner', { ...f.defaultSourcingCriteria(industry.industry), kind: 'suppliers', product: 'Áo polo' });
+  globalThis.fetch = async () => json(runResponse());
+  const run = await f.runSourcingRequest('owner', id, 1, true);
+  globalThis.fetch = async url => url.includes('/items?') ? json([{ organicResults: [{ title: 'Xưởng áo', url: 'https://example.com/polo', description: 'Cotton' }] }]) : json(runResponse('SUCCEEDED'));
+  const done = await f.readSourcingRun('owner', run.id), item = f.sourcingItems(done)[0];
+  await assert.rejects(f.saveSourcingDecision('other', { runId: run.id, itemKey: item.key, status: 'checked', note: '' }), error => error.status === 404);
+  await assert.rejects(f.readSourcingSelection('owner', run.id, 'invented-result'), error => error.status === 404);
+  await f.saveSourcingDecision('owner', { runId: run.id, itemKey: item.key, status: 'shortlist', note: 'Cần hỏi lại MOQ' });
+  assert.equal((await f.sourcingWorkspace('owner')).decisions[0].note, 'Cần hỏi lại MOQ');
+  assert.equal((await f.readSourcingSelection('owner', run.id, item.key)).price, null);
+  await f.saveSourcingDecision('owner', { runId: run.id, itemKey: item.key, status: 'checked', note: 'Shop đã liên hệ' });
+  assert.equal((await f.sourcingWorkspace('owner')).decisions.length, 1);
+  assert.equal((await f.sourcingWorkspace('owner')).decisions[0].status, 'checked');
 });
 
 test('missing token and invalid industry do not call Apify or reserve runs', async () => {
@@ -155,7 +205,7 @@ test('Google extracts organic candidates only, canonicalizes URLs and preserves 
   assert.equal(done.result.candidates[0].verified, false);
   assert.equal(done.result.duplicateCount, 1);
   assert.equal(done.result.rejectedCount, 1);
-  assert.equal(done.result.candidates[0].price, undefined);
+  assert.equal(done.result.candidates[0].price, null);
 });
 
 test('empty datasets differ from failed runs and malformed output', async () => {

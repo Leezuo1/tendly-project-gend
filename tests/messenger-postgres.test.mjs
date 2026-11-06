@@ -24,6 +24,9 @@ function fixture() {
   db.public.none(migration);
   db.public.none(migration); // Applying the initial schema again must preserve data.
   db.public.none(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
+  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '017-customer-care-sources.sql']) {
+    db.public.none(readFileSync(`db/migrations/${file}`, 'utf8'));
+  }
   const { Pool } = db.adapters.createPg();
   return { db, pool: new Pool() };
 }

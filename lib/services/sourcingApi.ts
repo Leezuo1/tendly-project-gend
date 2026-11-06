@@ -16,6 +16,7 @@ export async function startSourcingRequest(request: Request, kind: SourcingKind)
   const session = await requireAppAccess(request);
   const input = await readSecurityJson(request);
   try {
+    if (input.confirmed !== true) throw new SourcingInputError('Xác nhận truy vấn và giới hạn chi phí trước khi chạy.');
     const run = await createSourcingRun(JSON.stringify([session.role, session.userId || session.username]), kind, input);
     return Response.json(run, { status: 202 });
   } catch (error) { return sourcingError(error); }

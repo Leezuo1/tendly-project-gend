@@ -50,7 +50,7 @@ export const POST = withAppAccess(async function POST(request: Request) {
       sourcePostId = await facebookSourcePostId(pageId, body.sourceKind, body.sourceId);
     }
     const knowledge = parseAiKnowledge(body.knowledge);
-    const session = await createSession(pageId, { platform, sourceKind, sourceId, sourcePostId, title, waitForLive }, knowledge);
+    const session = await createSession(pageId, { platform, sourceKind, sourceId, sourcePostId, title, waitForLive, draft: true, preparation: body.preparation }, knowledge);
     return liveJson({ session }, 201);
   } catch (error) {
     return liveErrorResponse(error);

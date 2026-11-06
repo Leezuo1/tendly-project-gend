@@ -165,6 +165,18 @@ function applyShopee(products: Product[], source: ProductSource) {
 }
 
 export const productApi = {
+  async importSourced(input: Omit<Product, 'id'>): Promise<Product> {
+    const sku = input.sku.trim(), name = input.name.trim();
+    if (!sku || sku.length > 100 || !name || name.length > 500 || !Number.isSafeInteger(input.price) || input.price < 0) throw new ApiError('Nhập SKU, tên và giá bán VND hợp lệ.');
+    const details = parseProductDetails({ ...input });
+    const product: Product = { ...input, ...details, id: uid('p'), sku, name, qty: 0, stockKnown: false };
+    writeDb(db => {
+      if (db.products.some(row => row.sku.trim().toLowerCase() === sku.toLowerCase())) throw new ApiError('SKU đã tồn tại. Chọn mã khác; sản phẩm hiện có được giữ nguyên.');
+      if (db.products.length >= 500) throw new ApiError('Danh mục đã đạt 500 sản phẩm.');
+      db.products.push(product);
+    });
+    return respond(product);
+  },
   list: () => respond<Product[]>(readDb().products),
   getSource: () => respond<ProductSource>({ ...readDb().productSource, connected: false }, 100),
 

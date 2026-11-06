@@ -119,6 +119,8 @@ Prototype màn gán kênh hiển thị: Page, profile Chat, trạng thái bật/
 
 Ba chế độ hội thoại:
 
+Công tắc **AI tự động trả lời** nằm ở từng hội thoại và chỉ bật/tắt tự trả lời cho hội thoại đó. Muốn tắt chung, dùng công tắc AI Chat trong **Cấu hình AI**; mọi hội thoại thuộc phạm vi cấu hình đều phải tuân theo. Bật lại cấu hình không thay đổi lựa chọn bật/tắt riêng của các hội thoại và không tự gửi bù tin cũ. Đã triển khai hai cấp công tắc trong đợt Customer Care đầu tiên ngày 05/11; phân biệt đầy đủ ba chế độ bên dưới vẫn thuộc kế hoạch tiếp theo. Chi tiết tiến độ tại [Customer Care](customer-care-redesign-plan.md#8-tiến-độ-triển-khai-05112026).
+
 - **Thủ công:** không tự phân tích, soạn hay gửi; shop có thể chủ động yêu cầu gợi ý nếu AI của Page đang bật.
 - **Gợi ý:** AI phân tích và soạn nháp; người bán gửi.
 - **Tự động có điều kiện:** chỉ tự gửi khi đủ dữ liệu và các kiểm tra backend đều đạt; còn lại đưa về cần người xử lý.

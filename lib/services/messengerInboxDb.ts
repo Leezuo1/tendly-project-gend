@@ -3,6 +3,7 @@ import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import type { MessengerMessage } from '@/lib/types/messenger';
 import type { MessengerCustomerProfile, MessengerInboxSnapshot, MessengerThread } from '@/lib/types/messengerInbox';
 import { readConversationMemories } from '@/lib/services/conversationMemory';
+import { readConversationSourceContexts } from '@/lib/services/conversationSources';
 
 export function customerProfileFromRow(row: Record<string, unknown>): MessengerCustomerProfile {
   return {
@@ -19,9 +20,11 @@ export function customerProfileFromRow(row: Record<string, unknown>): MessengerC
 export interface MessageRow {
   page_id: string; message_id: string; psid: string; direction: 'in' | 'out';
   sent_at: string; text: string; attachments_json: MessengerMessage['attachments'];
+  reply_to_mid?: string | null;
 }
 export function messageFromRow(row: MessageRow): MessengerMessage {
   return { pageId: row.page_id, psid: row.psid, messageId: row.message_id,
+    ...(row.reply_to_mid ? { replyToMessageId: row.reply_to_mid } : {}),
     direction: row.direction, timestamp: Number(row.sent_at), text: row.text, attachments: row.attachments_json };
 }
 
@@ -46,12 +49,19 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
     conversations.push({ id: row.id, pageId, psid: row.psid, createdAt: Number(row.created_at), memory: memories.get(row.id) || [],
       viewStartAt: row.view_start_at == null ? undefined : Number(row.view_start_at), personalitySummary: row.personality_summary || '',
       waitingConfirmation: row.waiting_confirmation === true,
+      autoReply: row.ai_auto_reply === true, aiUpdatedAt: Number(row.ai_updated_at),
       lastInAt: row.last_in_at === null ? null : Number(row.last_in_at),
       lastOutAt: row.last_out_at === null ? null : Number(row.last_out_at),
       messages: messages.slice(-50).map((m) => messageFromRow({ ...m, psid: row.psid })), hasOlder: messages.length > 50,
       customer: customerProfileFromRow(row) });
   }
-  return { conversations, hasMore: rows.rows.length > limit };
+  const contexts = await readConversationSourceContexts(pageId, conversations.flatMap(thread => {
+    const incoming = [...thread.messages].reverse().find(message => message.direction === 'in');
+    return incoming ? [{ id: thread.id, cutoff: incoming.timestamp, reply_mid: incoming.replyToMessageId ?? null }] : [];
+  }), db);
+  for (const thread of conversations) thread.sourceContext = contexts.get(thread.id);
+  const settings = (await db.query('SELECT auto_reply,profile_json FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
+  return { conversations, hasMore: rows.rows.length > limit, aiEnabled: settings?.auto_reply === true && !!settings.profile_json };
 }
 
 export async function readOlderMessengerMessages(pageId: string, psid: string, timestamp: number, messageId: string,

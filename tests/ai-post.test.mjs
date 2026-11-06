@@ -116,7 +116,14 @@ test('generate route sends structured request to Gemini and returns drafts witho
   const { route, knowledge } = setup();
   const sent = [];
   globalThis.fetch = async (url, options) => {
-    sent.push({ url, body: JSON.parse(options.body) });
+    const body = JSON.parse(options.body); sent.push({ url, body });
+    if (body.system_instruction.parts[0].text.startsWith('Bạn là AI Review')) {
+      const input = JSON.parse(body.contents[0].parts[0].text);
+      return geminiReply(input.variants.map(({ draftId, draft }) => {
+        const finalDraft = { ...draft, content: draft.content.replace('259.000đ', '221.000đ') };
+        return { draftId, status: 'corrected', finalDraft, changes: [{ field: 'content', before: draft.content, after: finalDraft.content, reason: 'Đối chiếu giá', sourceIds: [input.evidence.sources.find(s => s.kind === 'product').id] }], issues: [] };
+      }));
+    }
     return geminiReply([variant(), variant({ title: 'Phương án 2' })]);
   };
   const res = await postGenerate(route, { request: request(), knowledge });
@@ -124,6 +131,7 @@ test('generate route sends structured request to Gemini and returns drafts witho
   const data = await res.json();
   assert.equal(data.drafts.length, 2);
   assert.equal(data.drafts[1].title, 'Phương án 2');
+  assert.match(data.drafts[0].content, /221\.000đ/); assert.equal(data.review.status, 'completed'); assert.equal(sent.length, 2);
   assert.match(sent[0].url, /models\/test-model:generateContent$/);
   assert.equal(sent[0].body.generationConfig.responseFormat.text.mimeType, 'APPLICATION_JSON');
 });

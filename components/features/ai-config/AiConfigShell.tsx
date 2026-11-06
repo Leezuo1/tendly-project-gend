@@ -17,11 +17,11 @@ import type { MarketingPost } from '@/lib/types/posts';
 import type { MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
 import type { LiveSessionListItem } from '@/lib/types/live';
 import styles from './ai-configuration.module.css';
+import { CustomerCareSettings } from './CustomerCareSettings';
 
 const TABS = [{ key: 'manage', label: 'Quản lý AI' }, { key: 'settings', label: 'Thiết lập AI' }] as const;
 const LABELS: Record<AiRoleId, string> = { chat: 'AI Chat', content: 'AI Soạn nội dung', review: 'AI Kiểm tra nội dung', sourcing: 'AI Smart Sourcing', livestream: 'AI Livestream' };
 const ORDER: AiRoleId[] = ['chat', 'content', 'review', 'sourcing', 'livestream'];
-interface ConnectedPage { id: string; name: string; }
 
 export function AiConfigShell() {
   const [tab, setTab] = useTabParam(TABS.map(item => item.key), 'manage');
@@ -33,7 +33,6 @@ export function AiConfigShell() {
   const [saved, setSaved] = useState('');
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
-  const [pages, setPages] = useState<ConnectedPage[] | null>(null);
   const [posts, setPosts] = useState<MarketingPost[] | null>(null);
   const [marketing, setMarketing] = useState<MarketingWorkspaceView | null>(null);
   const [sessions, setSessions] = useState<LiveSessionListItem[] | null>(null);
@@ -57,21 +56,15 @@ export function AiConfigShell() {
   useEffect(() => { if (owner) { const timer = setTimeout(load, 0); return () => clearTimeout(timer); } }, [load, owner]);
   const loadUsage = useCallback(async () => {
     const result = await Promise.allSettled([
-      dashboardRequest('/api/settings/channels').then(response => response.json()), postsClient.list(), liveClient.sessions(),
+      postsClient.list(), liveClient.sessions(),
       dashboardRequest('/api/marketing/workspace').then(response => response.json() as Promise<MarketingWorkspaceView>),
     ]);
     const errors: string[] = [];
-    const channels = result[0];
-    if (channels.status === 'fulfilled') {
-      const value = channels.value;
-      setPages(value.pageAccessible && value.pageId ? [{ id: value.pageId, name: value.pageName || `Fanpage ${value.pageId}` }] : []);
-      if (value.configured && !value.pageAccessible) errors.push('Chưa xác minh được kết nối Fanpage.');
-    } else { setPages(null); errors.push('Chưa tải được Fanpage.'); }
-    if (result[1].status === 'fulfilled') setPosts(result[1].value.posts);
+    if (result[0].status === 'fulfilled') setPosts(result[0].value.posts);
     else { setPosts(null); errors.push('Chưa tải được bài viết.'); }
-    if (result[2].status === 'fulfilled') setSessions(result[2].value);
+    if (result[1].status === 'fulfilled') setSessions(result[1].value);
     else { setSessions(null); errors.push('Chưa tải được phiên livestream.'); }
-    if (result[3].status === 'fulfilled') setMarketing(result[3].value);
+    if (result[2].status === 'fulfilled') setMarketing(result[2].value);
     else { setMarketing(null); errors.push('Chưa tải được chiến dịch Marketing.'); }
     setUsageErrors(errors);
   }, []);
@@ -85,14 +78,6 @@ export function AiConfigShell() {
 
   function updateProfile(id: AiRoleId, patch: Partial<AiProfile>) {
     setConfig(current => ({ ...current, profiles: { ...current.profiles, [id]: { ...current.profiles[id], ...patch } } }));
-  }
-  function updatePage(id: string, patch: Partial<AiConfiguration['pageBindings'][number]>) {
-    setConfig(current => {
-      const previous = current.pageBindings.find(page => page.pageId === id) ?? { pageId: id, assigned: false, enabled: false };
-      const next = { ...previous, ...patch };
-      if (!next.assigned) next.enabled = false;
-      return { ...current, pageBindings: [...current.pageBindings.filter(page => page.pageId !== id), next] };
-    });
   }
   function setRule(key: string, value: string) {
     if (!currentPlatform) updateProfile(selected, { rules: { ...profile.rules, [key]: value } });
@@ -114,15 +99,6 @@ export function AiConfigShell() {
     else updateProfile(selected, { rules: values });
   }
   const usage = (id: AiRoleId) => {
-    if (id === 'chat') return <>
-      <h3>Fanpage sử dụng AI Chat</h3>
-      {pages === null ? <p>Chưa tải được danh sách Fanpage.</p> : !pages.length ? <><p>Chưa có Fanpage được kết nối.</p><Link className="btn btn-outline btn-sm" href="/cai-dat?tab=channels">Kết nối fanpage</Link></> : pages.map(page => {
-        const binding = config.pageBindings.find(item => item.pageId === page.id);
-        return <div className={styles.pageRow} key={page.id}><div><strong>{page.name}</strong><p>Facebook · {binding?.assigned ? binding.enabled && config.profiles.chat.enabled ? 'AI Chat đã bật' : 'AI Chat đang tắt' : 'Chưa gán AI Chat'}</p></div>
-          <label className={styles.checkLabel}><input type="checkbox" checked={binding?.assigned ?? false} onChange={event => updatePage(page.id, { assigned: event.target.checked })} />Gán AI Chat</label>
-          <Switch checked={binding?.enabled ?? false} disabled={!binding?.assigned || !config.profiles.chat.enabled} label={`Bật AI Chat cho ${page.name}`} onChange={enabled => updatePage(page.id, { enabled })} /></div>;
-      })}<p>Quy tắc Facebook dùng chung cho các Fanpage được gán. Trạng thái bật/tắt được đặt riêng từng trang.</p>
-    </>;
     if (id === 'content' || id === 'review') {
       const items = posts?.filter(post => id === 'content' || post.status === 'draft');
       return <><h3>{id === 'content' ? 'Campaign & nền tảng đăng bài' : 'Campaign & bước duyệt bài'}</h3>
@@ -140,14 +116,14 @@ export function AiConfigShell() {
   };
 
   return <div className={styles.root}>
-    <div className="page-head"><div><h1>Cấu hình AI</h1><p>Quản lý nơi sử dụng và cách từng AI hỗ trợ shop.</p></div><button className="btn btn-primary" form="ai-profile-settings" type="submit" disabled={!ready || !dirty}>Lưu thiết lập</button></div>
+    <div className="page-head"><div><h1>Cấu hình AI</h1><p>Quản lý nơi sử dụng và cách từng AI hỗ trợ shop.</p></div>{!(tab === 'settings' && selected === 'chat') && <button className="btn btn-primary" form="ai-profile-settings" type="submit" disabled={!ready || !dirty}>Lưu thiết lập</button>}</div>
     <Tabs tabs={[...TABS]} active={tab} onChange={value => setTab(value, { ai: selected })} />
     {error && <div className={styles.error} role="alert">{error} {!ready && <button type="button" className="btn btn-outline btn-sm" onClick={load}>Thử lại</button>}</div>}
     {!ready && !error && <p className={styles.loading} role="status">Đang tải thiết lập…</p>}
-    <form id="ai-profile-settings" onSubmit={save}><fieldset disabled={!ready} className={styles.fieldset}>
+    <form id="ai-profile-settings" onSubmit={save}><fieldset className={styles.fieldset}>
       {tab === 'manage' ? <div className={styles.management}>
         {usageErrors.length > 0 && <div className={styles.usageError} role="status">{usageErrors.join(' ')} <button className="btn btn-text btn-sm" type="button" onClick={() => void loadUsage()}>Tải lại</button></div>}
-        {ORDER.map(id => <section key={id} className={styles.aiRow}>
+        {ORDER.map(id => id === 'chat' ? (ready || error) && <CustomerCareSettings key={id} mode="manage" initialProfile={config.profiles.chat} /> : ready && <section key={id} className={styles.aiRow}>
           <header className={styles.rowHead}><div><h2>{LABELS[id]}</h2><p>{AI_ROLES.find(item => item.id === id)!.description}</p></div>
             <div className={styles.statusControl}><span>{config.profiles[id].enabled ? 'Đã bật' : 'Đang tắt'}</span><Switch checked={config.profiles[id].enabled} label={`Bật ${LABELS[id]}`} onChange={enabled => updateProfile(id, { enabled })} /></div></header>
           <div className={styles.usage}>{usage(id)}</div>
@@ -156,8 +132,8 @@ export function AiConfigShell() {
         </section>)}
       </div> : <div className={styles.settings}>
         <div className={styles.selectors}><div><label htmlFor="ai-selector">Chọn AI</label><select id="ai-selector" value={selected} onChange={event => selectAi(event.target.value as AiRoleId)}>{ORDER.map(id => <option key={id} value={id}>{LABELS[id]}</option>)}</select></div>
-          {ROLE_PLATFORMS[selected].length > 0 && <div><label htmlFor="ai-platform">Bộ quy tắc</label><select id="ai-platform" value={currentPlatform ?? 'default'} onChange={event => setPlatform(event.target.value as AiPlatform | 'default')}><option value="default">Quy tắc mặc định</option>{ROLE_PLATFORMS[selected].map(item => <option key={item} value={item}>{AI_PLATFORMS[item]}</option>)}</select></div>}</div>
-        <section className={styles.editor} aria-labelledby="rules-heading"><header className={styles.editorHead}><div><h2 id="rules-heading">{LABELS[selected]} · {currentPlatform ? AI_PLATFORMS[currentPlatform] : 'Quy tắc mặc định'}</h2><p>{role.description}</p></div></header>
+          {selected !== 'chat' && ROLE_PLATFORMS[selected].length > 0 && <div><label htmlFor="ai-platform">Bộ quy tắc</label><select id="ai-platform" value={currentPlatform ?? 'default'} onChange={event => setPlatform(event.target.value as AiPlatform | 'default')}><option value="default">Quy tắc mặc định</option>{ROLE_PLATFORMS[selected].map(item => <option key={item} value={item}>{AI_PLATFORMS[item]}</option>)}</select></div>}</div>
+        {selected === 'chat' ? (ready || error) && <CustomerCareSettings mode="settings" initialProfile={config.profiles.chat} /> : ready && <section className={styles.editor} aria-labelledby="rules-heading"><header className={styles.editorHead}><div><h2 id="rules-heading">{LABELS[selected]} · {currentPlatform ? AI_PLATFORMS[currentPlatform] : 'Quy tắc mặc định'}</h2><p>{role.description}</p></div></header>
           <div className={styles.formBody}>
             {currentPlatform && <div className={styles.switchRow}><div><strong>Tùy chỉnh cho nền tảng này</strong><p>Các mục chưa tùy chỉnh sẽ dùng quy tắc mặc định.</p></div><Switch checked={override?.enabled ?? false} label="Tùy chỉnh cho nền tảng này" onChange={enabled => updateProfile(selected, { platformRules: { ...profile.platformRules, [currentPlatform]: { enabled, values: override?.values ?? {} } } })} /></div>}
             <div className={styles.templateRow}><p>Bắt đầu với mẫu có sẵn, rồi chỉnh theo shop.</p><button type="button" className="btn btn-outline btn-sm" disabled={!!currentPlatform && !override?.enabled} onClick={template}>Dùng mẫu gợi ý</button></div>
@@ -174,11 +150,11 @@ export function AiConfigShell() {
                 {currentPlatform && !customized && <small>Dùng quy tắc mặc định</small>}
               </div>;
             })}
-            <p className={styles.ruleHint}>{selected === 'review' ? 'Kết quả kiểm tra cần chỉ ra lỗi và gợi ý sửa. Chủ shop quyết định duyệt bài.' : selected === 'sourcing' ? 'Chỉ đối chiếu giá, MOQ và khu vực khi nguồn hàng có cung cấp thông tin tương ứng.' : selected === 'chat' ? 'Fanpage Facebook được gán AI Chat dùng bộ quy tắc Facebook. Bật/tắt từng trang ở Quản lý AI.' : role.guard}</p>
+            <p className={styles.ruleHint}>{selected === 'review' ? 'Kết quả kiểm tra cần chỉ ra lỗi và gợi ý sửa. Chủ shop quyết định duyệt bài.' : selected === 'sourcing' ? 'Chỉ đối chiếu giá, MOQ và khu vực khi nguồn hàng có cung cấp thông tin tương ứng.' : role.guard}</p>
           </div>
-        </section>
+        </section>}
       </div>}
-      <footer className={styles.saveBar}><p aria-live="polite">{dirty ? 'Có thay đổi chưa lưu' : config.updatedAt ? 'Đã lưu thiết lập' : 'Chưa có thay đổi'}</p><button className="btn btn-primary" type="submit" disabled={!ready || !dirty}>Lưu thiết lập</button></footer>
+      {!(tab === 'settings' && selected === 'chat') && <footer className={styles.saveBar}><p aria-live="polite">{dirty ? 'Có thay đổi chưa lưu' : config.updatedAt ? 'Đã lưu thiết lập' : 'Chưa có thay đổi'}</p><button className="btn btn-primary" type="submit" disabled={!ready || !dirty}>Lưu thiết lập</button></footer>}
     </fieldset></form>
   </div>;
 }

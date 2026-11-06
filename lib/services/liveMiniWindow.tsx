@@ -6,7 +6,7 @@
  *
  * Trình duyệt chỉ cho mở cửa sổ NGAY TRONG cú bấm của người dùng, nên hàm nhận cả Promise mã phiên:
  * cửa sổ mở trước (hiện "Đang tạo phiên…"), phiên tạo xong thì hiện dữ liệu. Ví dụ:
- *   onClick={() => openLiveMini(liveClient.start({...}).then((s) => s.id))}
+ *   onClick={() => openLiveMini(liveClient.activate(id, revision).then((s) => s.session.id))}
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { createPost, getPost, getPostImage, listPosts, markPublished, updateDraft, setPostImage, deletePostImage, type StoredPostImage } from '@/lib/services/postsPostgres';
 import { publishToFacebookPage } from '@/lib/services/facebookPage';
@@ -8,9 +8,13 @@ import { assertOperationAllowed, runAutomaticAccess } from '@/lib/services/appSe
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { parseAiConfiguration } from '@/lib/services/aiConfiguration';
 import { generateReviewedMarketing } from '@/lib/services/aiPostReview';
-import { emptyMarketingProfile, emptyMarketingWorkspace, marketingText, MarketingWorkflowError, MARKETING_POST_GOALS, offerValidAt, parseCampaignBrief, parseMarketingProfile, requireCampaignReady } from '@/lib/services/marketingBrief';
+import { marketingReviewCatalog, requireFreshReviewEvidence } from '@/lib/services/marketingReviewSources';
+import { blockingIssue } from '@/lib/services/reviewEvidence';
+import { emptyCampaignBrief, emptyMarketingProfile, emptyMarketingWorkspace, marketingText, MarketingWorkflowError, MARKETING_POST_GOALS, offerValidAt, parseCampaignBrief, parseMarketingProfile, requireCampaignReady } from '@/lib/services/marketingBrief';
+import { readSourcingSelection } from '@/lib/services/sourcingWorkflow';
 import type { MarketingAccount, MarketingCampaign, MarketingSchedule, MarketingWorkspace, MarketingWorkspaceView, ReviewedMarketingPost } from '@/lib/types/marketingWorkspace';
 import type { GeneratedPostDraft, MarketingPost } from '@/lib/types/posts';
+import type { ReviewAttempt } from '@/lib/types/postReview';
 
 export function marketingAccounts(pageId: string): MarketingAccount[] {
   return [{ id: pageId, name: 'Fanpage Facebook', platform: 'facebook', mock: false },
@@ -19,7 +23,7 @@ export function marketingAccounts(pageId: string): MarketingAccount[] {
     { id: 'sample-shopee', name: 'Shopee · Kênh mẫu', platform: 'shopee', mock: true }];
 }
 const document = (value: unknown): MarketingWorkspace => typeof value === 'string' ? JSON.parse(value) : value as MarketingWorkspace;
-export async function readMarketingWorkspace(pageId: string, db = getMessengerPool()) {
+export async function readMarketingWorkspace(pageId: string, db: Pick<Pool, 'query'> = getMessengerPool()) {
   const row = (await db.query('SELECT revision,document FROM marketing_workspaces WHERE page_id=$1', [pageId])).rows[0];
   return { revision: Number(row?.revision ?? 0), workspace: row ? document(row.document) : emptyMarketingWorkspace() };
 }
@@ -73,35 +77,82 @@ export function requireApprovedMarketingPost(state: MarketingWorkspace, post: Ma
   return { review, campaign, hash };
 }
 
-export async function marketingWorkspaceAction(pageId: string, actor: string, revision: number, action: string, input: Record<string, unknown>) {
+async function requireReviewSources(pageId: string, state: MarketingWorkspace, review: ReviewedMarketingPost, db: Pick<Pool, 'query'> = getMessengerPool()) {
+  const campaign = requireCurrentCampaign(state, review), account = marketingAccounts(pageId).find(item => item.id === campaign.accountId);
+  if (!account) throw new MarketingWorkflowError('Tài khoản Review không thuộc shop.', 403);
+  requireFreshReviewEvidence(review.review?.evidence, await marketingReviewCatalog(pageId, campaign, account, db));
+}
+
+export async function marketingWorkspaceAction(pageId: string, actor: string, revision: number, action: string, input: Record<string, unknown>, sourcingOwner?: string, signal?: AbortSignal) {
   const accounts = marketingAccounts(pageId);
   // AI runs outside the transaction; the revision check prevents overwriting newer edits.
-  if (action === 'generate' || action === 'review') {
+  if (action === 'generate' || action === 'review' || action === 'retryReview') {
     const current = await readMarketingWorkspace(pageId);
     if (current.revision !== revision) throw new MarketingWorkflowError('Tải lại dữ liệu trước khi tạo bài.', 409);
-    const previous = action === 'review' ? findReview(current.workspace, input.postId) : undefined;
-    const campaign = findCampaign(current.workspace, previous?.campaignId ?? input.campaignId);
+    const retry = action === 'retryReview' ? current.workspace.reviewAttempts?.find(item => item.id === input.attemptId && !item.appliedAt && !item.discardedAt && item.variants.some(variant => !variant.finalDraft)) : undefined;
+    if (action === 'retryReview' && !retry) throw new MarketingWorkflowError('Lượt Review không còn khả dụng.', 404);
+    const targetId = retry?.targetPostId ?? (action === 'review' ? input.postId : undefined);
+    const previous = targetId ? findReview(current.workspace, targetId) : undefined;
+    const campaign = findCampaign(current.workspace, previous?.campaignId ?? retry?.campaignId ?? input.campaignId);
     if (!campaign.approvedAt) throw new MarketingWorkflowError('Duyệt brief trước khi soạn hoặc kiểm tra nội dung.');
     requireCampaignReady(campaign);
-    const account = accounts.find(item => item.id === campaign.accountId)!;
+    const account = accounts.find(item => item.id === campaign.accountId);
+    if (!account) throw new MarketingWorkflowError('Tài khoản không thuộc shop.', 403);
+    if (retry && retry.campaignVersion !== campaign.version) throw new MarketingWorkflowError('Brief đã thay đổi. Tạo lượt Review theo brief mới.', 409);
     const post = previous ? await getPost(previous.postId) : undefined;
     if (previous?.publication !== undefined && previous.publication !== 'draft') throw new MarketingWorkflowError('Không sửa bài đã đăng hoặc đang được gửi.');
-    const original: GeneratedPostDraft | undefined = post ? { title: post.title, content: post.content, hashtags: post.hashtags, imageIdea: post.imageIdea, imagePrompt: '' } : undefined;
-    const results = await generateReviewedMarketing(campaign, account, original);
+    if (retry?.basePostHash && post && retry.basePostHash !== marketingPostHash(post)) throw new MarketingWorkflowError('Bài/ảnh đã đổi. Review lại bản đang sửa.', 409);
+    const original: GeneratedPostDraft | undefined = retry?.variants[0]?.original ?? (post ? { title: post.title, content: post.content, hashtags: post.hashtags, imageIdea: post.imageIdea, imagePrompt: '' } : undefined);
+    const results = await generateReviewedMarketing(campaign, account, await marketingReviewCatalog(pageId, campaign, account), original, signal);
     await changeWorkspace(pageId, revision, async (state, db) => {
       if (!previous && state.reviews.length >= 100) throw new MarketingWorkflowError('Tối đa 100 bài theo chiến dịch.');
-      for (const result of results) {
-        const final = previous ? await updateDraft(previous.postId, result.final, db) : await createPost({ ...result.final, channel: account.mock ? 'tiktok' : 'facebook', goal: MARKETING_POST_GOALS[campaign.goal], productSkus: campaign.knowledge.products.filter(item => campaign.productIds.includes(item.id)).map(item => item.sku) }, db);
-        const record: ReviewedMarketingPost = { postId: final.id, campaignId: campaign.id, campaignVersion: campaign.version, accountId: account.id, original: result.original, changes: result.changes,
+      try { requireFreshReviewEvidence(results.evidence, await marketingReviewCatalog(pageId, campaign, account, db)); }
+      catch (error) {
+        if (!(error instanceof MarketingWorkflowError)) throw error;
+        results.status = 'blocked'; results.variants = results.variants.map(item => ({ ...item, finalDraft: null, status: 'needs_input', issues: [...item.issues, blockingIssue('conflict', error.message)] }));
+      }
+      const attempt: ReviewAttempt = { ...results, id: retry?.id ?? randomUUID(), campaignId: campaign.id, campaignVersion: campaign.version, accountId: account.id, createdAt: Date.now(),
+        ...(post ? { targetPostId: post.id, basePostHash: marketingPostHash(post) } : {}) };
+      state.reviewAttempts = [attempt, ...(state.reviewAttempts ?? []).filter(item => item.id !== attempt.id)].slice(0, 20);
+      // Re-review proposes a candidate; the current post and its approval stay intact until Apply.
+      if (previous) return;
+      for (const result of results.variants.filter(item => item.finalDraft)) {
+        const final = await createPost({ ...result.finalDraft!, channel: account.mock ? 'tiktok' : 'facebook', goal: MARKETING_POST_GOALS[campaign.goal], productSkus: campaign.knowledge.products.filter(item => campaign.productIds.includes(item.id)).map(item => item.sku) }, db);
+        const record: ReviewedMarketingPost = { postId: final.id, campaignId: campaign.id, campaignVersion: campaign.version, accountId: account.id, original: result.original, changes: result.changes.map(change => change.reason), review: { ...results, variants: [result] },
           reviewHash: marketingPostHash(final), reviewedAt: Date.now(), approvedHash: null, approvedAt: null, approvedBy: '', publication: 'draft', campaignSnapshot: campaign };
-        state.reviews = [...state.reviews.filter(item => item.postId !== final.id), record];
+        state.reviews = [record, ...state.reviews];
       }
     });
     return;
   }
   if (action === 'publish') { await publishMarketingPost(pageId, String(input.postId), undefined, revision); return; }
   await changeWorkspace(pageId, revision, async (state, db) => {
-    if (action === 'profile') {
+    if (action === 'applyReview' || action === 'discardReview') {
+      const attempt = state.reviewAttempts?.find(item => item.id === input.attemptId && !item.appliedAt && !item.discardedAt);
+      if (!attempt) throw new MarketingWorkflowError('Lượt Review không còn khả dụng.', 404);
+      if (action === 'discardReview') { attempt.discardedAt = Date.now(); return; }
+      const result = attempt.variants.find(item => item.draftId === input.draftId && item.finalDraft);
+      if (!attempt.targetPostId || !result?.finalDraft) throw new MarketingWorkflowError('Chưa có bản đề xuất hợp lệ để áp dụng.');
+      const review = findReview(state, attempt.targetPostId), campaign = findCampaign(state, attempt.campaignId), post = await getPost(review.postId, db);
+      if (review.publication !== 'draft' || marketingPostHash(post) !== attempt.basePostHash || !campaign.approvedAt || campaign.version !== attempt.campaignVersion) throw new MarketingWorkflowError('Bài/ảnh/brief đã thay đổi. Review lại trước khi áp dụng.', 409);
+      const account = accounts.find(item => item.id === campaign.accountId)!;
+      requireFreshReviewEvidence(attempt.evidence, await marketingReviewCatalog(pageId, campaign, account, db));
+      const final = await updateDraft(post.id, result.finalDraft, db);
+      Object.assign(review, { original: result.original, changes: result.changes.map(change => change.reason), review: { ...attempt, variants: [result] }, reviewHash: marketingPostHash(final), reviewedAt: Date.now(), campaignVersion: campaign.version,
+        approvedAt: null, approvedHash: null, approvedBy: '', campaignSnapshot: campaign });
+      attempt.appliedAt = Date.now(); invalidatePostSchedules(state, [post.id]);
+    } else if (action === 'sourcingIdea') {
+      if (!sourcingOwner || input.confirmed !== true) throw new MarketingWorkflowError('Xác nhận mapping trước khi tạo brief nháp.');
+      if (state.campaigns.some(campaign => campaign.sourcing?.runId === input.runId && campaign.sourcing?.itemKey === input.itemKey)) return;
+      if (state.campaigns.length >= 50) throw new MarketingWorkflowError('Tối đa 50 chiến dịch.');
+      const item = await readSourcingSelection(sourcingOwner, input.runId, input.itemKey);
+      const campaign: MarketingCampaign = { ...emptyCampaignBrief(pageId), id: randomUUID(), version: 1,
+        name: `Ý tưởng: ${item.title}`.slice(0, 150), message: item.title.slice(0, 500),
+        notes: `Nguồn khảo sát: ${item.url}\nChưa xác nhận sản phẩm đang bán, giá bán, tồn kho hoặc chất lượng nguồn hàng.`.slice(0, 1500),
+        approvedAt: null, approvedBy: '', knowledge: parseAiKnowledge(input.knowledge), configuration: parseAiConfiguration(input.configuration),
+        profile: state.profiles[pageId] ?? emptyMarketingProfile(), sourcing: { runId: String(input.runId), itemKey: String(input.itemKey) } };
+      state.campaigns.unshift(campaign);
+    } else if (action === 'profile') {
       const accountId = marketingText(input.accountId, 'Tài khoản', 100, true);
       if (!accounts.some(item => item.id === accountId)) throw new MarketingWorkflowError('Tài khoản không thuộc shop.');
       state.profiles[accountId] = parseMarketingProfile(input.profile);
@@ -115,7 +166,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       knowledge.emailTriggers = [];
       const previous = input.id ? findCampaign(state, input.id) : undefined;
       if (!previous && state.campaigns.length >= 50) throw new MarketingWorkflowError('Tối đa 50 chiến dịch.');
-      const campaign: MarketingCampaign = { ...brief, id: previous?.id ?? randomUUID(), version: (previous?.version ?? 0) + 1, approvedAt: null, approvedBy: '', knowledge,
+      const campaign: MarketingCampaign = { ...brief, ...(previous?.sourcing ? { sourcing: previous.sourcing } : {}), id: previous?.id ?? randomUUID(), version: (previous?.version ?? 0) + 1, approvedAt: null, approvedBy: '', knowledge,
         configuration: parseAiConfiguration(input.configuration), profile: state.profiles[brief.accountId] ?? { ...emptyMarketingProfile(), name: accounts.find(item => item.id === brief.accountId)!.name, tone: '', address: '', cta: '' } };
       state.campaigns = [campaign, ...state.campaigns.filter(item => item.id !== campaign.id)];
       if (previous) invalidatePostSchedules(state, state.reviews.filter(review => review.campaignId === campaign.id).map(review => review.postId));
@@ -132,6 +183,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
         requireCurrentCampaign(state, review);
         const post = await getPost(review.postId, db);
         if (review.reviewHash !== marketingPostHash(post)) throw new MarketingWorkflowError('Chạy Review lại sau khi chỉnh bài hoặc ảnh.');
+        await requireReviewSources(pageId, state, review, db);
         review.approvedHash = review.reviewHash; review.approvedAt = Date.now(); review.approvedBy = actor;
       }
     } else if (action === 'schedule') {
@@ -141,7 +193,8 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       for (const raw of input.slots as Record<string, unknown>[]) {
         if (!Number.isSafeInteger(raw.at) || Number(raw.at) <= Date.now()) throw new MarketingWorkflowError('Giờ đăng phải ở tương lai.');
         const post = await getPost(String(raw.postId), db);
-        const { hash } = requireApprovedMarketingPost(state, post, Number(raw.at));
+        const { hash, review } = requireApprovedMarketingPost(state, post, Number(raw.at));
+        await requireReviewSources(pageId, state, review, db);
         slots.push({ id: randomUUID(), postId: post.id, at: Number(raw.at), approvedHash: hash, status: 'scheduled' as const, message: '' });
       }
       const existing = state.schedules.filter(item => item.status !== 'cancelled').flatMap(item => item.slots);
@@ -153,7 +206,8 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       if (action === 'pauseSchedule') { schedule.status = 'paused'; return; }
       if (action === 'cancelSchedule') { schedule.status = 'cancelled'; return; }
       for (const slot of schedule.slots.filter(item => item.status === 'scheduled')) {
-        const { hash } = requireApprovedMarketingPost(state, await getPost(slot.postId, db), slot.at);
+        const { hash, review } = requireApprovedMarketingPost(state, await getPost(slot.postId, db), slot.at);
+        await requireReviewSources(pageId, state, review, db);
         if (slot.at <= Date.now() || hash !== slot.approvedHash) throw new MarketingWorkflowError('Bài hoặc giờ đăng đã thay đổi. Lập lịch mới để duyệt lại.');
       }
       if (action === 'approveSchedule') { schedule.approvedAt = Date.now(); schedule.approvedBy = actor; schedule.status = 'approved'; }
@@ -171,6 +225,7 @@ export async function publishMarketingPost(pageId: string, postId: string, slotI
     await assertOperationAllowed();
     const post = await getPost(postId, db);
     const { review, campaign } = requireApprovedMarketingPost(state, post);
+    await requireReviewSources(pageId, state, review, db);
     let schedule: MarketingSchedule | undefined;
     const slot = slotId ? state.schedules.flatMap(item => { if (item.slots.some(slot => slot.id === slotId)) schedule = item; return item.slots; }).find(item => item.id === slotId) : undefined;
     if (slotId && (!slot || slot.postId !== postId || slot.status !== 'scheduled' || schedule?.status !== 'active' || !schedule.approvedAt || slot.at > Date.now() || slot.approvedHash !== review.approvedHash)) throw new MarketingWorkflowError('Lịch chưa được duyệt/kích hoạt hoặc không đến hạn.');
@@ -183,7 +238,8 @@ export async function publishMarketingPost(pageId: string, postId: string, slotI
     // A committed claim survives ambiguous provider outcomes; never automatically retry it.
     const fresh = (await readMarketingWorkspace(pageId)).workspace;
     if (slotId && !fresh.schedules.some(schedule => schedule.status === 'active' && schedule.slots.some(slot => slot.id === slotId))) throw new MarketingWorkflowError('Lịch đã tạm dừng trước khi gửi.');
-    requireApprovedMarketingPost(fresh, await getPost(postId));
+    const freshReview = requireApprovedMarketingPost(fresh, await getPost(postId)).review;
+    await requireReviewSources(pageId, fresh, freshReview);
     const image = claim.post.image ? await getPostImage(postId) : undefined;
     attempted = true;
     const external = claim.mock ? { id: `sample-${randomUUID()}`, url: null } : await publishToFacebookPage(composePostMessage(claim.post), image ?? undefined);

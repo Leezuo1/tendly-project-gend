@@ -37,6 +37,9 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     : 'FB';
   const avatarUrl = thread.customer?.avatarUrl || undefined;
   const base: Conversation = {
+    sourceContext: thread.sourceContext,
+    autoReply: (previous?.aiUpdatedAt ?? 0) > (thread.aiUpdatedAt ?? 0) ? previous?.autoReply : thread.autoReply === true,
+    aiUpdatedAt: Math.max(previous?.aiUpdatedAt ?? 0, thread.aiUpdatedAt ?? 0),
     waitingConfirmation: unanswered && thread.waitingConfirmation === true,
     memory: thread.memory || previous?.memory || [],
     personalitySummary: thread.personalitySummary || '',
@@ -68,10 +71,15 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     base.aiError = previous.aiError;
   }
   const saved = base.memory?.find((m) => m.messageId === latestIn?.id);
+  let merged = base;
   if (saved && !sameQuestion) {
     const restored = applyConversationAnalysis({ ...base, isUnreplied: true }, saved.messageId, saved);
-    return unanswered ? restored : { ...restored, isUnreplied: false, isUrgent: false, aiSuggestion: undefined,
+    merged = unanswered ? restored : { ...restored, isUnreplied: false, isUrgent: false, aiSuggestion: undefined,
       tags: restored.tags.filter((t) => t.kind !== 'priority') };
   }
-  return base;
+  if (merged.aiSuggestion && thread.sourceContext && (merged.aiSuggestion.sourceFingerprint || thread.sourceContext.sources.length)
+    && merged.aiSuggestion.sourceFingerprint !== thread.sourceContext.fingerprint) {
+    return { ...merged, aiSuggestion: undefined, aiStatus: 'error', aiError: 'Nguồn hoặc ưu đãi đã thay đổi. Tạo lại gợi ý trước khi gửi.' };
+  }
+  return merged;
 }

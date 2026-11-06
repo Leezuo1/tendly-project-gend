@@ -56,6 +56,13 @@ test('parser scopes Page, ignores receipts, distinguishes echoes and keeps attac
   assert.throws(() => parseMetaMessages({ object: 'page', entry: null }, '111'));
 });
 
+test('parser preserves a bounded native reply reference without inferring a source from names or payload text', () => {
+  const { parseMetaMessages } = loadModules()('lib/services/metaWebhook.ts');
+  assert.equal(parseMetaMessages(payload(event('reply', 100, { reply_to: { mid: 'private-post' } })), '111')[0].replyToMessageId, 'private-post');
+  assert.equal(parseMetaMessages(payload(event('story', 100, { reply_to: { story: { id: 'not-a-message' } } })), '111')[0].replyToMessageId, undefined);
+  for (const mid of ['', 123, 'x'.repeat(1025)]) assert.throws(() => parseMetaMessages(payload(event('bad-reference', 100, { reply_to: { mid } })), '111'));
+});
+
 test('webhook verifies challenges, rejects untrusted payloads, writes only signed messages and returns retryable storage errors', async () => {
   const names = ['APP_SECRET', 'PAGE_ID', 'VERIFY_TOKEN', 'DATABASE_URL', 'VERCEL'];
   const old = Object.fromEntries(names.map((key) => [key, process.env[key]]));

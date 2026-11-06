@@ -17,7 +17,7 @@ export const POST = withAppAccess(async function POST(request: Request) {
     const body = await readMarketingJson(request);
     if (!Number.isSafeInteger(body.revision) || Number(body.revision) < 0 || typeof body.action !== 'string' || !body.input || typeof body.input !== 'object' || Array.isArray(body.input)) throw new MarketingWorkflowError('Yêu cầu không hợp lệ.');
     const pageId = marketingPageId();
-    await marketingWorkspaceAction(pageId, session.username, Number(body.revision), body.action, body.input as Record<string, unknown>);
+    await marketingWorkspaceAction(pageId, session.username, Number(body.revision), body.action, body.input as Record<string, unknown>, JSON.stringify([session.role, session.userId || session.username]), request.signal);
     return Response.json(await marketingWorkspaceView(pageId));
   } catch (error) {
     if (error instanceof MarketingWorkflowError) return Response.json({ error: error.message }, { status: error.status });

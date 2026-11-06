@@ -1,6 +1,6 @@
 import { businessSecurity } from './business-security-fixture.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { after, afterEach, test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
@@ -9,8 +9,7 @@ import ts from 'typescript';
 const require = createRequire(import.meta.url);
 const db = new PGlite();
 const ready = (async () => {
-  for (const file of ['001-messenger.sql', '002-messenger-outbound.sql', '003-messenger-profiles.sql',
-    '004-conversation-memory.sql', '005-conversation-view.sql']) {
+  for (const file of readdirSync('db/migrations').filter(file => file.endsWith('.sql')).sort()) {
     await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
   }
 })();

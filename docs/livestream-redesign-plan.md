@@ -1,6 +1,6 @@
 # Kế hoạch bổ sung AI Livestream
 
-Ngày lập: 05/11/2026. Trạng thái: kế hoạch, chưa triển khai.
+Ngày lập: 05/11/2026. Trạng thái: đã triển khai luồng chuẩn bị/duyệt phiên và timeline; các phạm vi bổ sung ghi ở mục 7.
 
 Liên quan: [Marketing](marketing-redesign-plan.md), [Customer Care](customer-care-redesign-plan.md), [API Live hiện có](livestream-api.md).
 
@@ -62,3 +62,16 @@ Code liên quan: `lib/types/live.ts`, `lib/services/live/{engine,classify,templa
 Test trùng mã host, sai SKU, thiếu bảng size, comment đến trễ, tồn không biết/không đủ, giữ đồng thời/hết hạn, đổi giá sau chốt, hết deal, tắt gửi/chuyển người thật, quyền kênh và kết quả gửi chưa rõ. Duyệt lại khi thay đổi phần dữ liệu/hành động đã được xác nhận; không tự kích hoạt gửi do nâng cấp giao diện.
 
 Không mở thêm adapter TikTok/Shopee, hệ thanh toán hoặc kho toàn diện chỉ để làm cấu hình Page. Các chức năng đó cần phạm vi và xác minh riêng.
+
+## 7. Phạm vi đã triển khai
+
+- Phiên mới lưu nháp trên server, chọn SKU có tồn đã nhập, host, giờ dự kiến, chiến dịch đã duyệt của đúng Page, mã host/tên khác và bảng size có nguồn. Shop xem giá/lượng, FAQ, giọng Page và quyền gửi trước khi xác nhận bắt đầu đúng phiên bản. Đổi nháp/giọng Page yêu cầu kiểm tra lại; phiên nháp không thu thập bình luận hoặc gửi tin.
+- Quyền nhắn riêng và công khai tách biệt, tất cả phản hồi vẫn chờ duyệt. Page chỉ truyền xưng hô/giọng; giá, SKU, tồn và FAQ lấy bản của phiên. Thiếu bảng size hoặc tồn biến thể thì cần người kiểm tra, không hứa vừa/còn từng size.
+- Timeline mẫu lên sóng lưu ở server và đọc theo `createdAt` của comment; mã host số như `03` không trở thành số lượng 3. Mã/SKU xung đột hoặc nhiều mã khác SKU cần hỏi lại. Phiên cũ thiếu timeline không được suy ngược mẫu hiện tại vào quá khứ.
+- Giữ cơ chế giữ lượng theo SKU và hủy/xác nhận thủ công. Mở lại đơn hủy kiểm tra lại lượng trong transaction; comment không tự hồi sinh lượng giữ cũ. Flash price áp dụng đến lúc tắt/kết thúc phiên, đơn nháp giữ giá lúc ghi nhận. Đổi giá làm mất hiệu lực bản trả lời đã duyệt; gửi kiểm tra lại phiên/quyền/phiên bản. Kết quả gửi chưa rõ không tự gửi lại.
+- Cockpit/cửa sổ nổi vẫn dùng engine cũ; thêm bản duyệt, mã host, timeline và danh sách đơn/câu hỏi cần chăm sóc tiếp kèm lý do. Liên kết nguồn private reply sang Inbox tiếp tục dùng Page + message ID đã xác nhận của migration 017; mục chuyển người là hướng dẫn, chưa tạo hồ sơ/tác vụ hỗ trợ tự động.
+- Migration `018-live-workflow.sql`; API mới `PATCH /api/live/sessions/:id` và `POST /api/live/sessions/:id/start`. `POST /api/live/sessions` giờ tạo **nháp**, không tự bắt đầu.
+
+Chưa thêm hạn giữ tự động theo phút hoặc lịch hết deal tùy chỉnh; chưa có kho/fulfillment/thanh toán hoặc adapter mới. Các phạm vi này không được suy ra từ bản chụp tồn, đơn nháp hoặc danh sách chờ. Test dùng Postgres nhúng và Meta/Gemini giả lập; chưa xác minh gửi/phát Live thật trong lần triển khai này.
+
+Nghiệm thu local 06/11/2026: toàn bộ 218 test và production build/TypeScript qua; lint các file thay đổi qua. Đã xem bản chuẩn bị/duyệt và cockpit ở 1440px/390px, kiểm tra thao tác nháp → xác nhận → hoạt động bằng API giả lập. Migration 018/019 đã áp dụng lên Postgres cấu hình hiện tại. `npm run lint` toàn checkout còn lỗi trong thư mục công cụ cục bộ `.claude`/`.playwright-mcp`, không sửa chúng trong phạm vi này.

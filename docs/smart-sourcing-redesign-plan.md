@@ -1,6 +1,6 @@
 # Kế hoạch bổ sung AI Smart Sourcing
 
-Ngày lập: 05/11/2026. Trạng thái: kế hoạch, chưa triển khai.
+Ngày lập: 05/11/2026. Trạng thái: đã triển khai luồng yêu cầu → duyệt truy vấn → thu thập → lựa chọn/chuyển nháp; phạm vi xác minh ở mục 7.
 
 Liên quan: [Marketing](marketing-redesign-plan.md), [Livestream](livestream-redesign-plan.md). Sourcing phục vụ shop và yêu cầu tìm nguồn, không bắt buộc cấu hình theo từng Page.
 
@@ -63,3 +63,16 @@ Chuyển sang Marketing tạo ý tưởng/brief nháp để người dùng duy�
 Test tiền tệ/đơn vị/MOQ thiếu, khoảng giá sai, keyword rỗng, truy vấn ngoài phạm vi, quyền xem run, kết quả trùng, schema nguồn đổi, rate limit, provider timeout chưa rõ, tải lại trang và người dùng bấm chạy hai lần. Kiểm tra mapping sang sản phẩm/brief và không tự kích hoạt hành động ngoài phạm vi đã duyệt.
 
 Chưa mở bộ tùy chỉnh Page, tự đặt hàng, xác minh uy tín tự động, tính lợi nhuận đầy đủ hoặc tự động tìm định kỳ. Chưa được mô tả dữ liệu mẫu là nguồn thực hoặc xu hướng đo được.
+
+## 7. Phạm vi đã triển khai
+
+- UI thay dữ liệu mẫu bằng yêu cầu tìm nguồn có tiêu chí; giá/MOQ/khu vực mặc định lấy từ quy tắc Sourcing đã lưu của tài khoản. Có xem trước truy vấn chính xác, nguồn, cửa sổ 7 ngày cho TikTok, giới hạn kết quả giữ lại, timeout và trần phí provider 0,5 USD trước khi xác nhận chạy.
+- Yêu cầu, phiên bản, chấp thuận và run lưu ở Postgres qua `019-sourcing-workflow.sql`. Tải lại trang đọc tiếp run; double click/retry cùng yêu cầu trả cùng ID, trạng thái `unknown` không tự khởi chạy lại. Chủ yêu cầu được kiểm tra trước khi đọc run/kết quả hoặc lưu lựa chọn. Token chỉ ở server.
+- Hiển thị URL/nguồn/ngày thu thập, tương tác TikTok có thật trong dataset, tiêu chí khớp/không khớp/chưa rõ, ghi chú và danh sách ngắn/đã kiểm tra/đã loại. Google hiện chỉ cung cấp đầu mối tìm kiếm: giá, tiền tệ, đơn vị và MOQ vẫn `null`; không trích số từ đoạn mô tả để giả thành báo giá.
+- Chuyển sang sản phẩm có xem trước SKU mới, tên và **giá bán do shop nhập riêng**; lượng khởi tạo 0, tồn chưa xác nhận, giữ URL nguồn, chặn SKU trùng và không ghi đè. Tái sử dụng danh mục hiện có (lưu trong trình duyệt).
+- Chuyển sang Marketing đọc lại kết quả thuộc đúng chủ yêu cầu, tạo brief ý tưởng nháp có URL nguồn, chưa chọn sản phẩm đang bán/ưu đãi, không duyệt hoặc lập lịch/đăng bài. Cùng kết quả không tạo brief trùng.
+- API workspace `GET/POST /api/sourcing/requests`, kế thừa các API run/provider cũ. POST provider trực tiếp cũng yêu cầu `confirmed: true`. Bộ demo cũ còn trong fixture, không dùng làm kết quả trên UI.
+
+Chưa có lịch sử nhiều mốc để tính tăng trưởng, tự xác minh/liên hệ nhà cung cấp hay đặt hàng. Test backend dùng provider giả lập; kiểm tra trình duyệt dùng phản hồi API giả lập, chưa chạy Actor có phí hoặc xác minh nguồn cung trực tiếp trong lần triển khai này.
+
+Nghiệm thu local 06/11/2026: toàn bộ 218 test và production build/TypeScript qua; lint các file thay đổi qua. Trình duyệt 1440px/390px đã kiểm tra duyệt truy vấn, thu thập với API giả lập, shortlist giữ sau reload và nhập sản phẩm có giá bán riêng, lượng 0/tồn chưa xác nhận. Test backend kiểm tra quyền, retry run `unknown`, dữ liệu thiếu và chuyển brief nháp không tự duyệt/đăng. Migration 019 đã áp dụng lên Postgres cấu hình hiện tại. Lint toàn checkout còn lỗi từ công cụ cục bộ ngoài phạm vi.

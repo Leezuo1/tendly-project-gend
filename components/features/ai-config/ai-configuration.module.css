@@ -41,6 +41,17 @@
 .root .ruleHint { border-top: 1px solid var(--line); padding-top: 18px; }
 .root .saveBar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; padding: 18px 0 4px; border-top: 1px solid var(--line); }
 .root .saveBar p { font-size: 12px; color: var(--ink-soft); }
+.root .careScope { display: grid; gap: 10px; padding: 18px; background: var(--sand); border-radius: var(--radius-card); }
+.root .careScope h3 { font-size: 15px; }
+.root .careScope p, .root .carePreview p { font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.root .careScope .rowActions { justify-content: flex-start; flex-wrap: wrap; }
+.root .careScope summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.root .careScope details[open] { max-height: 360px; overflow-y: auto; }
+.root .careScope details div { margin-top: 16px; }
+.root .carePreview { display: grid; gap: 10px; padding: 18px; background: var(--sand); border-radius: var(--radius-card); }
+.root .carePreview small { overflow-wrap: anywhere; }
+.root .careScope .checkLabel, .root .formBody > .checkLabel { min-height: 44px; align-items: flex-start; padding-block: 10px; }
+.root .checkLabel input { flex-shrink: 0; }
 @media (max-width: 880px) {
   .root > :global(.tabs) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .root > :global(.tabs) > button { min-width: 0; min-height: 48px; padding: 8px 4px; font-size: 13px; }

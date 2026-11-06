@@ -5,6 +5,7 @@
 import type { AiMessageAnalysis } from './ai';
 import type { MessengerAttachment } from './messenger';
 import type { ConversationMemoryEntry } from './conversationMemory';
+import type { CareSourceContext } from './customerCare';
 
 export type InboxFilter = 'all' | 'urgent' | 'unreplied';
 
@@ -32,6 +33,7 @@ export interface ChatMessage {
 }
 
 export interface AISuggestion {
+  sourceFingerprint?: string;
   label: string;
   source: string;
   text: string;
@@ -59,6 +61,9 @@ export interface CustomerProfile {
 }
 
 export interface Conversation {
+  sourceContext?: CareSourceContext;
+  autoReply?: boolean;
+  aiUpdatedAt?: number;
   waitingConfirmation?: boolean;
   memory?: ConversationMemoryEntry[];
   personalitySummary?: string;

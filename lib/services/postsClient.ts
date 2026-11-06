@@ -2,6 +2,7 @@
 
 import { currentAiKnowledge } from '@/lib/services/aiChat';
 import type { GeneratedPostDraft, MarketingPost, NewMarketingPost, PostDraft, PostGenerationRequest, PostImageSource } from '@/lib/types/posts';
+import type { PostReviewResult } from '@/lib/types/postReview';
 
 const KEY_STORAGE = 'tendly.dashboardKey';
 /** Ảnh chủ shop tải lên được thu nhỏ trước khi gửi (Vercel giới hạn body ~4,5MB). */
@@ -83,11 +84,11 @@ export async function prepareUploadImage(file: File): Promise<Blob> {
 }
 
 export const postsClient = {
-  generate: (req: PostGenerationRequest) =>
-    call<{ drafts: GeneratedPostDraft[]; model: string }>('/api/posts/generate', {
+  generate: (req: PostGenerationRequest, originals?: GeneratedPostDraft[]) =>
+    call<{ drafts: GeneratedPostDraft[]; model: string; review: PostReviewResult }>('/api/posts/generate', {
       method: 'POST',
       // Đọc lại FAQ & sản phẩm mỗi lần tạo để dùng đúng giá/tồn kho/FAQ vừa lưu.
-      body: JSON.stringify({ request: req, knowledge: currentAiKnowledge() }),
+      body: JSON.stringify({ request: req, knowledge: currentAiKnowledge(), ...(originals ? { originals } : {}) }),
     }),
   list: () => call<{ posts: MarketingPost[]; facebookReady: boolean }>('/api/posts'),
   create: (post: NewMarketingPost) =>

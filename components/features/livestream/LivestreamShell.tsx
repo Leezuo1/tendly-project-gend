@@ -1,10 +1,8 @@
 'use client';
 
-/**
- * Trang Livestream TỐI GIẢN để chạy thử lõi + API (chọn nguồn, bắt đầu/kết thúc phiên, mẫu lên sóng, duyệt nhóm).
- * Dashboard thật (trong lúc live + tổng quan) do Hiển làm, dùng lib/services/liveClient.ts và lib/hooks/useLiveSession.ts.
- */
-import React, { useEffect, useState, type FormEvent } from 'react';
+/** Session preparation and approval share the existing Live cockpit and mini window. */
+import React, { useState } from 'react';
+import { LiveSetup, LiveDraftReview } from './LiveSetup';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { Toast } from '@/components/shared/Toast';
 import { MarketingDataNotice } from '@/components/features/marketing/MarketingDataNotice';
@@ -12,7 +10,7 @@ import { useMarketingData } from '@/lib/hooks/useMarketingData';
 import { useLiveSession } from '@/lib/hooks/useLiveSession';
 import { liveClient } from '@/lib/services/liveClient';
 import { miniUrl, openLiveMini } from '@/lib/services/liveMiniWindow';
-import type { LiveGroup, LiveIntent, LiveOrderStatus, LiveSnapshot, LiveSourceOption } from '@/lib/types/live';
+import type { LiveGroup, LiveIntent, LiveOrderStatus, LiveSnapshot } from '@/lib/types/live';
 import { formatMoney } from '@/lib/utils/format';
 
 const INTENT_LABEL: Record<LiveIntent, string> = {
@@ -57,6 +55,7 @@ function GroupCard({ group, sessionId, live, onDone, onToast }: {
       </div>
       {group.needsHuman && <span className="tag tag-rfm">Shop nên xem kỹ trước khi gửi</span>}
       {group.replySource === 'ai' && <span className="tag tag-loop">✨ AI soạn</span>}
+      {group.publicReplyUnknown && <p className="hint">Chưa rõ comment công khai đã đăng. Kiểm tra Facebook trước khi xử lý tiếp.</p>}
       <div className="live-samples">{group.samples.map((s, i) => <span key={i}>&ldquo;{s}&rdquo;</span>)}</div>
       <textarea className="pc-input" rows={3} value={text} onChange={(e) => setText(e.target.value)} disabled={busy} />
       <div className="live-row">
@@ -110,7 +109,7 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
       <div className="card">
         <div className="card-head">
           <h2>{live ? '🔴' : '⏹️'} {session.title}</h2>
-          <span className="hint">Facebook · bắt đầu {time(session.liveAt ?? session.startedAt)}</span>
+          <span className="hint">Facebook · {session.waiting ? 'Chờ phát Live' : `bắt đầu ${time(session.liveAt ?? session.startedAt)}`}</span>
         </div>
         <div className="live-stats">
           <div><b>{stats.comments}</b><span>bình luận</span></div>
@@ -150,7 +149,7 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
           <p className="hint">Tỉ lệ khách chốt: {s.conversionRate}% · Cao điểm: {s.peakAt ? time(s.peakAt) : '—'}</p>
           <div className="live-cols">
             <div><b>Hỏi nhiều nhất</b>{s.topAsked.map((p) => <div key={p.sku}>{p.name}: {p.count} khách</div>)}</div>
-            <div><b>Bán chạy nhất</b>{s.topOrdered.map((p) => <div key={p.sku}>{p.name}: {p.count} sp</div>)}</div>
+            <div><b>Chốt nháp nhiều nhất</b>{s.topOrdered.map((p) => <div key={p.sku}>{p.name}: {p.count} sp</div>)}</div>
             <div><b>Hỏi nhiều, chưa ai chốt</b>{s.askedNotOrdered.length ? s.askedNotOrdered.map((p) => <div key={p.sku}>{p.name}: {p.count}</div>) : <div>—</div>}</div>
           </div>
           <b>Gợi ý nhập hàng</b>
@@ -194,7 +193,7 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
       <div className="card">
         <div className="card-head"><h2>💬 Nhóm bình luận cần nhắn riêng</h2><span className="hint">AI gom bình luận cùng ý, shop duyệt 1 lần cho cả nhóm</span></div>
         {!snapshot.groups.length && <div className="pc-empty">Chưa có bình luận cần trả lời.</div>}
-        {snapshot.groups.map((g) => <GroupCard key={g.key} group={g} sessionId={session.id} live={live} onDone={reload} onToast={onToast} />)}
+        {snapshot.groups.map((g) => <GroupCard key={g.key} group={g} sessionId={session.id} live={live && session.preparation?.allowPrivate !== false} onDone={reload} onToast={onToast} />)}
       </div>
 
       <div className="card">
@@ -228,102 +227,34 @@ function SessionPanel({ snapshot, apply, reload, onToast }: {
 
 export function LivestreamShell() {
   const [toast, setToast] = useState<string | null>(null);
-  const onToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3200);
-  };
+  const onToast = (message: string) => { setToast(message); setTimeout(() => setToast(null), 4000); };
   const list = useMarketingData(liveClient.sessions);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const { snapshot, error, apply, reload } = useLiveSession(activeId);
-  const [title, setTitle] = useState('');
-  const [sources, setSources] = useState<LiveSourceOption[] | null>(null);
-  // 'auto' = tạo phiên trước rồi bật live trên Facebook, Tendly tự nhận video Live
-  const [sourceKey, setSourceKey] = useState('auto');
-  const [withMini, setWithMini] = useState(true);
-  const [starting, setStarting] = useState(false);
-
-  useEffect(() => {
-    if (sources) return;
-    liveClient.sources().then((r) => setSources(r.sources), (e) => { setSources([]); onToast(errorText(e)); });
-  }, [sources]);
-
-  const start = async (e: FormEvent) => {
-    e.preventDefault();
-    const source = sources?.find((s) => `${s.kind}:${s.id}` === sourceKey);
-    if (sourceKey !== 'auto' && !source) return onToast('Chọn video Live hoặc bài đăng làm nguồn bình luận');
-    setStarting(true);
-    // Flow: tạo phiên trên Tendly → (cửa sổ hỗ trợ bật ra ngay) → người bán bật live trên Facebook → tự nhận stream
-    const created = liveClient.start(sourceKey === 'auto' || !source
-      ? { platform: 'facebook', title, sourceKind: 'auto' }
-      : { platform: 'facebook', title, sourceKind: source.kind, sourceId: source.id });
-    // Mở cửa sổ NGAY trong cú bấm (trình duyệt chặn cửa sổ mở sau đó)
-    const mini = withMini ? openLiveMini(created.then((s) => s.id)) : null;
-    try {
-      const session = await created;
-      setActiveId(session.id);
-      if (mini && (await mini) === 'blocked') onToast('Trình duyệt chặn cửa sổ hỗ trợ — bấm "Mở cửa sổ nổi" bên dưới');
-      list.reload();
-    } catch (err) {
-      onToast(errorText(err));
-    } finally {
-      setStarting(false);
-    }
-  };
-
-  const fatal = list.error;
-  return (
-    <div className="marketing-root">
-      <div className="shell">
-        <Sidebar currentPath="livestream" onToast={onToast} />
-        <main className="main">
-          <div className="page-head">
-            <h1>Livestream</h1>
-            <p>Tendly đọc bình luận live, gom câu hỏi trùng, giữ đơn cho khách chốt và nhắn riêng sau khi shop duyệt. <span className="hint">(Bản chạy thử — dashboard chính thức đang làm.)</span></p>
-          </div>
-
-          {fatal ? <MarketingDataNotice error={fatal} onRetry={list.reload} /> : (
-            <>
-              <form className="card" onSubmit={start}>
-                <div className="card-head"><h2>Bắt đầu phiên live</h2></div>
-                <div className="live-row">
-                  <button type="button" className="chip selected">Facebook</button>
-                  <button type="button" className="chip" disabled title="Sắp ra mắt">TikTok · sắp ra mắt</button>
-                  <button type="button" className="chip" disabled title="Sắp ra mắt">Shopee · sắp ra mắt</button>
-                </div>
-                <select className="pc-input" value={sourceKey} onChange={(e) => setSourceKey(e.target.value)}>
-                    <option value="auto">🔄 Tự nhận video khi tôi bật live trên Facebook (khuyên dùng)</option>
-                    <option value="" disabled>{sources ? (sources.length ? '— hoặc chọn video Live / bài đăng có sẵn —' : 'Không đọc được nguồn từ Fanpage') : 'Đang tải...'}</option>
-                    {sources?.map((s) => <option key={`${s.kind}:${s.id}`} value={`${s.kind}:${s.id}`}>{s.kind === 'live_video' ? '🔴 ' : '📝 '}{s.title}</option>)}
-                </select>
-                <label className="live-row" style={{ justifyContent: 'flex-start' }}>
-                  <input type="checkbox" checked={withMini} onChange={(e) => setWithMini(e.target.checked)} />
-                  Mở cửa sổ hỗ trợ nổi trên màn hình khi bắt đầu
-                </label>
-                <div className="live-row">
-                  <input className="pc-input" placeholder="Tên phiên (tuỳ chọn)" value={title} onChange={(e) => setTitle(e.target.value)} />
-                  <button className="btn btn-primary" disabled={starting}>{starting ? 'Đang bắt đầu...' : 'Bắt đầu'}</button>
-                </div>
-                <p className="hint">Phiên dùng sản phẩm, giá, tồn kho và FAQ trong FAQ & sản phẩm tại thời điểm bắt đầu.</p>
-              </form>
-
-              <div className="card">
-                <div className="card-head"><h2>Các phiên</h2></div>
-                {!list.data?.length && <div className="pc-empty">{list.loading ? 'Đang tải...' : 'Chưa có phiên nào.'}</div>}
-                {list.data?.map((s) => (
-                  <div key={s.id} className="live-row">
-                    <span>{s.status === 'live' ? '🔴' : '⏹️'} <b>{s.title}</b> · {new Date(s.startedAt).toLocaleString('vi-VN')} · {s.comments} bình luận · {s.orders} đơn · {formatMoney(s.revenue)}</span>
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setActiveId(s.id)}>{activeId === s.id ? 'Đang mở' : 'Mở'}</button>
-                  </div>
-                ))}
-              </div>
-
-              {error ? <MarketingDataNotice error={error} onRetry={reload} /> : null}
-              {snapshot && <SessionPanel snapshot={snapshot} apply={apply} reload={reload} onToast={onToast} />}
-            </>
-          )}
-        </main>
-      </div>
-      <Toast message={toast} />
-    </div>
-  );
+  const saved = (id: string) => { setCreating(false); setActiveId(id); list.reload(); if (id === activeId) reload(); };
+  return <div className="marketing-root"><div className="shell">
+    <Sidebar currentPath="livestream" onToast={onToast} />
+    <main className="main">
+      <div className="page-head live-section-head"><div><h1>AI Livestream</h1><p>Host tập trung lên sóng. Tendly gom câu hỏi, ghi nhận đơn nháp và chờ bạn duyệt phản hồi.</p></div><button className="btn btn-primary" onClick={() => setCreating(value => !value)}>{creating ? 'Đóng chuẩn bị' : 'Chuẩn bị phiên mới'}</button></div>
+      {list.error ? <MarketingDataNotice error={list.error} onRetry={list.reload} /> : <>
+        {(creating || (!list.loading && !list.data?.length && !snapshot)) && <LiveSetup onSaved={saved} onToast={onToast} />}
+        <section className="card"><div className="card-head"><h2>Phiên của shop</h2><span className="hint">Nháp → duyệt dữ liệu → bắt đầu</span></div>
+          {!list.data?.length && <div className="pc-empty">{list.loading ? 'Đang tải phiên…' : 'Chưa có phiên nào. Chuẩn bị danh mục và người phụ trách để bắt đầu.'}</div>}
+          <div className="live-session-list">{list.data?.map(item => <button key={item.id} className={`live-session-item${activeId === item.id ? ' selected' : ''}`} onClick={() => { setCreating(false); setActiveId(item.id); }}><span className={`live-session-state ${item.status}`}>{item.status === 'draft' ? 'Bản nháp' : item.status === 'live' ? 'Đang hoạt động' : 'Đã kết thúc'}</span><b>{item.title}</b><small>{new Date(item.startedAt).toLocaleString('vi-VN')} · {item.comments} bình luận · {item.orders} đơn</small></button>)}</div>
+        </section>
+        {error ? <MarketingDataNotice error={error} onRetry={reload} /> : null}
+        {snapshot && !creating && (snapshot.session.status === 'draft' ? <LiveDraftReview key={`${snapshot.session.id}:${snapshot.session.preparationRevision}`} snapshot={snapshot} onSaved={saved} onToast={onToast} apply={apply} /> : <>
+          {snapshot.session.preparation && <section className="card live-session-context"><h2>{snapshot.session.preparation.host} phụ trách</h2><p>Duyệt bởi {snapshot.session.approvedBy} · {snapshot.session.approvedAt ? new Date(snapshot.session.approvedAt).toLocaleString('vi-VN') : ''}</p><p>Mã host: {snapshot.session.preparation.catalog.filter(item => item.codes.length).map(item => `${item.codes.join(', ')} → ${item.sku}`).join(' · ') || 'Chưa đặt'}<br />Chuyển người: {snapshot.session.preparation.handoff}<br />Giữ lượng: {snapshot.session.preparation.holdPolicy}</p><p className="hint">Flash price áp dụng đến khi tắt / kết thúc phiên. Đơn nháp giữ giá lúc ghi nhận.</p></section>}
+          <SessionPanel snapshot={snapshot} apply={apply} reload={reload} onToast={onToast} />
+          <section className="card"><div className="card-head"><h2>Việc cần chăm sóc tiếp</h2><a href="/hop-thoai">Mở Customer Care →</a></div><p className="hint">{snapshot.session.preparation?.handoff || 'Người phụ trách kiểm tra trước khi liên hệ khách.'}</p>
+            {snapshot.orders.filter(order => order.status === 'draft' || order.status === 'awaiting_info').map(order => <div key={order.id} className="live-row"><span><b>{order.customerName}</b> · {order.items.some(item => !item.stockOk) ? 'Thiếu lượng trong phiên; cần kiểm tra nguồn hàng' : order.status === 'awaiting_info' ? 'Chờ thông tin nhận hàng' : 'Đơn nháp chờ xác nhận'}</span></div>)}
+            {snapshot.groups.filter(group => group.needsHuman && group.pending).map(group => <div className="live-row" key={group.key}><span>{group.question} · {group.people} khách · cần người phụ trách</span></div>)}
+            {!snapshot.orders.some(order => ['draft', 'awaiting_info'].includes(order.status)) && !snapshot.groups.some(group => group.needsHuman && group.pending) && <p>Không có mục đang chờ xử lý trong dữ liệu phiên.</p>}
+          </section>
+          {!!snapshot.timeline?.length && <details className="card"><summary>Lịch sử mẫu lên sóng</summary>{snapshot.timeline.map(event => <p key={event.at}>{time(event.at)} · {event.sku || 'Bỏ chọn mẫu'}</p>)}</details>}
+        </>)}
+      </>}
+    </main>
+  </div><Toast message={toast} /></div>;
 }

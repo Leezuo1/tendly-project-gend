@@ -29,7 +29,7 @@ interface MemberRow {
 
 type Outcome = 'sent' | 'failed' | 'unknown' | 'not_allowed';
 
-async function sendFacebook(pageId: string, commentId: string, text: string, db: Database): Promise<{ outcome: Outcome; messageId: string | null; recipientId: string | null }> {
+async function sendFacebook(pageId: string, commentId: string, text: string, db: Database, stillApproved: () => Promise<boolean>): Promise<{ outcome: Outcome; messageId: string | null; recipientId: string | null }> {
   const { token, version } = metaConfig();
   try {
     const live = await graphRead(commentId, 'can_reply_privately');
@@ -40,6 +40,7 @@ async function sendFacebook(pageId: string, commentId: string, text: string, db:
   }
   try { await assertOperationAllowed(db); }
   catch { return { outcome: 'not_allowed', messageId: null, recipientId: null }; }
+  if (!await stillApproved()) return { outcome: 'failed', messageId: null, recipientId: null };
   try {
     const response = await fetch(`https://graph.facebook.com/${version}/${pageId}/messages`, {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -67,7 +68,8 @@ async function sendFacebook(pageId: string, commentId: string, text: string, db:
 export async function approveGroup(pageId: string, sessionId: string, groupKey: string, text: string, revision: number,
   db: Database = getMessengerPool(), now = Date.now()): Promise<LiveSendResult & { revision: number }> {
   await assertOperationAllowed(db);
-  const { products, session, row: sessionRow } = await loadSession(pageId, sessionId, db);
+  const { products, session, row: sessionRow, flash } = await loadSession(pageId, sessionId, db);
+  if (session.status !== 'live' || session.preparation?.allowPrivate === false) throw new LiveError('Phiên chưa hoạt động hoặc chưa được duyệt quyền nhắn riêng.', 409);
   const group = (await db.query('SELECT * FROM live_groups WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey])).rows[0];
   if (!group) throw new LiveError('Không tìm thấy nhóm bình luận.', 404);
   if (Number(group.revision) !== revision) throw new LiveError('Câu trả lời của nhóm vừa thay đổi. Hãy tải lại rồi duyệt.', 409);
@@ -82,7 +84,7 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
   }
 
   // Tồn kho hiện tại để điền {con_lai} / gợi ý mẫu khác khi hết hàng
-  const orders = (await db.query('SELECT items_json, status FROM live_orders WHERE session_id=$1', [sessionId])).rows;
+  const orders = (await db.query('SELECT customer_id,items_json, status FROM live_orders WHERE session_id=$1', [sessionId])).rows;
   const held = new Map<string, number>();
   for (const o of orders) {
     if (o.status === 'cancelled') continue;
@@ -97,15 +99,23 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
   const result: LiveSendResult = { sent: 0, failed: 0, notAllowed: 0, unknown: 0, remaining: 0 };
 
   for (const m of members) {
-    const product = products.find((p) => p.sku === m.sku) ?? null;
+    let product = products.find((p) => p.sku === m.sku) ?? null;
+    if (product && m.intent === 'order') {
+      const order = orders.find(order => order.customer_id === m.author_id && order.status !== 'cancelled');
+      const items: LiveOrderItem[] = order ? typeof order.items_json === 'string' ? JSON.parse(order.items_json) : order.items_json : [];
+      const item = items.find(item => item.sku === m.sku && item.color === m.color && item.size === m.size);
+      if (item) product = { ...product, price: item.price };
+    }
     const message = fillTemplate(template, {
       customerName: m.author_name, product, color: m.color, size: m.size, qty: m.qty,
       remaining: product ? remainingOf(product.sku) : null, suggestion: suggestAlternative(product, products, remainingOf),
     });
     // Đặt chỗ trước khi gửi: lần duyệt song song không gửi trùng
-    const reserved = await db.query(`UPDATE live_comments SET reply_status='sending', reply_text=$3
+    const reserved = await db.query(`UPDATE live_comments SET reply_status='sending', reply_text=$3,care_context_json=$4::jsonb
       WHERE session_id=$1 AND comment_id=$2 AND reply_status IN ('review','failed') RETURNING comment_id`,
-    [sessionId, m.comment_id, message]);
+    [sessionId, m.comment_id, message, JSON.stringify({ commentText: m.text, sku: m.sku,
+      product: product ? { id: product.id, sku: product.sku, name: product.name } : null,
+      flashPrice: m.sku ? flash[m.sku] ?? null : null })]);
     if (!reserved.rowCount) continue;
 
     const sharedPostId = session.platform === 'facebook' && session.sourceKind === 'post' ? sessionRow.source_post_id : null;
@@ -114,7 +124,8 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
         authorId: m.author_id, authorName: m.author_name, text: m.text,
         createdAt: Number(m.created_at), eventAt: now, removed: false }], db);
       // Both screens reserve the same Page/comment row before sending a post private reply.
-      const shared = await db.query(`UPDATE facebook_comments SET status='sending',draft=$3,reason='Đang gửi qua Meta'
+      const shared = await db.query(`UPDATE facebook_comments SET status='sending',draft=$3,reason='Đang gửi qua Meta',
+        care_context_json=jsonb_build_object('commentText',text,'postText',post_text,'revision',revision)
         WHERE page_id=$1 AND comment_id=$2 AND status IN ('pending','review','ignored','failed')
         AND author_id<>page_id RETURNING comment_id`, [pageId, m.comment_id, message]);
       if (!shared.rowCount) {
@@ -130,7 +141,11 @@ export async function approveGroup(pageId: string, sessionId: string, groupKey: 
     if (now - Number(m.created_at) >= WEEK) {
       outcome = 'not_allowed'; // Meta chỉ cho nhắn riêng trong 7 ngày
     } else {
-      ({ outcome, messageId, recipientId } = await sendFacebook(pageId, m.comment_id, message, db));
+      ({ outcome, messageId, recipientId } = await sendFacebook(pageId, m.comment_id, message, db, async () => {
+        const current = (await db.query(`SELECT g.revision,s.status,s.preparation_json FROM live_groups g
+          JOIN live_sessions s ON s.id=g.session_id WHERE g.session_id=$1 AND g.group_key=$2`, [sessionId, groupKey])).rows[0];
+        return current?.status === 'live' && current.preparation_json?.allowPrivate !== false && Number(current.revision) === currentRevision;
+      }));
     }
     const sentAt = Date.now();
     await db.query(`UPDATE live_comments SET reply_status=$3, message_id=$4, sent_at=$5 WHERE session_id=$1 AND comment_id=$2`,
@@ -170,7 +185,8 @@ export async function replyPublicly(pageId: string, sessionId: string, groupKey:
   db: Database = getMessengerPool(), now = Date.now()): Promise<{ commentId: string; repliedTo: string }> {
   await assertOperationAllowed(db);
   const { token, version } = metaConfig();
-  const { products } = await loadSession(pageId, sessionId, db);
+  const { products, session } = await loadSession(pageId, sessionId, db);
+  if (session.status !== 'live' || session.preparation?.allowPublic === false) throw new LiveError('Phiên chưa hoạt động hoặc chưa được duyệt quyền trả lời công khai.', 409);
   const group = (await db.query('SELECT * FROM live_groups WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey])).rows[0];
   if (!group) throw new LiveError('Không tìm thấy nhóm bình luận.', 404);
   if (Number(group.revision) !== revision) throw new LiveError('Câu trả lời của nhóm vừa thay đổi. Hãy tải lại rồi trả lời.', 409);
@@ -181,14 +197,19 @@ export async function replyPublicly(pageId: string, sessionId: string, groupKey:
   if (!target) throw new LiveError('Nhóm chưa có bình luận để trả lời.', 409);
   // Giữ chỗ: không cho 2 lần bấm cùng lúc đăng 2 comment; đã trả lời rồi thì chỉ trả lời lại khi có bình luận mới hơn
   const reserved = await db.query(`UPDATE live_groups SET public_reply_id=$4 WHERE session_id=$1 AND group_key=$2 AND revision=$3
-    AND (public_reply_id IS NULL OR (public_reply_id NOT LIKE 'pending:%' AND COALESCE(handled_at,0) < $5))
+    AND (public_reply_id IS NULL OR (public_reply_id NOT LIKE 'pending:%' AND public_reply_id NOT LIKE 'unknown:%' AND COALESCE(handled_at,0) < $5))
     RETURNING public_reply_id`, [sessionId, groupKey, revision, `pending:${now}`, Number(target.created_at)]);
-  if (!reserved.rowCount) throw new LiveError('Nhóm này vừa được trả lời bằng comment.', 409);
+  if (!reserved.rowCount) throw new LiveError('Nhóm đã được trả lời hoặc kết quả gửi chưa rõ. Kiểm tra bình luận trước khi gửi tiếp.', 409);
   const product = products.find((p) => p.sku === target.sku) ?? null;
   const message = fillTemplate(template, { customerName: 'mọi người', product, color: null, size: null, qty: null,
     remaining: null, suggestion: null });
   let response: Response;
-  try { await assertOperationAllowed(db); }
+  try {
+    await assertOperationAllowed(db);
+    const current = await loadSession(pageId, sessionId, db);
+    const currentGroup = (await db.query('SELECT revision FROM live_groups WHERE session_id=$1 AND group_key=$2', [sessionId, groupKey])).rows[0];
+    if (current.session.status !== 'live' || current.session.preparation?.allowPublic === false || Number(currentGroup?.revision) !== revision) throw new LiveError('Phiên / câu trả lời đã thay đổi. Tải lại trước khi gửi.', 409);
+  }
   catch (error) {
     await db.query(`UPDATE live_groups SET public_reply_id=NULL WHERE session_id=$1 AND group_key=$2 AND public_reply_id=$3`, [sessionId, groupKey, `pending:${now}`]);
     throw error;
@@ -199,12 +220,16 @@ export async function replyPublicly(pageId: string, sessionId: string, groupKey:
       signal: AbortSignal.timeout(12_000), body: JSON.stringify({ message }),
     });
   } catch {
-    await db.query(`UPDATE live_groups SET public_reply_id=NULL WHERE session_id=$1 AND group_key=$2 AND public_reply_id=$3`,
+    await db.query(`UPDATE live_groups SET public_reply_id='unknown:' || $3 WHERE session_id=$1 AND group_key=$2 AND public_reply_id=$3`,
       [sessionId, groupKey, `pending:${now}`]);
     throw new LiveError('Mất kết nối với Meta, chưa rõ comment đã đăng chưa. Kiểm tra dưới bình luận trước khi thử lại.', 502);
   }
   const data = await response.json().catch(() => ({})) as { id?: unknown; error?: { code?: unknown; message?: unknown } };
   if (!response.ok || typeof data.id !== 'string') {
+    if (response.status >= 500 || response.ok) {
+      await db.query(`UPDATE live_groups SET public_reply_id='unknown:' || $3 WHERE session_id=$1 AND group_key=$2 AND public_reply_id=$3`, [sessionId, groupKey, `pending:${now}`]);
+      throw new LiveError('Chưa xác định comment đã đăng. Kiểm tra Facebook; hệ thống không tự gửi lại.', 502);
+    }
     await db.query(`UPDATE live_groups SET public_reply_id=NULL WHERE session_id=$1 AND group_key=$2 AND public_reply_id=$3`,
       [sessionId, groupKey, `pending:${now}`]);
     const code = Number(data.error?.code);

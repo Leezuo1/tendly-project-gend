@@ -131,6 +131,16 @@ test('scheduler rejects app cookies, legacy keys and a missing/wrong cron secret
   assert.equal((await route.GET(f.req('GET', cookie, undefined, { Authorization: 'Bearer wrong-secret' }))).status, 401);
 });
 
+test('Customer Care configuration and conversation switches reject foreign origins for an authorized admin', async () => {
+  const f = await fixture(); const owner = await f.login('admin');
+  for (const file of ['app/api/customer-care/route.ts', 'app/api/messenger/ai/route.ts']) {
+    const route = f.load(file);
+    const response = await route.PUT(f.req('PUT', owner, { autoReply: false }, { origin: 'https://foreign.example' }));
+    assert.equal(response.status, 403, file);
+    assert.equal((await response.json()).code, 'BAD_ORIGIN');
+  }
+});
+
 test('inbox bootstrap never mints authority; missing settings fail closed', async () => {
   const f = await fixture(); const route = f.load('app/api/inbox/session/route.ts');
   const response = await route.GET(f.req());

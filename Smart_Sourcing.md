@@ -1,6 +1,6 @@
 # Smart Sourcing — phương án đã chốt
 
-Tài liệu chốt hướng phát triển Smart Sourcing cho Tendly. Đây là phương án triển khai; màn Smart Sourcing hiện tại vẫn dùng dữ liệu demo, chưa thu thập và phân tích thị trường thật.
+Tài liệu chốt hướng phát triển Smart Sourcing cho Tendly. UI đã nối API thu thập, lưu yêu cầu/shortlist và duyệt chuyển dữ liệu; provider thật và phân tích tăng trưởng chưa được xác minh. Chi tiết phạm vi hiện hành tại [kế hoạch redesign](docs/smart-sourcing-redesign-plan.md#7-phạm-vi-đã-triển-khai).
 
 ## Tiến độ triển khai
 
@@ -12,24 +12,24 @@ Backend thu thập cho hai Actor đã được viết và kiểm tra bằng prov
 - `lib/services/sourcingSearch.ts` định nghĩa cấu trúc bài đầu vào cho adapter Actor sau này, chuẩn hóa các trường, kiểm tra link HTTP/HTTPS không chứa thông tin đăng nhập, giữ số liệu/ngày thiếu là `null`, đếm bản ghi bị loại và bỏ trùng theo nguồn + ID trong một batch (giữ bản hợp lệ đầu tiên).
 - Adapter TikTok đọc output theo schema công bố của `clockworks/tiktok-scraper`: ID, caption, link, tác giả, ngày đăng và tương tác; lọc bài có ngày trong kỳ 7 ngày đã yêu cầu. Bài thiếu ngày hoặc ngoài kỳ bị loại khỏi kết quả phân tích, có số đếm riêng. Chưa gộp các link/ID khác nhau chỉ vì nội dung giống nhau.
 - Adapter Google đọc `organicResults` của `apify/google-search-scraper`, bỏ trùng URL sau khi loại tham số theo dõi đã biết, giữ mô tả và truy vấn làm bằng chứng. Chỉ trả đầu mối tham khảo, chưa đọc website đích hoặc xác minh bán sỉ/giá/MOQ.
-- Lượt tìm và kết quả chuẩn hóa lưu tại Postgres, gắn với tài khoản khởi tạo; có API kiểm tra tiến trình. Chưa nối nút demo sang API mới, chưa có lịch thu thập, phân tích AI hay xếp hạng sản phẩm thật.
+- Lượt tìm và kết quả chuẩn hóa lưu tại Postgres, gắn với tài khoản khởi tạo; UI đọc tiến trình và khôi phục sau tải lại. Thêm `sourcing_requests` và `sourcing_decisions` (migration 019) cho nhu cầu, chấp thuận và lựa chọn của shop. Chưa có lịch thu thập, phân tích AI hay xếp hạng tăng trưởng.
 
-Bước tiếp theo: cấu hình token, áp dụng migration, kiểm tra lượt chạy Apify thật → nối giao diện → phân tích AI và tính tín hiệu.
+Bước xác minh tiếp theo: cấu hình token, áp dụng migration ở môi trường triển khai và kiểm tra Actor thật; chỉ phân tích tăng trưởng khi có dữ liệu nhiều mốc phù hợp.
 
 ### Cấu hình backend Apify
 
 1. Đặt `APIFY_API_TOKEN` trong `.env.local` và biến môi trường server khi deploy. Không dùng tiền tố `NEXT_PUBLIC_` và không gửi token trong body từ frontend.
-2. Chạy `npm run db:migrate` để thêm `014-sourcing.sql` (hai bảng `sourcing_runs`, `sourcing_start_limits`), sau đó khởi động lại app. Migration được viết idempotent; chưa áp dụng lên DB thật trong bước triển khai này.
+2. Chạy `npm run db:migrate` để áp dụng `014-sourcing.sql` và `019-sourcing-workflow.sql`, sau đó khởi động lại app. Migration idempotent, giữ các run cũ.
 3. Gọi API trong phiên app có quyền sử dụng dữ liệu thật. Các POST phải có Origin cùng nguồn. Quyền hiện hành vẫn giới hạn admin/demo owner; tài khoản mới chưa hoàn tất setup không được dùng các API nghiệp vụ.
 
 | API | Body | Kết quả |
 | --- | --- | --- |
 | `POST /api/sourcing/plan` | `{ "industry": "Thời trang & phụ kiện" }` | Chuẩn bị từ khóa, không phát sinh lượt Apify |
-| `POST /api/sourcing/tiktok` | `{ "industry": "Thời trang & phụ kiện" }` | HTTP 202, ID nội bộ và trạng thái lượt thu thập TikTok |
-| `POST /api/sourcing/suppliers` | `{ "product": "áo polo cotton" }` | HTTP 202, ID nội bộ và trạng thái lượt tìm nguồn trên Google |
+| `POST /api/sourcing/tiktok` | `{ "industry": "Thời trang & phụ kiện", "confirmed": true }` | HTTP 202, ID nội bộ và trạng thái lượt thu thập TikTok |
+| `POST /api/sourcing/suppliers` | `{ "product": "áo polo cotton", "confirmed": true }` | HTTP 202, ID nội bộ và trạng thái lượt tìm nguồn trên Google |
 | `GET /api/sourcing/runs/{id}` | Không có | Kiểm tra trạng thái, lấy dataset khi thành công, lưu/trả kết quả chuẩn hóa |
 
-Frontend sau này lưu ID được trả về và gọi GET mỗi 3–5 giây khi trạng thái `running`; không POST lại để kiểm tra tiến trình. Dừng polling khi hoàn tất hoặc lỗi, có thể thử GET lại nếu lỗi mạng tạm thời. Backend hiện chỉ cập nhật/lấy kết quả khi có GET, chưa có worker tự đồng bộ nền. Kết quả đã hoàn tất được đọc lại từ DB.
+UI dùng `GET/POST /api/sourcing/requests`: action `prepare` nhận `criteria`, action `run` nhận `id/revision/confirmed`, action `decision` nhận `runId/itemKey/status/note`. `GET ?run=...&item=...` đọc lại lựa chọn trước khi nhập sản phẩm. Cùng yêu cầu chỉ gắn một run; tải lại đọc workspace, GET run mỗi khoảng 4 giây khi `running/starting`, không POST lại để poll. Backend chỉ cập nhật/lấy kết quả khi có GET, chưa có worker tự đồng bộ nền. Kết quả hoàn tất đọc lại từ DB.
 
 - TikTok: tối đa ba truy vấn theo ngành, 20 video/truy vấn; yêu cầu proxy VN và `PAST_WEEK`. Bộ lọc ngày của Actor có thể tính thêm phí. Proxy VN và truy vấn tiếng Việt không chứng minh tác giả/người xem là người Việt; kết quả chỉ là mẫu thu thập.
 - Google: hai truy vấn có cụm bán sỉ/nhà sản xuất/nhà phân phối, một trang/truy vấn; `countryCode: vn`, giao diện `vi`. Không gửi `searchLanguage: vi` vì schema Actor hiện không liệt kê lựa chọn đó. Các add-on đọc website, AI và tìm contact không được bật.

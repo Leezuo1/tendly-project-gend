@@ -1,4 +1,5 @@
 import { normalizeSourcingPosts, prepareSourcingSearch, SourcingInputError } from '@/lib/services/sourcingSearch';
+import type { SupplierCandidate } from '@/lib/types/sourcing';
 
 export type SourcingKind = 'tiktok' | 'suppliers';
 export const sourcingActors = { tiktok: 'clockworks/tiktok-scraper', suppliers: 'apify/google-search-scraper' } as const;
@@ -16,10 +17,15 @@ export function apifyToken() {
 export function sourcingRequest(kind: SourcingKind, input: Record<string, unknown>, now = new Date()) {
   if (kind === 'tiktok') {
     const plan = prepareSourcingSearch(input, now);
+    if (input.keywords !== undefined && (!Array.isArray(input.keywords) || !input.keywords.length || input.keywords.length > 3
+      || input.keywords.some(k => typeof k !== 'string' || k.trim().length < 2 || k.length > 120 || !/^[\p{L}\p{N}\s.,()&+%\/-]+$/u.test(k)))) throw new SourcingInputError('Truy vấn TikTok không hợp lệ.');
+    const keywords = input.keywords === undefined ? plan.keywords : [...new Set((input.keywords as string[]).map(k => k.trim()))];
+    const limit = input.resultLimit ?? 20;
+    if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 20) throw new SourcingInputError('Giới hạn kết quả phải từ 1–20.');
     return {
-      context: { industry: plan.industry, keywords: plan.keywords, market: plan.market, period: plan.period },
+      context: { industry: plan.industry, keywords, market: plan.market, period: plan.period, resultLimit: limit },
       actorInput: {
-        searchQueries: plan.keywords, searchSection: '/video', resultsPerPage: 20,
+        searchQueries: keywords, searchSection: '/video', resultsPerPage: limit,
         proxyCountryCode: 'VN', videoSearchDateFilter: 'PAST_WEEK',
         shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false,
         shouldDownloadSlideshowImages: false, shouldDownloadAvatars: false, shouldDownloadMusicCovers: false,
@@ -33,9 +39,13 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
     || !/^[\p{L}\p{N}\s.,()&+%\/-]+$/u.test(product) || product.split(' ').length > 16) {
     throw new SourcingInputError('Tên sản phẩm cần từ 2–120 ký tự, tối đa 16 từ; không nhập URL hoặc cú pháp tìm kiếm.');
   }
-  const queries = [`${product} bán sỉ Việt Nam`, `${product} nhà sản xuất nhà phân phối Việt Nam`];
+  const region = input.region ?? 'Việt Nam';
+  if (typeof region !== 'string' || !region.trim() || region.length > 100 || !/^[\p{L}\p{N} .,()-]+$/u.test(region)) throw new SourcingInputError('Khu vực nhà cung cấp không hợp lệ.');
+  const queries = [`${product} bán sỉ ${region}`, `${product} nhà sản xuất nhà phân phối ${region}`];
+  const limit = input.resultLimit ?? 20;
+  if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 20) throw new SourcingInputError('Giới hạn kết quả phải từ 1–20.');
   return {
-    context: { product, queries, market: 'VN' },
+    context: { product, queries, market: 'VN', resultLimit: limit },
     actorInput: {
       queries: queries.join('\n'), countryCode: 'vn', languageCode: 'vi', maxPagesPerQuery: 1,
       focusOnPaidAds: false, aiOverview: { scrapeFullAiOverview: false },
@@ -120,8 +130,8 @@ function supplierUrl(value: unknown) {
   } catch { return null; }
 }
 
-export function normalizeSupplierResults(items: unknown[]) {
-  const candidates = new Map<string, { title: string; url: string; description: string; position: number | null; queries: string[]; verified: false }>();
+export function normalizeSupplierResults(items: unknown[], now = new Date()) {
+  const candidates = new Map<string, SupplierCandidate>();
   let rejectedCount = 0, duplicateCount = 0;
   for (const item of items) {
     const page = record(item);
@@ -139,7 +149,8 @@ export function normalizeSupplierResults(items: unknown[]) {
       }
       candidates.set(url, { title, url, description: text(raw.description),
         position: typeof raw.position === 'number' && Number.isSafeInteger(raw.position) && raw.position > 0 ? raw.position : null,
-        queries: query ? [query] : [], verified: false });
+        queries: query ? [query] : [], verified: false, collectedAt: now.toISOString(), source: 'google',
+        price: null, currency: null, unit: null, moq: null, region: null, leadTime: null });
     }
   }
   return { candidates: [...candidates.values()], rejectedCount, duplicateCount,

@@ -5,7 +5,7 @@ Lõi Livestream đã chạy xong. Dashboard trong lúc live và dashboard tổng
 - `lib/hooks/useLiveSession.ts`: dữ liệu của 1 phiên. Khi phiên đang live, hook tự `sync` khoảng 3 giây một lần và tạm dừng khi tab bị ẩn.
 - `lib/services/liveClient.ts`: các thao tác (bắt đầu/kết thúc phiên, đổi mẫu lên sóng, duyệt nhóm, đổi trạng thái đơn, xem tổng quan).
 
-Kiểu dữ liệu nằm trong `lib/types/live.ts`. Trang chạy thử `app/livestream` (`components/features/livestream/LivestreamShell.tsx`) là ví dụ dùng đầy đủ, nên **thay bằng dashboard thật**.
+Kiểu dữ liệu nằm trong `lib/types/live.ts`. `app/livestream` bổ sung chuẩn bị/duyệt phiên quanh cockpit và cửa sổ nổi hiện có. Migration 018 thêm nháp, phiên bản chấp thuận và timeline mẫu.
 
 Mọi API cần phiên đăng nhập app qua cookie HttpOnly. `dashboardRequest` dùng cookie cùng origin; chưa đăng nhập trả `401 LOGIN_REQUIRED`, user bị khóa trả `403 APP_PROTECTED`. Admin vẫn sử dụng được khi khóa. `DASHBOARD_KEY` cũ không vượt qua lớp bảo vệ. API ghi yêu cầu Origin cùng website.
 
@@ -15,8 +15,10 @@ Mọi API cần phiên đăng nhập app qua cookie HttpOnly. `dashboardRequest`
 const { snapshot, error, paused, setPaused, apply, reload } = useLiveSession(sessionId);
 // snapshot: LiveSnapshot | null — tự cập nhật khi đang live
 
-await liveClient.start({ platform: 'facebook', sourceKind: 'auto', title: 'Live tối thứ 6' }); // tự nhận video khi bật live
-await liveClient.start({ platform: 'facebook', sourceKind: 'post', sourceId });                // hoặc nguồn có sẵn từ liveClient.sources()
+const draft = await liveClient.start({ platform: 'facebook', sourceKind: 'auto', title: 'Live tối thứ 6', preparation });
+// Hiển thị bản nháp: sản phẩm, giá/lượng, FAQ, giọng Page và từng quyền gửi.
+// Chỉ sau khi shop xác nhận đúng phiên bản:
+apply(await liveClient.activate(draft.id, draft.preparationRevision!));
 apply(await liveClient.setOnAir(id, 'AT-01'));                                    // mẫu đang lên sóng
 const r = await liveClient.approve(id, group.key, text, group.revision);          // nhắn riêng cả nhóm
 apply(await liveClient.updateOrder(id, order.id, 'confirmed'));
@@ -29,9 +31,9 @@ const overview = await liveClient.insights();                                   
 
 ## Flow bắt đầu live
 
-1. Người bán bấm **Bắt đầu phiên** trên Tendly với `sourceKind: 'auto'`.
-2. Cửa sổ hỗ trợ **bật ra ngay trong cú bấm đó**: `openLiveMini(liveClient.start(...).then((s) => s.id))`.
-3. Cửa sổ hiện màn hình chờ (`snapshot.session.waiting = true`) kèm hướng dẫn bật live.
+1. Người bán lưu phiên nháp với `preparation` và `sourceKind: 'auto'` hoặc nguồn được cấp quyền; xem bản dữ liệu và từng quyền gửi.
+2. Shop xác nhận rồi bấm **Duyệt dữ liệu & bắt đầu phiên**. Cửa sổ hỗ trợ mở trong cú bấm đó: `openLiveMini(liveClient.activate(id, revision).then((s) => s.session.id))`.
+3. Phiên nháp không sync/gửi; sau duyệt cửa sổ hiện màn hình chờ (`snapshot.session.waiting = true`) kèm hướng dẫn bật live.
 4. Người bán bật **Phát trực tiếp** trên Trang của shop.
    - Mỗi lượt `sync`, Tendly dò `/{page}/live_videos?broadcast_status=["LIVE"]` (tối đa 10 giây/lần, để không hết hạn mức API của Trang).
    - Thấy video thì tự gắn video đó làm nguồn bình luận, đặt `liveAt`, và cửa sổ tự chuyển sang hỗ trợ bán hàng.
@@ -63,8 +65,10 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
 |---|---|---|---|
 | GET | `/api/live/sources` | | `{ sources: LiveSourceOption[], upcoming: ['tiktok','shopee'] }` |
 | GET | `/api/live/sessions` | | `{ sessions: LiveSessionListItem[] }` |
-| POST | `/api/live/sessions` | `{ platform, sourceKind?, sourceId?, title?, knowledge }` | `{ session }` |
+| POST | `/api/live/sessions` | `{ platform, sourceKind?, sourceId?, title?, knowledge, preparation }` | `{ session }` nháp |
 | GET | `/api/live/sessions/:id` | | `LiveSnapshot` (không kéo bình luận mới) |
+| PATCH | `/api/live/sessions/:id` | `{ revision, title, knowledge, preparation }` | `LiveSnapshot` nháp đã lưu |
+| POST | `/api/live/sessions/:id/start` | `{ revision, confirmed: true }` | `LiveSnapshot` đã hoạt động |
 | POST | `/api/live/sessions/:id/sync` | | `LiveSnapshot` (kéo bình luận mới, phân loại) |
 | POST | `/api/live/sessions/:id/on-air` | `{ sku \| null }` | `LiveSnapshot` |
 | POST | `/api/live/sessions/:id/groups/:key/approve` | `{ text, revision }` | `LiveSendResult & { revision }` |
@@ -75,7 +79,7 @@ Mọi nơi dùng `useLiveSession` cùng một phiên (trang chính, dashboard, c
 | POST | `/api/live/sessions/:id/end` | | `LiveSnapshot` có `summary` |
 | GET | `/api/live/insights` | | `LiveInsights` (theo phiên + theo tháng) |
 
-`knowledge` là `currentAiKnowledge()` (sản phẩm, giá, tồn kho, FAQ trong Cấu hình AI). `liveClient.start` tự gửi kèm. Danh mục này **được chốt lại lúc bắt đầu phiên**.
+`knowledge` là `currentAiKnowledge()`; `liveClient.start/saveDraft` tự gửi kèm. Chỉ SKU được chọn có tồn đã nhập vào bản phiên; thay nháp tăng phiên bản. `preparation` theo `LivePreparation` gồm host, lịch dự kiến, campaign đã duyệt của Page nếu chọn, catalog/mã host/bảng size có nguồn, thông tin nhận hàng, handoff, giữ lượng thủ công và quyền private/public riêng. API start yêu cầu đúng phiên bản đang xem và lưu người/thời điểm duyệt. Mọi lần gửi vẫn cần duyệt nhóm; chưa có tự gửi theo phiên.
 
 ## `LiveSnapshot` — hiển thị gì trong lúc live
 

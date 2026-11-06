@@ -1,6 +1,7 @@
 import type { AiKnowledge } from './ai';
 import type { AiConfiguration } from '@/lib/services/aiConfiguration';
 import type { GeneratedPostDraft, MarketingPost } from './posts';
+import type { PostReviewResult, ReviewAttempt } from './postReview';
 
 export type MarketingPlatform = 'facebook' | 'instagram' | 'tiktok' | 'shopee';
 export interface MarketingAccount {
@@ -18,12 +19,14 @@ export interface CampaignBrief {
   proof: string; proofSource: string;
 }
 export interface MarketingCampaign extends CampaignBrief {
+  sourcing?: { runId: string; itemKey: string };
   id: string; version: number; approvedAt: number | null; approvedBy: string;
   knowledge: AiKnowledge; configuration: AiConfiguration; profile: MarketingProfile;
 }
 export interface ReviewedMarketingPost {
   postId: string; campaignId: string; campaignVersion: number; accountId: string;
   original: GeneratedPostDraft; changes: string[]; reviewHash: string; reviewedAt: number;
+  review?: PostReviewResult;
   campaignSnapshot?: MarketingCampaign;
   publications?: { externalId: string; externalUrl: string | null; at: number }[];
   approvedHash: string | null; approvedAt: number | null; approvedBy: string;
@@ -39,6 +42,7 @@ export interface MarketingSchedule {
   slots: MarketingScheduleSlot[];
 }
 export interface MarketingWorkspace {
+  reviewAttempts?: ReviewAttempt[];
   profiles: Record<string, MarketingProfile>; campaigns: MarketingCampaign[];
   reviews: ReviewedMarketingPost[]; schedules: MarketingSchedule[];
 }

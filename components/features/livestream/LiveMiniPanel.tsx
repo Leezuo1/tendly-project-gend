@@ -166,6 +166,7 @@ function PriorityTab({ snapshot, apply, notify, live }: TabProps) {
           </div>
           <div className="lm-question">{top.question}</div>
           <div className="lm-muted">{askersText(top)}</div>
+          {top.publicReplyUnknown && <p className="lm-muted">Chưa rõ comment đã đăng. Kiểm tra trên Facebook trước khi xử lý tiếp.</p>}
           <div className="lm-answer">
             <span className="lm-label">Có thể trả lời</span>
             <div>{top.needsHuman && top.replySource !== 'shop' ? 'Shop trả lời trực tiếp trên live — chưa có câu trả lời mẫu chắc chắn.' : top.preview}</div>
@@ -173,12 +174,12 @@ function PriorityTab({ snapshot, apply, notify, live }: TabProps) {
           {live && (
             <div className="lm-actions">
               <button type="button" className="btn btn-sm btn-primary" onClick={() => void handled(top)}>Đã trả lời</button>
-              {!top.needsHuman && top.pending > 0 && (
+              {!top.needsHuman && top.pending > 0 && snapshot.session.preparation?.allowPrivate !== false && (
                 <ConfirmButton label={`Nhắn riêng ${top.pending}`} armedLabel={`Gửi thật ${top.pending}?`} busyLabel="Đang gửi…"
                   onConfirm={() => sendPrivate(top)} />
               )}
               {/* Nhóm đã comment rồi mà vẫn hiện ở đây nghĩa là có bình luận mới → cho comment lại */}
-              {!top.needsHuman && (
+              {!top.needsHuman && !top.publicReplyUnknown && snapshot.session.preparation?.allowPublic !== false && (
                 <ConfirmButton label={top.publicReplied ? 'Comment lại' : 'Trả lời bằng comment'} armedLabel="Đăng comment?"
                   busyLabel="Đang đăng…" onConfirm={() => sendPublic(top)} />
               )}
@@ -218,7 +219,7 @@ function OrdersTab({ snapshot, apply, notify, live }: TabProps) {
         <div><b>{formatMoney(snapshot.stats.revenue)}</b><span>dự kiến</span></div>
         <div><b>{snapshot.stats.customers}</b><span>khách</span></div>
       </div>
-      {live && confirmGroups.map((g) => (
+      {live && snapshot.session.preparation?.allowPrivate !== false && confirmGroups.map((g) => (
         <div key={g.key} className="lm-row lm-row-box">
           <span>Nhắn xác nhận đơn{g.productName ? ` · ${g.productName}` : ''}</span>
           <ConfirmButton label={`Nhắn ${g.pending}`} armedLabel={`Gửi thật ${g.pending}?`} busyLabel="Đang gửi…" onConfirm={() => act(async () => {

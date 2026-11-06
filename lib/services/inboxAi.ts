@@ -54,6 +54,9 @@ export function automaticAnalysisCandidates(
 export function applyConversationAnalysis(conversation: Conversation, messageId: string, result: AiChatReply): Conversation {
   // Kết quả chậm không được ghi đè tin nhắn mới hoặc tạo lại đề xuất đã xử lý.
   if (latestCustomerMessage(conversation)?.id !== messageId || !conversation.isUnreplied) return conversation;
+  if (result.sourceContext && conversation.sourceContext && result.sourceContext.fingerprint !== conversation.sourceContext.fingerprint) {
+    return { ...conversation, aiSuggestion: undefined, aiStatus: 'error', aiError: 'Nguồn hoặc ưu đãi đã thay đổi. Tạo lại gợi ý trước khi gửi.' };
+  }
   const a = result.analysis;
   const emotionTag: ConversationTag = {
     label: EMOTION_LABELS[a.emotion],
@@ -76,6 +79,7 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
       tags: [...conversation.profile.tags.filter((t) => t.type === 'vip' || (t.type === 'loop' && t.source !== 'ai')), emotionTag],
     },
     aiSuggestion: {
+      sourceFingerprint: result.sourceContext?.fingerprint,
       label: `✨ AI đề xuất · ${EMOTION_LABELS[a.emotion]}`,
       source: result.sourceSummary, text: result.reply,
     },

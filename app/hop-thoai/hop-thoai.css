@@ -1411,6 +1411,25 @@
 }
 
 .thread-back { display: none; }
+.inbox-root .thread-sources { padding: 12px 14px; margin-bottom: 12px; background: var(--sand); border-radius: var(--radius-card); }
+.inbox-root .thread-sources h3 { margin: 0 0 5px; font-size: 14px; }
+.inbox-root .thread-sources p, .inbox-root .thread-sources blockquote, .inbox-root .thread-sources li { font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.inbox-root .thread-sources summary, .inbox-root .thread-sources a { display: flex; align-items: center; min-height: 44px; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.inbox-root .thread-sources article { padding-block: 12px; }
+.inbox-root .thread-sources article strong { font-size: 13px; }
+.inbox-root .thread-sources article p { margin-top: 6px; }
+.inbox-root .thread-sources blockquote { margin: 10px 0; padding: 10px; background: var(--paper); }
+.inbox-root .thread-sources ul { padding-left: 18px; color: var(--coral-deep); }
+.inbox-root .thread-missing-facts { margin-bottom: 12px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.inbox-root .thread-ai-control { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex-shrink: 0; padding: 12px 20px; background: var(--sand); }
+.inbox-root .thread-ai-control > div { flex: 1; min-width: 180px; }
+.inbox-root .thread-ai-control strong { font-size: 13px; }
+.inbox-root .thread-ai-control p, .inbox-root .thread-ai-control a { font-size: 12px; line-height: 1.6; }
+.inbox-root .thread-ai-control p { margin-top: 3px; color: var(--ink-soft); }
+.inbox-root .thread-ai-control .switch { display: flex; align-items: center; width: 54px; height: 44px; }
+.inbox-root .thread-ai-control .switch-track { inset: 11px 8px; }
+.inbox-root .thread-ai-control a { text-decoration: underline; text-underline-offset: 3px; }
+.inbox-root .messenger-toolbar > a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 880px) {
   .inbox-root .inbox-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
   .inbox-root .conv-search { grid-template-columns: minmax(0, 1fr); }

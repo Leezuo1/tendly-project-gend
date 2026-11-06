@@ -131,7 +131,8 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
   if (live.can_reply_privately !== true || live.message !== row.text) {
     throw new FacebookCommentError('Meta không cho phép nhắn riêng hoặc bình luận đã thay đổi.');
   }
-  const reserved = await db.query(`UPDATE facebook_comments SET status='sending',draft=$4,reason='Đang gửi qua Meta'
+  const reserved = await db.query(`UPDATE facebook_comments SET status='sending',draft=$4,reason='Đang gửi qua Meta',
+    care_context_json=jsonb_build_object('commentText',text,'postText',post_text,'revision',revision)
     WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND status=ANY($6::text[])
     AND ($5::bigint IS NULL OR EXISTS (SELECT 1 FROM facebook_comment_settings s
       WHERE s.page_id=$1 AND s.auto_reply AND s.updated_at=$5 AND facebook_comments.created_at>=s.enabled_at))
