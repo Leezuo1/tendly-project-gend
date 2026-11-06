@@ -108,6 +108,8 @@ test('ordinary post source does not block automatic private replies or change in
   await service.saveFacebookComments([event({ createdAt: enabledAt })], pool);
   await service.processPendingComments('111', pool);
   assert.equal((await row()).status, 'sent');
+  assert.equal((await row()).care_context_json.commentText, 'Áo này bao nhiêu shop?');
+  assert.equal((await row()).care_context_json.revision, (await row()).revision);
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].recipient, { comment_id: '500_600' });
   assert.equal((await query('SELECT last_in_at FROM messenger_conversations')).rows[0].last_in_at, null);

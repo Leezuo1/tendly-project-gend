@@ -80,7 +80,10 @@ export function parseMetaMessages(payload: unknown, pageId: string): MessengerMe
       const outgoing = message.is_echo === true;
       if ((outgoing ? sender : recipient) !== pageId) continue;
       const attachments = (message.attachments ?? []) as unknown[];
+      const replyTo = record(message.reply_to)?.mid;
+      if (replyTo !== undefined && (typeof replyTo !== 'string' || !replyTo.trim() || replyTo.length > 1024)) throw new InvalidWebhook('Invalid reply reference');
       messages.push({
+        ...(typeof replyTo === 'string' ? { replyToMessageId: replyTo } : {}),
         pageId, psid: outgoing ? recipient : sender, messageId: message.mid,
         direction: outgoing ? 'out' : 'in', timestamp, text: typeof message.text === 'string' ? message.text : '',
         attachments: attachments.flatMap((value) => {

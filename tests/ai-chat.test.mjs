@@ -73,6 +73,16 @@ function fixture() {
   };
 }
 
+test('sourced product import rejects duplicate SKU and preserves unknown stock and retail price', async () => {
+  const f = fixture();
+  const input = { sku: 'SOURCE-01', name: 'Áo từ nguồn khảo sát', material: '', emoji: '', category: 'Áo', colors: [], sizes: [], qty: 999, stockKnown: true, price: 150000, sourceUrl: 'https://example.com/ao' };
+  const saved = await f.api.productApi.importSourced(input);
+  assert.equal(saved.qty, 0); assert.equal(saved.stockKnown, false); assert.equal(saved.price, 150000);
+  await assert.rejects(f.api.productApi.importSourced({ ...input, sku: 'source-01', price: 1 }), /SKU đã tồn tại/);
+  const rows = await f.api.productApi.list();
+  assert.equal(rows.filter(p => p.id === saved.id).length, 1); assert.equal(rows.find(p => p.id === saved.id).price, 150000);
+});
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
   delete globalThis.window;
@@ -250,7 +260,7 @@ test('chat gửi nguồn sản phẩm, FAQ và email đã lưu; không gửi h�
   assert.equal(f.sent[0].url.includes('test-key'), false);
   assert.equal(f.sent[0].options.headers['x-goog-api-key'], 'test-key');
   assert.equal(result.model, 'test-model');
-  assert.match(result.sourceSummary, /20 sản phẩm.*5 FAQ.*3 kịch bản/);
+  assert.match(result.sourceSummary, /10 sản phẩm.*5 FAQ.*3 kịch bản/);
 });
 
 test('chỉnh giá/tồn kho qua nhập sản phẩm, sửa FAQ và mẫu email áp dụng ở câu hỏi kế tiếp', async () => {

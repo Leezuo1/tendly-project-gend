@@ -1,5 +1,6 @@
 import type { MessengerMessage } from './messenger';
 import type { ConversationMemoryEntry } from './conversationMemory';
+import type { CareSourceContext } from './customerCare';
 
 export interface MessengerCustomerProfile {
   name: string | null;
@@ -12,6 +13,9 @@ export interface MessengerCustomerProfile {
 }
 
 export interface MessengerThread {
+  sourceContext?: CareSourceContext;
+  autoReply?: boolean;
+  aiUpdatedAt?: number;
   waitingConfirmation?: boolean;
   viewStartAt?: number;
   personalitySummary?: string;
@@ -27,6 +31,7 @@ export interface MessengerThread {
   customer?: MessengerCustomerProfile;
 }
 export interface MessengerInboxSnapshot {
+  aiEnabled?: boolean;
   conversations: MessengerThread[];
   hasMore: boolean;
 }

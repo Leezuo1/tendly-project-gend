@@ -3,8 +3,9 @@
 import { readDb } from '@/lib/services/mockDb';
 import type { AiChatReply, AiKnowledge, AiSessionMessage } from '@/lib/types/ai';
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
+import { parseProductDetails } from '@/lib/services/productDetails';
 
-/** Đọc lại mỗi lần hỏi để áp dụng ngay thay đổi đã lưu trong Cấu hình AI. */
+/** Đọc lại mỗi lần hỏi để áp dụng ngay thay đổi đã lưu trong FAQ & sản phẩm. */
 export function currentAiKnowledge(): AiKnowledge {
   const db = readDb();
   return structuredClone({
@@ -12,10 +13,8 @@ export function currentAiKnowledge(): AiKnowledge {
     productSource: {
       name: db.productSource.name, connected: db.productSource.connected, lastSyncedAt: db.productSource.lastSyncedAt,
     },
-    products: db.products.map((p) => ({
-      id: p.id, sku: p.sku, name: p.name, material: p.material, category: p.category,
-      colors: p.colors, sizes: p.sizes, qty: p.qty, price: p.price,
-    })),
+    products: db.products.map(p => ({ id: p.id, sku: p.sku, name: p.name, material: p.material, category: p.category,
+      colors: p.colors, sizes: p.sizes, qty: p.qty, price: p.price, ...parseProductDetails({ ...p }) })),
     faqs: db.faqs.filter((f) => f.active),
     emailTriggers: db.triggers.filter((t) => t.enabled),
   });

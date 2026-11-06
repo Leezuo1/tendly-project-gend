@@ -131,6 +131,7 @@ export function botReply(text: string, faqs: Faq[], products: Product[], ctx: Co
   };
 
   // ---- Xác nhận đặt hàng ----
+  if (product?.stockKnown === false) return { text: `${product.name} có giá ${formatMoney(product.price)}. Shop chưa xác nhận số lượng tồn kho; cần kiểm tra lại trước khi nhận đơn.`, quickReplies: [], ctx: next };
   if (has(t, 'xac nhan dat hang') || has(t, 'xac nhan')) {
     if (!product) return { text: 'Dạ chị muốn đặt sản phẩm nào ạ? Chị gửi tên hoặc mã sản phẩm giúp mình nha 🥰', quickReplies: [], ctx: next };
     const size = next.size ?? singleSize(product);

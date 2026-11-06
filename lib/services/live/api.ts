@@ -1,12 +1,14 @@
 import { FacebookCommentError } from '@/lib/services/facebookComments';
 import { InvalidMarketingRequest, marketingErrorResponse } from '@/lib/services/marketingApi';
 import { LiveError } from '@/lib/services/live/engine';
+import { LivePreparationError } from '@/lib/services/live/preparation';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
 export const liveJson = (body: unknown, status = 200) => Response.json(body, { status, headers: NO_STORE });
 
 export function liveErrorResponse(error: unknown): Response {
+  if (error instanceof LivePreparationError) return liveJson({ error: error.message }, 400);
   if (error instanceof LiveError) return liveJson({ error: error.message, ...(error.code ? { code: error.code } : {}) }, error.status);
   if (error instanceof FacebookCommentError) return liveJson({ error: error.message }, error.status);
   return marketingErrorResponse(error);

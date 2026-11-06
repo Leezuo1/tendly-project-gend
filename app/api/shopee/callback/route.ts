@@ -22,7 +22,7 @@ export const GET = withAppAccess(async function GET(request: Request) {
       return Response.json({ error: 'Cấp quyền chưa thành công. Hãy đăng nhập tài khoản shop đúng SHOPEE_SHOP_ID, không dùng tài khoản chính nhiều shop.' }, { status: 400, headers });
     }
     await authorizeShopee(config, code);
-    headers.set('Location', new URL('/cau-hinh-ai?tab=products&shopee=connected', redirect.origin).href);
+    headers.set('Location', new URL('/cai-dat?tab=products&shopee=connected', redirect.origin).href);
     return new Response(null, { status: 303, headers });
   } catch (error) {
     const response = shopeeErrorResponse(error);

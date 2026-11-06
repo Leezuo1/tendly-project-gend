@@ -1,19 +1,47 @@
 # Smart Sourcing — phương án đã chốt
 
-Tài liệu chốt hướng phát triển Smart Sourcing cho Tendly. Đây là phương án triển khai; màn Smart Sourcing hiện tại vẫn dùng dữ liệu demo, chưa thu thập và phân tích thị trường thật.
+Tài liệu chốt hướng phát triển Smart Sourcing cho Tendly. UI đã nối API thu thập, lưu yêu cầu/shortlist và duyệt chuyển dữ liệu; provider thật và phân tích tăng trưởng chưa được xác minh. Chi tiết phạm vi hiện hành tại [kế hoạch redesign](docs/smart-sourcing-redesign-plan.md#7-phạm-vi-đã-triển-khai).
 
 ## Tiến độ triển khai
 
-Phần nền tảng đầu tiên đã được viết, chưa kết nối nhà cung cấp:
+Backend thu thập cho hai Actor đã được viết và kiểm tra bằng provider mock; chưa chạy Apify thật:
 
 - `POST /api/sourcing/plan`: nhận `{ "industry": "Thời trang & phụ kiện" }`, kiểm tra phiên/quyền truy cập, cùng nguồn truy cập và kích thước JSON bằng cơ chế bảo vệ hiện có.
-- Trả kế hoạch tìm trong 7 ngày gần nhất, thị trường VN và bộ từ khóa đầu vào theo ngành. Trạng thái `prepared`, `collectionReady: false` có nghĩa chỉ chuẩn bị yêu cầu, chưa tạo lượt chạy hoặc gọi Apify.
+- Trả kế hoạch tìm trong 7 ngày gần nhất, thị trường VN và bộ từ khóa đầu vào theo ngành. Trạng thái `prepared`, `collectionStarted: false` có nghĩa chỉ chuẩn bị yêu cầu, chưa tạo lượt chạy hoặc gọi Apify.
 - Có bộ từ khóa cho năm ngành sản phẩm; `Dịch vụ`, `Khác` và ngành không hợp lệ bị từ chối. Bộ từ khóa là dữ liệu khởi đầu cần đánh giá, không phải từ khóa đã đo là hot.
 - `lib/services/sourcingSearch.ts` định nghĩa cấu trúc bài đầu vào cho adapter Actor sau này, chuẩn hóa các trường, kiểm tra link HTTP/HTTPS không chứa thông tin đăng nhập, giữ số liệu/ngày thiếu là `null`, đếm bản ghi bị loại và bỏ trùng theo nguồn + ID trong một batch (giữ bản hợp lệ đầu tiên).
-- Chưa có adapter đọc output Actor thực tế. Hàm chuẩn hóa nhận dữ liệu đã được adapter ánh xạ về cấu trúc chung; thiếu ID hoặc nội dung thì bỏ qua. Chưa gộp các link/ID khác nhau chỉ vì nội dung giống nhau.
-- Chưa nối nút demo sang API mới; chưa có lưu trữ, polling, lịch thu thập, phân tích AI, lọc theo kỳ hay xếp hạng thật. API kế hoạch không gọi nhà cung cấp nên chưa phát sinh phí thu thập.
+- Adapter TikTok đọc output theo schema công bố của `clockworks/tiktok-scraper`: ID, caption, link, tác giả, ngày đăng và tương tác; lọc bài có ngày trong kỳ 7 ngày đã yêu cầu. Bài thiếu ngày hoặc ngoài kỳ bị loại khỏi kết quả phân tích, có số đếm riêng. Chưa gộp các link/ID khác nhau chỉ vì nội dung giống nhau.
+- Adapter Google đọc `organicResults` của `apify/google-search-scraper`, bỏ trùng URL sau khi loại tham số theo dõi đã biết, giữ mô tả và truy vấn làm bằng chứng. Chỉ trả đầu mối tham khảo, chưa đọc website đích hoặc xác minh bán sỉ/giá/MOQ.
+- Lượt tìm và kết quả chuẩn hóa lưu tại Postgres, gắn với tài khoản khởi tạo; UI đọc tiến trình và khôi phục sau tải lại. Thêm `sourcing_requests` và `sourcing_decisions` (migration 019) cho nhu cầu, chấp thuận và lựa chọn của shop. Chưa có lịch thu thập, phân tích AI hay xếp hạng tăng trưởng.
 
-Bước tiếp theo: chọn một nguồn/Actor, kiểm tra input và output mẫu → viết adapter và kết nối backend → lưu lượt chạy, dữ liệu → nối giao diện → phân tích AI và tính tín hiệu.
+Bước xác minh tiếp theo: cấu hình token, áp dụng migration ở môi trường triển khai và kiểm tra Actor thật; chỉ phân tích tăng trưởng khi có dữ liệu nhiều mốc phù hợp.
+
+### Cấu hình backend Apify
+
+1. Đặt `APIFY_API_TOKEN` trong `.env.local` và biến môi trường server khi deploy. Không dùng tiền tố `NEXT_PUBLIC_` và không gửi token trong body từ frontend.
+2. Chạy `npm run db:migrate` để áp dụng `014-sourcing.sql` và `019-sourcing-workflow.sql`, sau đó khởi động lại app. Migration idempotent, giữ các run cũ.
+3. Gọi API trong phiên app có quyền sử dụng dữ liệu thật. Các POST phải có Origin cùng nguồn. Quyền hiện hành vẫn giới hạn admin/demo owner; tài khoản mới chưa hoàn tất setup không được dùng các API nghiệp vụ.
+
+| API | Body | Kết quả |
+| --- | --- | --- |
+| `POST /api/sourcing/plan` | `{ "industry": "Thời trang & phụ kiện" }` | Chuẩn bị từ khóa, không phát sinh lượt Apify |
+| `POST /api/sourcing/tiktok` | `{ "industry": "Thời trang & phụ kiện", "confirmed": true }` | HTTP 202, ID nội bộ và trạng thái lượt thu thập TikTok |
+| `POST /api/sourcing/suppliers` | `{ "product": "áo polo cotton", "confirmed": true }` | HTTP 202, ID nội bộ và trạng thái lượt tìm nguồn trên Google |
+| `GET /api/sourcing/runs/{id}` | Không có | Kiểm tra trạng thái, lấy dataset khi thành công, lưu/trả kết quả chuẩn hóa |
+
+UI dùng `GET/POST /api/sourcing/requests`: action `prepare` nhận `criteria`, action `run` nhận `id/revision/confirmed`, action `decision` nhận `runId/itemKey/status/note`. `GET ?run=...&item=...` đọc lại lựa chọn trước khi nhập sản phẩm. Cùng yêu cầu chỉ gắn một run; tải lại đọc workspace, GET run mỗi khoảng 4 giây khi `running/starting`, không POST lại để poll. Backend chỉ cập nhật/lấy kết quả khi có GET, chưa có worker tự đồng bộ nền. Kết quả hoàn tất đọc lại từ DB.
+
+- TikTok: tối đa ba truy vấn theo ngành, 20 video/truy vấn; yêu cầu proxy VN và `PAST_WEEK`. Bộ lọc ngày của Actor có thể tính thêm phí. Proxy VN và truy vấn tiếng Việt không chứng minh tác giả/người xem là người Việt; kết quả chỉ là mẫu thu thập.
+- Google: hai truy vấn có cụm bán sỉ/nhà sản xuất/nhà phân phối, một trang/truy vấn; `countryCode: vn`, giao diện `vi`. Không gửi `searchLanguage: vi` vì schema Actor hiện không liệt kê lựa chọn đó. Các add-on đọc website, AI và tìm contact không được bật.
+- Token chỉ gửi trong header Authorization tới API cố định của Apify. Không nhận Actor ID, dataset ID hoặc URL API từ người dùng. ID provider không trả cho frontend.
+- Mỗi lượt yêu cầu timeout Actor 300 giây và trần chi phí USD 0.50 theo API Apify. Số lượng là giới hạn demo và không bảo đảm luôn nhận đủ kết quả. Cần kiểm tra giá/quy tắc tính phí thực tế trong Console.
+- Mỗi tài khoản chỉ khởi tạo một lượt cùng loại trong 60 giây; đồng thời chặn lượt mới khi có lượt `starting/running/unknown` được tạo trong 6 phút gần nhất. Kiểm tra này lưu ở DB, không phụ thuộc bộ nhớ của một server.
+- Trạng thái: `starting`, `running`, `succeeded`, `empty`, `failed`, `unknown`. `empty` là thu thập xong nhưng không còn bản ghi hợp lệ trong phạm vi; xem các số đếm bị loại. Lỗi HTTP/schema không chuyển thành kết quả rỗng.
+- Nếu mất phản hồi lúc khởi chạy, lưu `unknown`, giữ ID nội bộ và không tự retry POST để tránh tạo hai lượt tính phí. Phải kiểm tra Console trước khi tìm lại. Nếu tiến trình server dừng khi đang `starting` cũng cần kiểm tra Console; chưa có chức năng tự khôi phục lượt mơ hồ.
+
+Tài liệu schema đã đối chiếu: [TikTok input](https://apify.com/clockworks/tiktok-scraper/input-schema), [Google input](https://apify.com/apify/google-search-scraper/input-schema), [Run Actor](https://docs.apify.com/api/v2/actors-runs-post). Output mẫu trong test là fixture theo tài liệu, không phải bằng chứng đã chạy provider thật.
+
+Kiểm tra: `node --test tests/sourcing-apify.test.mjs tests/sourcing-search.test.mjs tests/app-security.test.mjs`.
 
 ## 1. Mục tiêu và giao diện
 

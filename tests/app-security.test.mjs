@@ -16,7 +16,7 @@ const ready = (async () => {
 })();
 const query = async (sql, values) => { const result = await db.query(sql, values); return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length }; };
 const pool = { query, connect: async () => ({ query, release() {} }) };
-const envKeys = ['APP_ADMIN_USERNAME', 'APP_ADMIN_PASSWORD_HASH', 'INBOX_ACCESS_KEY', 'DASHBOARD_KEY', 'PAGE_ID', 'PAGE_ACCESS_TOKEN', 'META_GRAPH_VERSION', 'DATABASE_URL'];
+const envKeys = ['APP_ADMIN_USERNAME', 'APP_ADMIN_PASSWORD_HASH', 'INBOX_ACCESS_KEY', 'DASHBOARD_KEY', 'PAGE_ID', 'PAGE_ACCESS_TOKEN', 'META_GRAPH_VERSION', 'DATABASE_URL', 'CRON_SECRET'];
 const originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 const salt = 'a'.repeat(32);
@@ -107,7 +107,8 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
   let checked = 0;
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/'].some(part => file.includes(part))) continue;
+    // The scheduler has a server-only bearer secret, tested separately below.
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;
@@ -118,6 +119,26 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
     }
   }
   assert.ok(checked >= 40); assert.equal(providerCalls, 0);
+});
+
+test('scheduler rejects app cookies, legacy keys and a missing/wrong cron secret', async () => {
+  const f = await fixture(); const route = f.load('app/api/marketing/schedules/run/route.ts');
+  const cookie = await f.login('admin');
+  delete process.env.CRON_SECRET;
+  assert.equal((await route.GET(f.req('GET', cookie))).status, 401);
+  process.env.CRON_SECRET = 'server-only-cron-test-secret';
+  assert.equal((await route.GET(f.req('GET', cookie))).status, 401);
+  assert.equal((await route.GET(f.req('GET', cookie, undefined, { Authorization: 'Bearer wrong-secret' }))).status, 401);
+});
+
+test('Customer Care configuration and conversation switches reject foreign origins for an authorized admin', async () => {
+  const f = await fixture(); const owner = await f.login('admin');
+  for (const file of ['app/api/customer-care/route.ts', 'app/api/messenger/ai/route.ts']) {
+    const route = f.load(file);
+    const response = await route.PUT(f.req('PUT', owner, { autoReply: false }, { origin: 'https://foreign.example' }));
+    assert.equal(response.status, 403, file);
+    assert.equal((await response.json()).code, 'BAD_ORIGIN');
+  }
 });
 
 test('inbox bootstrap never mints authority; missing settings fail closed', async () => {
@@ -258,7 +279,7 @@ test('new accounts cannot reach any business API even after the demo is unlocked
   globalThis.fetch = async () => { calls++; throw new Error('new user must not reach providers'); };
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;

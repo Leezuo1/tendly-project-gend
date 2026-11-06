@@ -7,7 +7,7 @@ import { requireDashboardKey } from '@/lib/services/postsApi';
 export const runtime = 'nodejs';
 
 /**
- * Khách Messenger thật kèm nhóm hoạt động. POST vì cần danh sách sản phẩm trong Cấu hình AI
+ * Khách Messenger thật kèm nhóm hoạt động. POST vì cần danh sách sản phẩm trong FAQ & sản phẩm
  * (đang lưu trên trình duyệt) để dò khách đã hỏi sản phẩm nào.
  */
 export const POST = withAppAccess(async function POST(request: Request) {

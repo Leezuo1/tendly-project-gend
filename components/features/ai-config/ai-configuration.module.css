@@ -1,0 +1,68 @@
+:global(.admin-root) .root { max-width: 1240px; margin-inline: auto; min-width: 0; }
+.root .fieldset { border: 0; min-width: 0; }
+.root .loading, .root .error, .root .usageError { padding: 16px 0; font-size: 13px; color: var(--ink-soft); }
+.root .error { color: var(--coral-deep); }
+.root .management, .root .settings { margin-top: 28px; }
+.root .aiRow { padding: 26px 0; border-bottom: 1px solid var(--line); }
+.root .aiRow:first-child { padding-top: 0; }
+.root .rowHead, .root .rowActions, .root .statusControl, .root .pageRow, .root .switchRow, .root .templateRow, .root .fieldHeading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.root .rowHead { align-items: flex-start; }
+.root .rowHead h2 { font-size: 19px; font-weight: 650; }
+.root .rowHead p, .root .usage p, .root .switchRow p, .root .templateRow p, .root .ruleHint { font-size: 13px; color: var(--ink-soft); line-height: 1.75; max-width: 75ch; }
+.root .rowHead p { margin-top: 6px; }
+.root .statusControl { justify-content: flex-end; flex-shrink: 0; font-size: 12px; }
+.root .usage { margin: 20px 0; padding: 18px 22px; background: var(--sand); border-radius: 8px; }
+.root .usage h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.root .usage p + p { margin-top: 6px; }
+.root .usage a { display: inline-flex; margin-top: 12px; }
+.root .rowActions { justify-content: flex-end; gap: 10px; }
+.root .pageRow { flex-wrap: wrap; padding: 12px 0; }
+.root .pageRow > div { margin-right: auto; }
+.root .pageRow strong, .root .switchRow strong { font-size: 13px; }
+.root .selectors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; max-width: 760px; margin-bottom: 24px; }
+.root .selectors > div { display: grid; gap: 8px; }
+.root label { font-size: 13px; font-weight: 550; }
+.root .editor { border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.root .editorHead { padding: 22px 24px; border-bottom: 1px solid var(--line); }
+.root .editorHead h2 { font-size: 19px; font-weight: 600; line-height: 1.5; }
+.root .editorHead p { color: var(--ink-soft); font-size: 13px; line-height: 1.7; margin-top: 6px; max-width: 70ch; }
+.root .formBody { display: grid; gap: 24px; padding: 24px; }
+.root .ruleField { display: grid; gap: 8px; }
+.root .fieldHeading { min-height: 26px; }
+.root input:not([type='checkbox']), .root select, .root textarea { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 5px; background: var(--canvas); color: var(--ink); padding: 10px 12px; font: inherit; font-size: 14px; line-height: 1.65; }
+.root textarea { resize: vertical; }
+.root input:disabled, .root textarea:disabled { opacity: 1; background: var(--sand); color: var(--ink-soft); }
+.root .checkLabel input { width: 16px; height: 16px; accent-color: var(--coral-deep); }
+.root .detail { margin-bottom: 18px; }
+.root .detail h3 { font-size: 14px; margin-bottom: 8px; }
+.root .detail p { font-size: 13px; color: var(--ink-soft); max-width: 75ch; line-height: 1.7; margin-top: 6px; }
+.root .checkLabel { display: inline-flex; align-items: center; gap: 8px; font-weight: 400; font-size: 12px; min-height: 36px; }
+.root .ruleField small { font-size: 12px; color: var(--ink-soft); }
+.root .ruleHint { border-top: 1px solid var(--line); padding-top: 18px; }
+.root .saveBar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; padding: 18px 0 4px; border-top: 1px solid var(--line); }
+.root .saveBar p { font-size: 12px; color: var(--ink-soft); }
+.root .careScope { display: grid; gap: 10px; padding: 18px; background: var(--sand); border-radius: var(--radius-card); }
+.root .careScope h3 { font-size: 15px; }
+.root .careScope p, .root .carePreview p { font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.root .careScope .rowActions { justify-content: flex-start; flex-wrap: wrap; }
+.root .careScope summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.root .careScope details[open] { max-height: 360px; overflow-y: auto; }
+.root .careScope details div { margin-top: 16px; }
+.root .carePreview { display: grid; gap: 10px; padding: 18px; background: var(--sand); border-radius: var(--radius-card); }
+.root .carePreview small { overflow-wrap: anywhere; }
+.root .careScope .checkLabel, .root .formBody > .checkLabel { min-height: 44px; align-items: flex-start; padding-block: 10px; }
+.root .checkLabel input { flex-shrink: 0; }
+@media (max-width: 880px) {
+  .root > :global(.tabs) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .root > :global(.tabs) > button { min-width: 0; min-height: 48px; padding: 8px 4px; font-size: 13px; }
+  .root .rowHead, .root .templateRow { flex-wrap: wrap; }
+  .root .selectors { grid-template-columns: minmax(0, 1fr); }
+  .root .editorHead, .root .formBody { padding: 18px 16px; }
+  .root .editorHead h2 { font-size: 17px; }
+  .root .usage { padding: 16px; }
+  .root .pageRow { gap: 10px; }
+  .root .pageRow > div { width: 100%; }
+  .root .fieldHeading { flex-wrap: wrap; gap: 4px; }
+  .root .saveBar { flex-wrap: wrap; }
+  .root input:not([type='checkbox']), .root select, .root textarea { font-size: 16px; }
+}

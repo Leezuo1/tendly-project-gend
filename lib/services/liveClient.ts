@@ -7,7 +7,7 @@
 import { currentAiKnowledge } from '@/lib/services/aiChat';
 import { dashboardRequest } from '@/lib/services/postsClient';
 import type {
-  LiveInsights, LiveOrderStatus, LiveSendResult, LiveSession, LiveSessionListItem, LiveSnapshot, LiveSourceKind, LiveSourceOption,
+  LiveInsights, LiveOrderStatus, LivePreparation, LiveSendResult, LiveSession, LiveSessionListItem, LiveSnapshot, LiveSourceKind, LiveSourceOption,
 } from '@/lib/types/live';
 
 const json = <T,>(res: Response) => res.json() as Promise<T>;
@@ -20,15 +20,18 @@ export interface StartLiveInput {
   sourceKind?: LiveSourceKind | 'auto';
   sourceId?: string;
   title?: string;
+  preparation: LivePreparation;
 }
 
 export const liveClient = {
   /** Video Live / bài đăng của Fanpage để chọn nguồn, kèm nền tảng sắp hỗ trợ. */
   sources: () => dashboardRequest('/api/live/sources').then(json<{ sources: LiveSourceOption[]; upcoming: string[] }>),
   sessions: () => dashboardRequest('/api/live/sessions').then(json<{ sessions: LiveSessionListItem[] }>).then((r) => r.sessions),
-  /** Gửi kèm Cấu hình AI (sản phẩm, giá, tồn kho, FAQ) làm danh mục cố định của phiên. */
+  /** Lưu phiên nháp; activate chỉ được gọi sau khi shop xem và duyệt bản dữ liệu đã lưu. */
   start: (input: StartLiveInput) => post('/api/live/sessions', { ...input, knowledge: currentAiKnowledge() })
     .then(json<{ session: LiveSession }>).then((r) => r.session),
+  saveDraft: (id: string, revision: number, title: string, preparation: LivePreparation) => dashboardRequest(session(id), { method: 'PATCH', body: JSON.stringify({ revision, title, preparation, knowledge: currentAiKnowledge() }) }).then(json<LiveSnapshot>),
+  activate: (id: string, revision: number) => post(`${session(id)}/start`, { revision, confirmed: true }).then(json<LiveSnapshot>),
   snapshot: (id: string) => dashboardRequest(session(id)).then(json<LiveSnapshot>),
   /** Kéo bình luận mới rồi trả snapshot — gọi định kỳ khi đang live (useLiveSession lo việc này). */
   sync: (id: string) => post(`${session(id)}/sync`).then(json<LiveSnapshot>),

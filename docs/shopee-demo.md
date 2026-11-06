@@ -32,7 +32,7 @@ Khi dùng tunnel, mở Tendly bằng chính URL HTTPS của tunnel, đăng ký d
 
 ## 3. Cấp quyền và đồng bộ
 
-1. Mở **Cấu hình AI → Sản phẩm** (`/cau-hinh-ai?tab=products`) trên đúng domain đã cấu hình.
+1. Mở **Cài đặt → Nguồn sản phẩm** (`/cai-dat?tab=products`) trên đúng domain đã cấu hình.
 2. Bấm **Kết nối Shopee** để mở trang cấp quyền chính thức.
 3. Đăng nhập **tài khoản của shop demo**, xác nhận quyền. Không dùng tài khoản chính nhiều shop: code chỉ nhận callback có `shop_id` đúng `SHOPEE_SHOP_ID`.
 4. Trở về Tendly, thẻ nguồn hiển thị **Đã cấp quyền**. Bấm **Đồng bộ Shopee**.

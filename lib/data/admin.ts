@@ -1,4 +1,28 @@
-import type { MockDb, Plan } from '@/lib/types/admin';
+import { CATALOG_PRODUCTS } from '@/lib/data/products';
+import type { MockDb, Plan, Product } from '@/lib/types/admin';
+
+export const LEGACY_PRODUCTS: Product[] = [
+      { id: 'p-at01', sku: 'AT-01', name: 'Áo thun basic cotton Tendly', material: '100% Cotton Compact', emoji: '👕', category: 'Áo thun', colors: ['Trắng', 'Đen', 'Xám'], sizes: ['S', 'M', 'L', 'XL'], qty: 145, price: 259000 },
+      { id: 'p-ak23', sku: 'AK-23', name: 'Áo khoác dạ nữ dáng dài AK-23', material: 'Dạ ép 2 lớp cao cấp', emoji: '🧥', category: 'Áo khoác', colors: ['Be', 'Nâu tây', 'Đen'], sizes: ['S', 'M'], qty: 42, price: 1290000 },
+      { id: 'p-dv12', sku: 'DV-12', name: 'Đầm voan hoa nhí cổ V vintage', material: 'Voan tơ lót lụa habutai', emoji: '👗', category: 'Váy & Đầm', colors: ['Vàng pastel', 'Xanh mint'], sizes: ['Freesize'], qty: 68, price: 459000 },
+      { id: 'p-qj88', sku: 'QJ-88', name: 'Quần jeans ống suông lưng cao QJ-88', material: 'Denim co giãn nhẹ', emoji: '👖', category: 'Quần jeans', colors: ['Xanh khói', 'Xanh đen'], sizes: ['26', '27', '28', '29'], qty: 55, price: 499000 },
+      { id: 'p-cv05', sku: 'CV-05', name: 'Chân váy chữ A kaki túi hộp CV-05', material: 'Kaki chéo dày dặn', emoji: '👚', category: 'Chân váy', colors: ['Be sáng', 'Đen'], sizes: ['S', 'M'], qty: 12, price: 329000 },
+      { id: 'p-sm09', sku: 'SM-09', name: 'Áo sơ mi lụa satin công sở SM-09', material: 'Lụa ngọc trai mềm mát', emoji: '👔', category: 'Áo sơ mi', colors: ['Trắng kem', 'Hồng phấn'], sizes: ['M', 'L'], qty: 89, price: 389000 },
+      { id: 'p-pk03', sku: 'PK-03', name: 'Túi tote vải canvas in chữ Tendly', material: 'Canvas dệt sợi đôi', emoji: '👜', category: 'Phụ kiện', colors: ['Trắng ngà', 'Đen'], sizes: ['One size'], qty: 180, price: 159000 },
+      { id: 'p-at02', sku: 'AT-02', name: 'Áo thun oversize in chữ Tendly', material: 'Cotton 2 chiều 250gsm', emoji: '👕', category: 'Áo thun', colors: ['Trắng', 'Đen', 'Be'], sizes: ['M', 'L', 'XL'], qty: 96, price: 289000 },
+      { id: 'p-at07', sku: 'AT-07', name: 'Áo polo nữ dệt kim AT-07', material: 'Cotton pique thoáng khí', emoji: '👕', category: 'Áo thun', colors: ['Trắng', 'Xanh navy'], sizes: ['S', 'M', 'L'], qty: 8, price: 319000 },
+      { id: 'p-ak11', sku: 'AK-11', name: 'Áo khoác jean wash bụi AK-11', material: 'Denim 100% cotton', emoji: '🧥', category: 'Áo khoác', colors: ['Xanh nhạt'], sizes: ['M', 'L'], qty: 27, price: 559000 },
+      { id: 'p-ak15', sku: 'AK-15', name: 'Áo cardigan len mỏng AK-15', material: 'Len lông cừu pha', emoji: '🧶', category: 'Áo khoác', colors: ['Kem', 'Xám tro', 'Nâu'], sizes: ['Freesize'], qty: 0, price: 429000 },
+      { id: 'p-dv20', sku: 'DV-20', name: 'Đầm suông linen cổ tròn DV-20', material: 'Linen bột mềm', emoji: '👗', category: 'Váy & Đầm', colors: ['Trắng', 'Be', 'Xanh rêu'], sizes: ['S', 'M', 'L'], qty: 34, price: 489000 },
+      { id: 'p-dv31', sku: 'DV-31', name: 'Đầm dự tiệc satin hai dây DV-31', material: 'Satin lụa Hàn', emoji: '👗', category: 'Váy & Đầm', colors: ['Đen', 'Đỏ rượu'], sizes: ['S', 'M'], qty: 15, price: 690000 },
+      { id: 'p-qj41', sku: 'QJ-41', name: 'Quần jeans skinny QJ-41', material: 'Denim cotton spandex', emoji: '👖', category: 'Quần jeans', colors: ['Đen', 'Xanh đậm'], sizes: ['26', '27', '28', '29', '30'], qty: 73, price: 459000 },
+      { id: 'p-qt02', sku: 'QT-02', name: 'Quần tây ống đứng công sở QT-02', material: 'Tuyết mưa Hàn', emoji: '👖', category: 'Quần tây', colors: ['Đen', 'Be', 'Ghi'], sizes: ['S', 'M', 'L'], qty: 61, price: 399000 },
+      { id: 'p-qs08', sku: 'QS-08', name: 'Quần short kaki QS-08', material: 'Kaki cotton', emoji: '🩳', category: 'Quần short', colors: ['Be', 'Đen', 'Trắng'], sizes: ['S', 'M', 'L'], qty: 110, price: 229000 },
+      { id: 'p-cv12', sku: 'CV-12', name: 'Chân váy xếp ly dài CV-12', material: 'Voan chiffon 2 lớp', emoji: '👚', category: 'Chân váy', colors: ['Đen', 'Kem', 'Xanh dương'], sizes: ['Freesize'], qty: 47, price: 359000 },
+      { id: 'p-sm14', sku: 'SM-14', name: 'Áo sơ mi kẻ sọc form rộng SM-14', material: 'Cotton lụa', emoji: '👔', category: 'Áo sơ mi', colors: ['Xanh sọc trắng', 'Hồng sọc trắng'], sizes: ['Freesize'], qty: 19, price: 349000 },
+      { id: 'p-pk07', sku: 'PK-07', name: 'Mũ bucket vải dù PK-07', material: 'Vải dù chống nước', emoji: '🧢', category: 'Phụ kiện', colors: ['Đen', 'Be', 'Xanh rêu'], sizes: ['One size'], qty: 140, price: 129000 },
+      { id: 'p-pk11', sku: 'PK-11', name: 'Thắt lưng da khoá tròn PK-11', material: 'Da bò thật', emoji: '👝', category: 'Phụ kiện', colors: ['Đen', 'Nâu'], sizes: ['One size'], qty: 38, price: 249000 },
+    ];
 
 export const PLANS: Plan[] = [
   {
@@ -57,28 +81,8 @@ export function createSeed(): MockDb {
       lastSyncedAt: 0,
       syncCount: 0,
     },
-    products: [
-      { id: 'p-at01', sku: 'AT-01', name: 'Áo thun basic cotton Tendly', material: '100% Cotton Compact', emoji: '👕', category: 'Áo thun', colors: ['Trắng', 'Đen', 'Xám'], sizes: ['S', 'M', 'L', 'XL'], qty: 145, price: 259000 },
-      { id: 'p-ak23', sku: 'AK-23', name: 'Áo khoác dạ nữ dáng dài AK-23', material: 'Dạ ép 2 lớp cao cấp', emoji: '🧥', category: 'Áo khoác', colors: ['Be', 'Nâu tây', 'Đen'], sizes: ['S', 'M'], qty: 42, price: 1290000 },
-      { id: 'p-dv12', sku: 'DV-12', name: 'Đầm voan hoa nhí cổ V vintage', material: 'Voan tơ lót lụa habutai', emoji: '👗', category: 'Váy & Đầm', colors: ['Vàng pastel', 'Xanh mint'], sizes: ['Freesize'], qty: 68, price: 459000 },
-      { id: 'p-qj88', sku: 'QJ-88', name: 'Quần jeans ống suông lưng cao QJ-88', material: 'Denim co giãn nhẹ', emoji: '👖', category: 'Quần jeans', colors: ['Xanh khói', 'Xanh đen'], sizes: ['26', '27', '28', '29'], qty: 55, price: 499000 },
-      { id: 'p-cv05', sku: 'CV-05', name: 'Chân váy chữ A kaki túi hộp CV-05', material: 'Kaki chéo dày dặn', emoji: '👚', category: 'Chân váy', colors: ['Be sáng', 'Đen'], sizes: ['S', 'M'], qty: 12, price: 329000 },
-      { id: 'p-sm09', sku: 'SM-09', name: 'Áo sơ mi lụa satin công sở SM-09', material: 'Lụa ngọc trai mềm mát', emoji: '👔', category: 'Áo sơ mi', colors: ['Trắng kem', 'Hồng phấn'], sizes: ['M', 'L'], qty: 89, price: 389000 },
-      { id: 'p-pk03', sku: 'PK-03', name: 'Túi tote vải canvas in chữ Tendly', material: 'Canvas dệt sợi đôi', emoji: '👜', category: 'Phụ kiện', colors: ['Trắng ngà', 'Đen'], sizes: ['One size'], qty: 180, price: 159000 },
-      { id: 'p-at02', sku: 'AT-02', name: 'Áo thun oversize in chữ Tendly', material: 'Cotton 2 chiều 250gsm', emoji: '👕', category: 'Áo thun', colors: ['Trắng', 'Đen', 'Be'], sizes: ['M', 'L', 'XL'], qty: 96, price: 289000 },
-      { id: 'p-at07', sku: 'AT-07', name: 'Áo polo nữ dệt kim AT-07', material: 'Cotton pique thoáng khí', emoji: '👕', category: 'Áo thun', colors: ['Trắng', 'Xanh navy'], sizes: ['S', 'M', 'L'], qty: 8, price: 319000 },
-      { id: 'p-ak11', sku: 'AK-11', name: 'Áo khoác jean wash bụi AK-11', material: 'Denim 100% cotton', emoji: '🧥', category: 'Áo khoác', colors: ['Xanh nhạt'], sizes: ['M', 'L'], qty: 27, price: 559000 },
-      { id: 'p-ak15', sku: 'AK-15', name: 'Áo cardigan len mỏng AK-15', material: 'Len lông cừu pha', emoji: '🧶', category: 'Áo khoác', colors: ['Kem', 'Xám tro', 'Nâu'], sizes: ['Freesize'], qty: 0, price: 429000 },
-      { id: 'p-dv20', sku: 'DV-20', name: 'Đầm suông linen cổ tròn DV-20', material: 'Linen bột mềm', emoji: '👗', category: 'Váy & Đầm', colors: ['Trắng', 'Be', 'Xanh rêu'], sizes: ['S', 'M', 'L'], qty: 34, price: 489000 },
-      { id: 'p-dv31', sku: 'DV-31', name: 'Đầm dự tiệc satin hai dây DV-31', material: 'Satin lụa Hàn', emoji: '👗', category: 'Váy & Đầm', colors: ['Đen', 'Đỏ rượu'], sizes: ['S', 'M'], qty: 15, price: 690000 },
-      { id: 'p-qj41', sku: 'QJ-41', name: 'Quần jeans skinny QJ-41', material: 'Denim cotton spandex', emoji: '👖', category: 'Quần jeans', colors: ['Đen', 'Xanh đậm'], sizes: ['26', '27', '28', '29', '30'], qty: 73, price: 459000 },
-      { id: 'p-qt02', sku: 'QT-02', name: 'Quần tây ống đứng công sở QT-02', material: 'Tuyết mưa Hàn', emoji: '👖', category: 'Quần tây', colors: ['Đen', 'Be', 'Ghi'], sizes: ['S', 'M', 'L'], qty: 61, price: 399000 },
-      { id: 'p-qs08', sku: 'QS-08', name: 'Quần short kaki QS-08', material: 'Kaki cotton', emoji: '🩳', category: 'Quần short', colors: ['Be', 'Đen', 'Trắng'], sizes: ['S', 'M', 'L'], qty: 110, price: 229000 },
-      { id: 'p-cv12', sku: 'CV-12', name: 'Chân váy xếp ly dài CV-12', material: 'Voan chiffon 2 lớp', emoji: '👚', category: 'Chân váy', colors: ['Đen', 'Kem', 'Xanh dương'], sizes: ['Freesize'], qty: 47, price: 359000 },
-      { id: 'p-sm14', sku: 'SM-14', name: 'Áo sơ mi kẻ sọc form rộng SM-14', material: 'Cotton lụa', emoji: '👔', category: 'Áo sơ mi', colors: ['Xanh sọc trắng', 'Hồng sọc trắng'], sizes: ['Freesize'], qty: 19, price: 349000 },
-      { id: 'p-pk07', sku: 'PK-07', name: 'Mũ bucket vải dù PK-07', material: 'Vải dù chống nước', emoji: '🧢', category: 'Phụ kiện', colors: ['Đen', 'Be', 'Xanh rêu'], sizes: ['One size'], qty: 140, price: 129000 },
-      { id: 'p-pk11', sku: 'PK-11', name: 'Thắt lưng da khoá tròn PK-11', material: 'Da bò thật', emoji: '👝', category: 'Phụ kiện', colors: ['Đen', 'Nâu'], sizes: ['One size'], qty: 38, price: 249000 },
-    ],
+    productCatalogVersion: 1,
+    products: structuredClone(CATALOG_PRODUCTS),
     faqs: [
       {
         id: 'f1', question: 'Shop có giao COD không?', tag: 'Giao hàng & Thanh toán', active: true,

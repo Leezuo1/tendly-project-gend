@@ -22,7 +22,7 @@ const post = (extra = {}) => ({ source: ' TikTok ', externalId: '123', url: 'htt
 test('search plan validates industry and returns seed queries, not collected trends', () => {
   const plan = prepareSourcingSearch({ industry: ' Thời trang & phụ kiện ' }, now);
   assert.equal(plan.status, 'prepared');
-  assert.equal(plan.collectionReady, false);
+  assert.equal(plan.collectionStarted, false);
   assert.deepEqual(plan.keywords, ['thời trang', 'phối đồ', 'phụ kiện thời trang']);
   assert.deepEqual(plan.period, { from: '2026-10-27T10:00:00.000Z', to: now.toISOString() });
   for (const industry of [undefined, {}, 'không tồn tại', 'constructor', 'Dịch vụ', 'Khác']) {

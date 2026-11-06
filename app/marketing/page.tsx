@@ -5,10 +5,11 @@ import './marketing.css';
 import './post-composer.css';
 import './facebook-comments.css';
 import './facebook-posts.css';
+import './marketing-workspace.css';
 
 export const metadata: Metadata = {
   title: 'Marketing — Tendly',
-  description: 'Duyệt nội dung remarketing do AI đề xuất và theo dõi hiệu suất so với cách làm cũ.',
+  description: 'Lập chiến dịch, soạn và rà soát nội dung, duyệt bài, xếp lịch và chăm sóc khách từ Fanpage.',
 };
 
 export default function MarketingPage() {

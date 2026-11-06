@@ -19,7 +19,8 @@ function RefreshIcon() {
   return <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 2M5 16a8 8 0 0 0 13 2" /></svg>;
 }
 
-export function FacebookCommentsTab({ onToast }: { onToast: (message: string) => void }) {
+export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (message: string) => void; initialPostId?: string }) {
+  const [postFilter, setPostFilter] = useState(initialPostId ?? '');
   const { data, loading, error, reload } = useMarketingData(client.list);
   const [busy, setBusy] = useState('');
   const [query, setQuery] = useState('');
@@ -41,7 +42,7 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
     finally { setBusy(''); reload(); }
   };
   const comments = (data?.comments ?? []).filter((c) =>
-    (filter === 'all' || c.status === filter) && `${c.authorName} ${c.text} ${c.postId}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi')));
+    (!postFilter || c.postId === postFilter) && (filter === 'all' || c.status === filter) && `${c.authorName} ${c.text} ${c.postId}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi')));
   const selected = comments.find((c) => c.commentId === selectedId) ?? comments[0];
   const groups = groupCommentsByAuthor(comments);
   const selectedGroup = groups.find((group) => group.includes(selected)) ?? [];
@@ -61,6 +62,7 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
       <div className="card fc-settings">
         <div className="card-head fc-settings-head">
           <h2>Bình luận → Messenger</h2>
+          {postFilter && <button type="button" className="btn btn-outline btn-sm" onClick={() => setPostFilter('')}>Bài {postFilter} · Xem tất cả</button>}
           <div className="fc-settings-controls">
           <button type="button" className="fc-toggle" role="switch" aria-checked={data?.settings.autoReply ?? false}
             aria-label="AI tự nhắn riêng" disabled={!!busy || !data}
@@ -139,7 +141,7 @@ export function FacebookCommentsTab({ onToast }: { onToast: (message: string) =>
           Đồng bộ dữ liệu sản phẩm để AI sẵn sàng hỗ trợ khách.</p>
         <div className="fc-empty-actions">
           <Link className="btn btn-primary btn-sm" href="/cai-dat?tab=channels">Kiểm tra kết nối Fanpage →</Link>
-          <Link className="btn btn-outline btn-sm" href="/cau-hinh-ai">Cài đặt dữ liệu AI</Link>
+          <Link className="btn btn-outline btn-sm" href="/cai-dat?tab=faq">Cài đặt dữ liệu AI</Link>
         </div>
       </div> : <div className="fc-workspace">
         <div className="card fc-list" aria-label="Bình luận theo người dùng">

@@ -4,7 +4,7 @@
  */
 import { normalize, formatMoney } from '@/lib/utils/format';
 import type { AiKnowledge } from '@/lib/types/ai';
-import type { LiveIntent } from '@/lib/types/live';
+import type { LiveIntent, LivePreparation } from '@/lib/types/live';
 import type { LiveProduct } from '@/lib/services/live/classify';
 
 export interface TemplateResult {
@@ -23,7 +23,7 @@ function faqAnswer(knowledge: AiKnowledge, phrases: string[]): string | null {
 const PRODUCT_INTENTS: LiveIntent[] = ['order', 'price', 'stock', 'view', 'size_advice'];
 
 /** Câu mẫu của nhóm; placeholder được điền riêng cho từng khách lúc gửi (fillTemplate). */
-export function groupTemplate(intent: LiveIntent, product: LiveProduct | null, knowledge: AiKnowledge, outOfStock = false): TemplateResult {
+export function groupTemplate(intent: LiveIntent, product: LiveProduct | null, knowledge: AiKnowledge, outOfStock = false, preparation?: LivePreparation | null): TemplateResult {
   if (PRODUCT_INTENTS.includes(intent) && !product) {
     // Chưa biết khách hỏi mẫu nào: shop chọn "mẫu đang lên sóng" hoặc tự trả lời
     return { text: 'Dạ {ten_khach} ơi, bạn đang hỏi mẫu nào ạ? Bạn gửi shop tên hoặc mã sản phẩm để shop báo giá và giữ hàng nha 💕', needsHuman: true };
@@ -32,15 +32,19 @@ export function groupTemplate(intent: LiveIntent, product: LiveProduct | null, k
     case 'order':
       return outOfStock
         ? { text: 'Dạ {ten_khach} ơi, tiếc quá {san_pham} vừa hết hàng rồi ạ 😢 Shop gợi ý mẫu {goi_y} cũng rất xinh, bạn muốn xem không ạ?', needsHuman: false }
-        : { text: 'Dạ shop đã giữ {san_pham} {mau} {size} x{so_luong} ({gia}) cho {ten_khach} rồi ạ. Bạn gửi giúp shop SĐT + địa chỉ nhận hàng để shop lên đơn nha 💕', needsHuman: false };
+        : { text: `Dạ shop ghi nhận yêu cầu {san_pham} {mau} {size} x{so_luong} ({gia}) của {ten_khach}. Shop kiểm tra tồn size/màu trước khi xác nhận. Bạn gửi giúp shop ${preparation?.receivingFields || 'SĐT + địa chỉ nhận hàng'} nhé.`, needsHuman: !!product?.sizes.length || !!product?.colors.length };
     case 'price':
-      return { text: 'Dạ {ten_khach} ơi, {san_pham} giá {gia}, shop còn {con_lai} sản phẩm (size {ds_size}, màu {ds_mau}). Bạn ưng size/màu nào nhắn shop giữ hàng liền nha 💕', needsHuman: false };
+      return { text: 'Dạ {ten_khach} ơi, {san_pham} giá {gia}, lượng còn trong phiên là {con_lai}. Shop kiểm tra size/màu bạn chọn trước khi xác nhận nhé.', needsHuman: false };
     case 'stock':
-      return { text: 'Dạ {san_pham} hiện còn {con_lai} sản phẩm ạ (size {ds_size}, màu {ds_mau}). Bạn chốt size/màu nào shop giữ cho mình nha!', needsHuman: false };
+      return { text: 'Dạ {san_pham} còn {con_lai} theo lượng trong phiên. Bạn cần size/màu nào để shop kiểm tra trước khi xác nhận?', needsHuman: !!product?.sizes.length || !!product?.colors.length };
     case 'view':
-      return { text: 'Dạ shop lên mẫu {san_pham} ngay đây ạ, {ten_khach} xem live nha. Giá {gia}, còn {con_lai} sản phẩm 💕', needsHuman: false };
-    case 'size_advice':
-      return { text: 'Dạ {san_pham} có size {ds_size} ạ. Bạn cho shop xin chiều cao + cân nặng, shop tư vấn size vừa nhất cho {ten_khach} nha!', needsHuman: false };
+      return { text: 'Dạ shop đã ghi nhận bạn muốn xem {san_pham}. Host sẽ kiểm tra để giới thiệu; giá {gia}.', needsHuman: false };
+    case 'size_advice': {
+      const entry = preparation?.catalog.find(item => item.sku === product?.sku);
+      return entry?.sizeChart && entry.sizeSource
+        ? { text: `Bảng size tham khảo của {san_pham}: ${entry.sizeChart}. Nguồn: ${entry.sizeSource}.${entry.fit ? ` Form dáng: ${entry.fit}.` : ''} Bạn gửi số đo để shop đối chiếu, chưa thể đảm bảo vừa.`, needsHuman: false }
+        : { text: 'Dạ shop chưa có bảng size có nguồn cho {san_pham}. Bạn gửi số đo, shop nhờ người phụ trách kiểm tra trước khi tư vấn nhé.', needsHuman: true };
+    }
     case 'shipping': {
       const answer = faqAnswer(knowledge, ['ship', 'giao hang', 'van chuyen', 'cod', 'phi ship']);
       return answer

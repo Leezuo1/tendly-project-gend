@@ -2,6 +2,36 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Marketing theo chiến dịch
+
+- Marketing gồm **Chiến dịch → Soạn nội dung → Duyệt nội dung → Lịch đăng → Hiệu quả**. Hồ sơ từng tài khoản, bài/bình luận Facebook, private reply và các công cụ CSKH cũ nằm trong nhóm công cụ phụ. `?tab=queue` vẫn là hàng chờ remarketing; duyệt bài dùng `?tab=approvals`.
+- Trong **Soạn nội dung**, luồng bắt buộc là **brief đã duyệt → trụ cột, heading/dàn ý → Review và duyệt kế hoạch → viết bài theo dàn ý → Review → duyệt bài → lịch**. Popup hai tab Dàn ý/Bài viết tự mở sau tạo và mở lại từ danh sách, có AI Review, nguồn và chỉnh sửa bên cạnh. Mặc định AI đề xuất 3 trụ cột/3 dàn ý; server nhận tối đa 3 trụ cột/6 dàn ý mỗi phương án. Kế hoạch lưu cùng workspace, không cần migration mới. Sửa kế hoạch hủy duyệt bài phụ thuộc và tạm dừng lịch; viết lại bằng AI tạo phương án riêng. Bài campaign cũ chưa gắn dàn ý cần chọn kế hoạch hiện hành và Review lại trước khi duyệt/đăng. Xem [luồng kế hoạch nội dung](docs/marketing-redesign-plan.md#11-bổ-sung-trụ-cột-headingdàn-ý-và-popup-chi-tiết).
+- Chạy migration `npm run db:migrate` để có bảng `marketing_workspaces` (migration 015). Campaign, hồ sơ kênh, nguồn tri thức/quy tắc được xác nhận, kết quả Review, chấp thuận và lịch lưu ở PostgreSQL theo Page hiện được cấp quyền. Bài/ảnh tái sử dụng các bảng Marketing hiện có; không tạo kho bài song song.
+- Facebook dùng Gemini Content rồi một lượt Review với **căn cứ được chọn riêng theo dữ kiện cần đối chiếu**; có thể bổ sung tri thức/FAQ Page đã xác nhận ngoài nguồn Content. Hiển thị bản cuối cùng phần trước/sau, lý do và nguồn. Thiếu/mâu thuẫn căn cứ thì yêu cầu bổ sung, lỗi giữ bản gốc để thử lại. Review lại bài đã có tạo đề xuất chờ shop áp dụng; chưa ghi đè bài/lịch. Áp dụng bản sửa hoặc đổi bài/ảnh/brief/hồ sơ cần Review/duyệt lại; nguồn căn cứ đổi cũng chặn duyệt/lịch/publish. Review chỉ kiểm tra văn bản, ảnh đính kèm do người duyệt xem. Xem [phạm vi AI Review](docs/review-redesign-plan.md#13-phạm-vi-triển-khai-06112026).
+- Facebook đăng qua luồng Graph API hiện có sau xác nhận đăng hoặc lịch được duyệt/kích hoạt. Instagram/TikTok/Shopee là tài khoản mẫu, tạo nội dung theo mẫu từ brief và chỉ mô phỏng bước đăng; không gọi provider và không được cộng thành bài Facebook thật. Hồ sơ Page thật hiện theo một Page đã được backend cấp quyền; không có kết nối nhiều Page mới.
+- Lịch hỗ trợ một lần, tuần hữu hạn tối đa 12 tuần, các mẫu lễ/sale/ra mắt/Live/xả hàng và các mốc sửa tay. Mỗi mốc chọn bài đã duyệt. Không gửi bù dồn mốc lỡ quá 15 phút; kết quả chưa rõ không tự thử lại. Bài campaign không thể sửa/xóa/đăng vượt gate bằng các API bài cũ.
+- **Để lịch thực thi:** cấu hình `CRON_SECRET` server-side rồi chạy `npm run marketing:scheduler` cạnh app đang chạy; `TENDLY_APP_URL` mặc định `http://localhost:3000`. Khi triển khai, dùng trusted cron gọi `GET /api/marketing/schedules/run` mỗi phút với `Authorization: Bearer <CRON_SECRET>`. Lưu/kích hoạt lịch không tự cài cron trên hosting. Không đặt secret vào client.
+- Bình luận của bài campaign dùng đúng snapshot sản phẩm/brief và ưu đãi còn hiệu lực; đổi brief hoặc deal hết hạn chặn nhánh tự gửi và đưa về nhân viên. Giữ private reply, duyệt tay và chống gửi trùng với Live; không tự bật chế độ gửi khi redesign.
+- Nguồn sản phẩm/FAQ và quy tắc AI hiện được chủ shop xác nhận thành snapshot server khi duyệt brief, chưa phải đồng bộ catalog/kho chung liên tục. Chỉnh nguồn cần lưu/duyệt lại brief để cập nhật. Hiệu quả hiển thị số bài/trạng thái và số liệu Facebook hiện có, chưa có attribution doanh thu.
+- Kiểm thử: `node --test tests/marketing-workspace.test.mjs` kiểm tra pipeline, nguồn chung, gate duyệt, lịch, ảnh và lỗi gửi; provider được stub. Chưa chạy đăng/private reply hoặc Gemini thật để kiểm thử trong đợt này.
+
+### FAQ và cấu hình vai trò AI
+
+- **Cài đặt** có các tab Nguồn sản phẩm (`/cai-dat?tab=products`), FAQ (`/cai-dat?tab=faq`) và Gắn thẻ theo ngữ cảnh (`/cai-dat?tab=tags`). Link cũ `/faq` và `/cau-hinh-ai?tab=products|faq|email` chuyển đến Cài đặt; `tab=email` chuyển sang gắn thẻ. Callback Shopee về tab Nguồn sản phẩm. Dữ liệu hiện có được giữ nguyên.
+- Gắn thẻ hỗ trợ thêm/sửa/xóa, chọn màu, bật/tắt và thử quy tắc. Khớp một trong các từ khóa/cụm từ đầy đủ, không phân biệt hoa thường và dấu tiếng Việt, trên tin nhắn mới nhất của khách. Hộp thoại hiển thị thẻ trong danh sách và hồ sơ khách, hỗ trợ tìm theo tên thẻ. Quy tắc lưu trong mock DB hiện có của trình duyệt; chưa chạy phân loại ở webhook/backend.
+- `/cau-hinh-ai` gồm hai tab **Quản lý AI** và **Thiết lập AI**. Quản lý hiển thị năm AI, nhiệm vụ, trạng thái, nơi sử dụng, chi tiết và lối tắt chỉnh quy tắc. AI Chat đọc Fanpage đã kết nối từ `/api/settings/channels`, gán/bật/tắt riêng theo ID trang. Nội dung/Review đọc chiến dịch và bài viết từ Marketing; Livestream đọc phiên thực tế.
+- Thiết lập có bộ chọn AI, trường ngắn theo vai trò, mẫu gợi ý và quy tắc mặc định. Tùy chỉnh nền tảng lưu từng trường, các trường còn lại kế thừa mặc định; tắt tùy chỉnh vẫn giữ nội dung để bật lại. Smart Sourcing có ngành, giá VND, MOQ và khu vực. Link `?tab=settings&ai=chat|content|review|sourcing|livestream` chọn sẵn AI.
+- Content/Review/Live/Sourcing giữ cấu hình trình duyệt theo tài khoản, tương thích cấu hình v1 cũ. Page cũ nhập tên không được tự coi là Fanpage đã kết nối. Quy tắc Content/Review được chụp vào brief khi lưu và dùng trong luồng campaign đã xác nhận; sửa cấu hình cần lưu/duyệt lại brief để cập nhật. Riêng Chat lưu tri thức, hồ sơ Page và quy tắc mặc định/Facebook đã xác nhận trên server; công tắc chung tại Cấu hình AI và công tắc riêng từng hội thoại điều khiển tự gửi Messenger. Quy tắc Live/Sourcing tại màn này chưa điều khiển backend tương ứng. Lỗi lưu không ghi đè dữ liệu cũ; lỗi đọc không tự thay bằng mặc định.
+- Kiểm tra cấu hình: `node --test tests/ai-configuration.test.mjs`. Tri thức sản phẩm/FAQ vẫn dùng luồng hiện tại; chưa chuyển nguồn tri thức chung lên server.
+
+### Danh mục sản phẩm và chỉnh sửa
+
+Trong **Cài đặt → Nguồn sản phẩm**, danh mục mặc định gồm 10 sản phẩm Coolmate có ảnh và link gốc. Thông tin nguồn/giá tại ngày lấy được ghi tại [nguồn danh mục](docs/product-catalog-sources.md). Tồn kho shop để chưa nhập; giá là dữ liệu tại lần lấy, không tự cập nhật theo website.
+
+Nút **Sửa** mở hồ sơ riêng: SKU, tên, thương hiệu, giá/tồn, chất liệu, màu/size, mô tả, tính năng, lợi ích, USP, tệp khách, tình huống dùng, keyword, sản phẩm liên quan, bảo quản và giới hạn cam kết. Thông tin được lưu lại và đưa vào nguồn AI khi đọc danh mục hiện hành; soạn bài nhận các trường tư vấn mới. Messenger dùng bản nguồn đã cập nhật và xác nhận tại Cấu hình AI → Thiết lập AI → AI Chat; phiên Live chỉ nhận sản phẩm đã xác nhận tồn kho và giữ danh mục lúc bắt đầu phiên.
+
+Danh mục mới thay các dòng mẫu cũ chưa chỉnh; giữ lại sản phẩm đã sửa, CSV và Shopee cùng thông tin shop/FAQ. Đồng bộ Shopee cập nhật dữ kiện thương mại, giữ nội dung tư vấn đã bổ sung và bỏ liên kết tới sản phẩm đã ngừng có trong danh mục. Lưu lỗi không thay dữ liệu/cached state trước đó. Kiểm tra: `node --test tests/products.test.mjs tests/shopee.test.mjs tests/ai-chat.test.mjs tests/ai-post.test.mjs tests/livestream.test.mjs`.
+
 ### Bảo vệ dữ liệu & tài khoản quản trị
 
 - Chạy `node scripts/setup-app-security.mjs` để tạo tài khoản quản trị riêng. Script giữ nguyên cấu hình đang có, thêm `APP_ADMIN_USERNAME` và `APP_ADMIN_PASSWORD_HASH` vào `.env.local`; thông tin đăng nhập được lưu trong `.env.security-admin.local` (Git bỏ qua). Không đưa file này hoặc mật khẩu lên Git. Nếu đã cấu hình hash thì script không đổi thông tin đăng nhập.
@@ -17,7 +47,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 Kiểm tra quyền: `node --test tests/app-security.test.mjs` dùng PostgreSQL giả lập PGlite, thử tất cả handler API, phiên cũ/giả mạo, bật khóa giữa lúc gửi, quyền admin, logout/đổi mật khẩu, rate limit và lỗi DB. Các test nghiệp vụ khác dùng fixture tách quyền truy cập để tiếp tục kiểm tra luồng xử lý cũ.
 
-Kết nối một shop Shopee thật, cấu hình callback và đồng bộ sản phẩm: [hướng dẫn Shopee demo](docs/shopee-demo.md). Nút đồng bộ ở Cấu hình AI gọi API thật; lựa chọn Shopee trong onboarding vẫn là mô phỏng.
+Kết nối một shop Shopee thật, cấu hình callback và đồng bộ sản phẩm: [hướng dẫn Shopee demo](docs/shopee-demo.md). Nút đồng bộ ở FAQ & sản phẩm gọi API thật; lựa chọn Shopee trong onboarding vẫn là mô phỏng.
 
 ### Đăng ký và đăng nhập
 
@@ -29,13 +59,15 @@ Tài khoản mới có màn hình xác nhận đăng nhập, hiển thị tên/e
 
 Kiểm tra: `node --test tests/app-security.test.mjs` (đăng ký, đăng nhập, email trùng, validation, phiên, rate limit và cách ly dữ liệu demo). Thuật toán băm tài khoản mới dùng scrypt N=131072, r=8, p=1 theo [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html); hash quản trị định dạng cũ vẫn được hỗ trợ.
 
-### Smart Sourcing demo & thông tin setup
+### Smart Sourcing & thông tin setup
 
 Tên shop, ngành hàng, múi giờ, biểu tượng và màu nền ở `/tao-shop` dùng chung dữ liệu với **Cài đặt → Tài khoản & nhân viên**. Sửa trong Cài đặt sẽ cập nhật lại setup, giữ nguyên liên hệ, sản phẩm và dữ liệu kết nối. Bước 2 kết nối nền tảng vẫn mô phỏng và chưa đồng bộ sang Cài đặt.
 
-Mở **Smart Sourcing** (`/smart-sourcing`) từ sidebar → **Phân tích xu hướng mẫu** → chọn từ khóa → **Tìm nguồn hàng** trên sản phẩm. Demo có bộ mẫu riêng cho cả 7 ngành setup, mô phỏng tín hiệu Facebook/TikTok/sàn TMĐT, sản phẩm liên quan và nguồn cung. Đổi ngành trong Cài đặt sẽ đổi bộ mẫu và xóa kết quả phân tích cũ trên màn hình. Chưa setup thì trang hướng dẫn vào Cài đặt để bổ sung.
+Mở **Smart Sourcing** (`/smart-sourcing`) → nhập nhu cầu → lưu/xem truy vấn → xác nhận nguồn, giới hạn và phí trước khi thu thập. Yêu cầu, chấp thuận, run và shortlist lưu trên server theo chủ yêu cầu; tải lại trang đọc tiếp tiến trình. Kết quả có URL, nguồn, thời điểm và thông tin còn thiếu, thay cho dữ liệu mẫu trên UI.
 
-Từ khóa, mức tăng, lượt thảo luận, giá, số lượng tối thiểu và nhà cung cấp đều là dữ liệu minh họa, không phải khảo sát hay báo giá thật. **Tra cứu nguồn tương tự** mở tìm kiếm Google, chưa xác minh/liên hệ nhà cung cấp hoặc đặt hàng. Không thêm API, crawler, đồng bộ nền tảng hay phụ thuộc mới; dữ liệu setup vẫn chỉ lưu trên trình duyệt.
+Google chỉ trả đầu mối tham khảo, giá/tiền tệ/đơn vị/MOQ chưa rõ để `null`; tương tác TikTok không phải doanh số hoặc bằng chứng tăng trưởng. Có ghi chú, shortlist, đánh dấu shop đã kiểm tra/loại, xem trước nhập sản phẩm mới (giá bán nhập riêng, tồn chưa xác nhận, chặn trùng SKU) hoặc tạo brief ý tưởng Marketing nháp. Không tự liên hệ, mua hàng, duyệt hoặc đăng bài.
+
+UI nối backend Apify `clockworks/tiktok-scraper` và `apify/google-search-scraper`. Cần `APIFY_API_TOKEN`, `DATABASE_URL` và migration 019 (`npm run db:migrate`). API khởi tạo trả ID để kiểm tra tiến trình và lưu kết quả; start chưa rõ không tự retry. Xem [kế hoạch/phạm vi đã triển khai](docs/smart-sourcing-redesign-plan.md#7-phạm-vi-đã-triển-khai). Chưa xác nhận kết nối provider thật; danh mục sản phẩm vẫn dùng nơi lưu hiện có trong trình duyệt.
 
 Kiểm tra: `node --test tests/mock-onboarding.test.mjs tests/ai-chat.test.mjs tests/smart-sourcing.test.mjs`.
 
@@ -84,17 +116,17 @@ Trang Cài đặt bỏ banner khôi phục và thông tin mẫu. Nút bút chì 
 
 Dashboard `/tong-quan` lấy số hội thoại đang chờ, tin đến/tin gửi hôm nay, 10 tin khách gần đây và thống kê hội thoại 7 ngày từ PostgreSQL qua `/api/dashboard`, cập nhật khoảng 2 giây khi tab đang mở. Tổng quan và Hộp thoại dùng phiên đăng nhập app và công tắc bảo vệ dữ liệu; không nhập hay lưu mã truy cập trong trình duyệt. Các số liệu email, đơn hàng và cảm xúc chưa có nguồn lưu thật được để trống. Tên chủ shop đọc từ thành viên chủ shop đã lưu trong cấu hình trình duyệt, bỏ qua tên mẫu; chưa có backend tài khoản nên chưa có tên thì để trống.
 
-Trong `/cau-hinh-ai`, nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình email tự động. Mỗi lần hỏi AI, ứng dụng đọc lại dữ liệu đã lưu; chỉ FAQ đang bật và kịch bản email đang bật được cung cấp cho Gemini. Hộp thoại, khung chat khách và ô **Thử hỏi AI** dùng chung luồng này.
+Trong Cài đặt (`/cai-dat`), nhập/đồng bộ sản phẩm, lưu FAQ và cấu hình gắn thẻ theo ngữ cảnh tại các tab tương ứng. Khung chat khách và ô **Thử hỏi AI** đọc lại dữ liệu trình duyệt mỗi lần hỏi; chỉ FAQ đang bật và kịch bản email cũ đang bật được cung cấp cho Gemini. Hộp thoại Messenger dùng bộ tri thức/quy tắc đã xác nhận trên server, gồm cả gợi ý thủ công và phân tích lịch sử; cần cập nhật và xác nhận lại trong Thiết lập AI Chat khi sửa sản phẩm/FAQ. Dữ liệu email cũ được giữ để tương thích khung email khách hàng; tab gắn thẻ không gửi email.
 
 Sản phẩm là nguồn cho giá, chất liệu, size, màu và tổng tồn kho. FAQ là nguồn cho chính sách shop. Mẫu email chỉ cung cấp thông tin về kịch bản, không chứng minh khách đủ điều kiện nhận ưu đãi hay email đã được gửi. Chỉ dẫn yêu cầu AI báo thiếu dữ liệu thay vì đoán thông tin hoặc tự xác nhận đã tạo đơn/gửi email. Việc gửi email thực tế không nằm trong tính năng này.
 
-Cấu hình hiện dùng mock DB tại `localStorage` của trình duyệt, chưa phải dữ liệu chung trên backend. Client gửi bản cấu hình đã lưu tới `/api/chat`; server kiểm tra cấu trúc, lọc trạng thái và tạo chỉ dẫn. Khi tích hợp kênh khách thật, cần lưu cấu hình ở backend và để server đọc theo shop đã xác thực, thay cho bản cấu hình client gửi. Tính năng này chưa thêm lưu lịch sử hay tính cách từng khách.
+Khung chat khách và ô thử AI vẫn gửi nguồn tri thức từ mock DB trình duyệt tới `/api/chat`; server kiểm tra cấu trúc, lọc trạng thái và tạo chỉ dẫn. Riêng Customer Care Messenger đã dùng cấu hình xác nhận trên backend theo Page được cấp quyền qua `/api/customer-care`; webhook và Inbox không thay bản tri thức này bằng dữ liệu tùy ý từ client. Lịch sử phân tích Messenger tiếp tục lưu trong PostgreSQL.
 
 Đặt `GEMINI_API_KEY` trong `.env.local` (xem `.env.example`), có thể đặt thêm `GEMINI_MODEL` để chọn model được cấp quyền. Khóa chỉ được đọc ở server. API sử dụng [Gemini generateContent](https://ai.google.dev/api/generate-content).
 
 ## Cảm xúc và hàng chờ trả lời
 
-Khi khách nhắn tin ở Hộp thoại, Gemini phân tích cảm xúc (tích cực, trung lập, lo lắng, thất vọng, tức giận), mức ưu tiên (cao, bình thường, thấp), lý do và nhu cầu nhân viên hỗ trợ; sau đó tạo câu trả lời theo cảm xúc và nguồn Cấu hình AI trong cùng một lượt. API yêu cầu [kết quả có cấu trúc](https://ai.google.dev/gemini-api/docs/generate-content/structured-output) và kiểm tra nhãn trước khi cập nhật UI. Mỗi lượt dùng tối đa 10 tin trước đó làm ngữ cảnh. Kết quả cảm xúc, ưu tiên và phong cách giao tiếp quan sát được được lưu theo tin nhắn trong PostgreSQL để xem diễn biến cả cuộc trò chuyện.
+Khi khách nhắn tin ở Hộp thoại, Gemini phân tích cảm xúc (tích cực, trung lập, lo lắng, thất vọng, tức giận), mức ưu tiên (cao, bình thường, thấp), lý do và nhu cầu nhân viên hỗ trợ; sau đó tạo câu trả lời theo cảm xúc và nguồn FAQ & sản phẩm trong cùng một lượt. API yêu cầu [kết quả có cấu trúc](https://ai.google.dev/gemini-api/docs/generate-content/structured-output) và kiểm tra nhãn trước khi cập nhật UI. Mỗi lượt dùng tối đa 10 tin trước đó làm ngữ cảnh. Kết quả cảm xúc, ưu tiên và phong cách giao tiếp quan sát được được lưu theo tin nhắn trong PostgreSQL để xem diễn biến cả cuộc trò chuyện.
 
 Tin khách chưa xem được tô nổi bật, có nhãn **Tin mới** và đứng đầu danh sách theo thời gian mới nhất; mở hội thoại sẽ bỏ đánh dấu. Tiếp theo là hội thoại chưa trả lời, sắp theo điểm ưu tiên AI; cùng điểm thì khách chờ lâu hơn đứng trước. Khi trang hội thoại đang mở và đã kết nối, AI tự phân tích tin đang chờ, cập nhật nhãn cảm xúc, mức ưu tiên và tạo gợi ý, tối đa hai hội thoại cùng lúc. Shop duyệt và gửi gợi ý qua Send API. Lỗi AI giữ tin ở trạng thái chờ và có nút thử lại; không gọi lại liên tục mỗi lần polling. Kết quả chậm không ghi đè câu hỏi mới hay mở lại hội thoại đã trả lời.
 
@@ -147,11 +179,15 @@ Mỗi lần polling chỉ lấy hồ sơ tối đa ba khách; lease trong databa
 
 Hội thoại thật chỉ gửi với tư cách Shop. Gửi text qua `/api/messenger/send` tới Send API; tiêu chuẩn RESPONSE trong 24 giờ từ tin khách gần nhất. Tin không được đánh dấu đã gửi nếu Meta từ chối. Chống gửi lặp cùng request ID bằng bảng outbound; timeout/HTTP 5xx/kết quả không rõ không tự gửi lại. Client giữ request ID khi lỗi không rõ, người dùng cần kiểm tra Messenger trước khi chủ động gửi một yêu cầu mới. Nếu Meta nhận tin nhưng lưu message bị lỗi, UI báo đã gửi và chờ webhook echo để đồng bộ. Webhook echo và bản gửi dashboard có cùng message ID nên không tạo bản thứ hai. [Meta Send API](https://www.postman.com/meta/messenger-platform-api/documentation/iyp204x/messenger-platform-api)
 
-Nút **AI tự động trả lời** trong cột Hàng chờ mặc định tắt, độc lập với AI bình luận Facebook. Chạy `npm run db:migrate` (migration `011-messenger-ai.sql`). Khi bật, Cấu hình AI hiện tại được lưu lên máy chủ; tin Messenger mới được webhook phân tích và tự trả lời dù đóng trang. Bật lại sau khi cập nhật sản phẩm/FAQ để cập nhật nguồn tri thức. Không tự gửi bù tin cũ khi bật.
+Nút **AI tự động trả lời** nằm trong từng hội thoại, mặc định tắt và độc lập với AI bình luận Facebook. Chạy `npm run db:migrate` (gồm `016-customer-care.sql`). Trước khi bật, vào Cấu hình AI → Thiết lập AI → AI Chat để xem tri thức, gán Fanpage, thử tình huống và xác nhận áp dụng. Quy tắc mặc định kế thừa xưng hô/giọng/ví dụ của Page; tùy chỉnh Facebook được ưu tiên. Cấu hình cũ cần xác nhận lại, không tự bật các hội thoại.
+
+Muốn tắt chung, tắt AI Chat trong Cấu hình AI; hội thoại không thể vượt công tắc này. Bật lại giữ nguyên lựa chọn riêng và không gửi bù tin cũ. Sửa sản phẩm/FAQ thì bấm cập nhật tri thức và xác nhận lại; bật/tắt đơn thuần không thay bản nguồn đã xác nhận. Các lượt Inbox thủ công, phân tích lịch sử và webhook dùng chung nguồn server. Thử tình huống không gửi cho khách. Chưa có hồ sơ giao việc hoặc tra cứu đơn/vận đơn; xem [tiến độ Customer Care](docs/customer-care-redesign-plan.md#8-tiến-độ-triển-khai-05112026).
+
+Migration `017-customer-care-sources.sql` nối nguồn campaign/bài/comment/Live vào Inbox bằng Page và message ID của private reply đã xác nhận, không ghép khách bằng tên hay ID tác giả bình luận. Khu vực **Nguồn hội thoại** cạnh gợi ý cho xem sản phẩm, deal, điều kiện và bài gốc. Nhiều nguồn chưa xác định thì hỏi lại/chờ nhân viên; reply trực tiếp đúng private message giúp xác định nguồn. Campaign hết hạn/đổi phiên bản, flash sale đổi hoặc phiên kết thúc đều chặn xác nhận deal cũ, kể cả thay đổi sát lúc gửi. Lịch sử phân tích giữ bản nguồn đã dùng; gợi ý cũ bị ẩn khi nguồn đổi. Tin Live cũ thiếu bản chụp lúc gửi cần nhân viên kiểm tra; chưa tự xử lý referral quảng cáo/m.me hoặc gộp danh tính đa kênh. Chi tiết tại [bước nối nguồn Customer Care](docs/customer-care-redesign-plan.md#9-bước-2-nguồn-marketingcommentlive-trong-inbox).
 
 AI chỉ tự gửi khi phân tích xác nhận đủ căn cứ từ nguồn tri thức và không cần người thật; thiếu cờ xác nhận, có tệp chưa đọc, lỗi AI hoặc thiếu dữ liệu đều giữ lại cho shop. Hội thoại có nhãn **Chờ xác nhận**, đứng trước tin mới/khẩn cấp và giữ chặn tự gửi cả khi bật lại AI hoặc khách nhắn tiếp, cho đến khi shop trả lời thủ công. Phân tích lại không tự bỏ chặn. Timeout/kết quả gửi chưa rõ không tự gửi lại. Việc đánh giá đủ căn cứ do model thực hiện, không bảo đảm loại bỏ mọi sai sót của AI.
 
-Khi chưa bật lần nào, AI dùng Cấu hình AI trong trình duyệt để phân tích khi mở trang; nút **Phân tích AI** vẫn chạy lại thủ công. Phân tích được lưu PostgreSQL và khôi phục khi mở lại. Xử lý nền dùng `after()` trong giới hạn thời gian của webhook, chưa có worker/scheduler riêng; nếu tiến trình bị dừng, mở inbox để tiếp tục các tin chưa xử lý. Đánh dấu đã xem vẫn lưu trong phiên trình duyệt.
+Khi chưa có bộ quy tắc/tri thức xác nhận trên server, Inbox yêu cầu cấu hình AI Chat trước khi phân tích. Sau khi xác nhận, nút **Phân tích AI** dùng lại cùng bộ nguồn server; phân tích lưu PostgreSQL và khôi phục khi mở lại. Yêu cầu ưu tiên cao được giữ để nhân viên kiểm tra dù model đánh dấu đủ căn cứ. Xử lý nền dùng `after()` trong giới hạn thời gian của webhook, chưa có worker/scheduler riêng; nếu tiến trình bị dừng, mở inbox để tiếp tục các tin chưa xử lý. Đánh dấu đã xem vẫn lưu trong phiên trình duyệt.
 
 Chạy `npm test`: kiểm tra signature/body bị sửa, xác minh callback, đúng Page, echo/attachment, chống trùng, thứ tự sự kiện, rollback và lỗi lưu trữ. Postgres writer và schema được kiểm tra bằng `pg-mem`; rollback/release được kiểm tra bằng client giả. Đây không thay thế kiểm tra trên Postgres thật (đặc biệt concurrency và TLS). Test không gọi Meta hoặc dùng token thật.
 
@@ -161,7 +197,7 @@ Test đồng bộ dùng PostgreSQL WASM (PGlite) để chạy SQL đọc inbox/p
 
 Chủ shop chọn kênh (Facebook, TikTok, Email), mục tiêu, giọng văn, tối đa 5 sản phẩm và ghi chú (khuyến mãi, sự kiện). Gemini viết 1–3 phương án gồm tiêu đề, nội dung, hashtag và gợi ý ảnh/kịch bản video. Bài AI viết chỉ là bản nháp: chủ shop sửa trực tiếp rồi **Lưu nháp**, **Sao chép** hoặc **Lưu & đăng Fanpage**.
 
-- Nguồn dữ liệu là Cấu hình AI (giống `/api/chat`): chỉ gửi sản phẩm được chọn và FAQ đang bật. Chỉ dẫn yêu cầu không bịa giá, khuyến mãi, phí ship; sản phẩm hết hàng không được quảng bá như còn hàng. Ghi chú của chủ shop là dữ liệu, không thay được quy tắc.
+- Nguồn dữ liệu là FAQ & sản phẩm (giống `/api/chat`): chỉ gửi sản phẩm được chọn và FAQ đang bật. Chỉ dẫn yêu cầu không bịa giá, khuyến mãi, phí ship; sản phẩm hết hàng không được quảng bá như còn hàng. Ghi chú của chủ shop là dữ liệu, không thay được quy tắc.
 - Bài viết lưu trong bảng `marketing_posts` (`db/migrations/002-marketing-posts.sql`). `npm run db:migrate` giờ áp dụng mọi file trong `db/migrations` theo thứ tự tên. Chưa có `DATABASE_URL` thì AI vẫn soạn được, chỉ không lưu/đăng.
 - Đăng Fanpage dùng Graph API `POST /{PAGE_ID}/feed` (v26.0) với `PAGE_ID` + `PAGE_ACCESS_TOKEN`; token cần quyền `pages_manage_posts`. Token gửi trong body, không đặt trên URL. TikTok/Email chưa có API đăng: sao chép nội dung rồi bấm **Đánh dấu đã đăng**. Bài đã đăng thì không sửa được; xoá trong Tendly không xoá bài trên Fanpage.
 - Mọi API /api/posts/* dùng phiên đăng nhập app và công tắc bảo vệ; user bị khóa không thể tạo/lưu/đăng bài. Admin vẫn sử dụng được. Không nhập hoặc gửi DASHBOARD_KEY từ trình duyệt.
@@ -198,11 +234,11 @@ Trang **Livestream** (`/livestream`) giúp shop bán hàng trong lúc live. Tend
 - `facebook`: bình luận của một video Live hoặc một bài đăng, đọc qua Graph API.
 - Muốn có TikTok/Shopee Live thì viết thêm adapter tương ứng.
 
-**Flow:** bấm **Bắt đầu** trên Tendly. Cửa sổ hỗ trợ nổi bật ra ngay và chờ người bán bật live trên Facebook. Tendly tự nhận video Live của Trang rồi bắt đầu hỗ trợ.
+**Flow:** chuẩn bị phiên → lưu nháp → xem sản phẩm/giá/lượng, FAQ, mã host, bảng size có nguồn và từng quyền gửi → xác nhận **Duyệt dữ liệu & bắt đầu phiên**. Cửa sổ hỗ trợ nổi có thể mở sau bước duyệt, chờ người bán phát Live trên Page. Phiên nháp chưa thu thập hoặc gửi tin. Xem [phạm vi redesign](docs/livestream-redesign-plan.md#7-phạm-vi-đã-triển-khai).
 
 **Chạy thử:**
-1. `npm run db:migrate` (migration `009-livestream.sql` và `010-live-waiting.sql`).
-2. Mở `/livestream`, để nguồn **Tự nhận video khi tôi bật live**, bấm **Bắt đầu**, rồi bật Phát trực tiếp trên Trang (Meta yêu cầu Trang có từ 100 người theo dõi). Chưa đủ điều kiện thì chọn một **bài đăng** làm nguồn và bình luận thử dưới bài.
+1. `npm run db:migrate` (bao gồm migration `018-live-workflow.sql`).
+2. Mở `/livestream`, chọn nguồn tự nhận Live hoặc bài đăng được cấp quyền, chọn SKU đã nhập tồn, điền host/mã Live và lưu nháp. Kiểm tra bản dữ liệu rồi xác nhận bắt đầu; với nguồn tự nhận, bật Phát trực tiếp trên Page sau đó.
 3. Bình luận mới hiện lên sau khoảng 3 giây. Tendly gom nhóm, tạo đơn nháp, và shop duyệt để nhắn riêng.
 
 **Chi phí AI thấp:**

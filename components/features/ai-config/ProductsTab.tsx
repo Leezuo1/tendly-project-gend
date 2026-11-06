@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { IconSearch } from '@/components/ui/Icons';
+import { IconEdit, IconSearch } from '@/components/ui/Icons';
+import { ProductEditor } from './ProductEditor';
 import { errorMessage, useToast } from '@/components/shared/ToastProvider';
 import { productApi } from '@/lib/services/api';
 import type { Product, ProductSource } from '@/lib/types/admin';
@@ -11,7 +12,8 @@ import { formatMoney, normalize, relativeTime } from '@/lib/utils/format';
 const PAGE_SIZE = 8;
 const LOW_STOCK = 20;
 
-function StockBadge({ qty }: { qty: number }) {
+function StockBadge({ qty, known = true }: { qty: number; known?: boolean }) {
+  if (!known) return <span className="stock-badge">Chưa nhập</span>;
   if (qty === 0) return <span className="stock-badge stock-out"><span className="s-dot" />Hết hàng</span>;
   if (qty < LOW_STOCK) return <span className="stock-badge stock-low"><span className="s-dot" />Sắp hết</span>;
   return <span className="stock-badge stock-in"><span className="s-dot" />Còn hàng</span>;
@@ -27,6 +29,7 @@ export function ProductsTab() {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
+  const [editing, setEditing] = useState<Product | null>(null);
   const [source, setSource] = useState<ProductSource | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
@@ -68,11 +71,13 @@ export function ProductsTab() {
     const q = normalize(query);
     let list = products.filter((p) => {
       if (category && p.category !== category) return false;
+      if (stock && stock !== 'unknown' && p.stockKnown === false) return false;
+      if (stock === 'unknown' && p.stockKnown !== false) return false;
       if (stock === 'in' && p.qty < LOW_STOCK) return false;
       if (stock === 'low' && (p.qty === 0 || p.qty >= LOW_STOCK)) return false;
       if (stock === 'out' && p.qty !== 0) return false;
       if (!q) return true;
-      return normalize([p.name, p.sku, p.category, p.material, ...p.colors, ...p.sizes].join(' ')).includes(q);
+      return normalize([p.name, p.sku, p.category, p.material, p.description, p.usp, ...(p.keywords || []), ...p.colors, ...p.sizes].join(' ')).includes(q);
     });
     if (sort !== 'default') list = [...list].sort((a, b) => (sort === 'qty-asc' ? a.qty - b.qty : b.qty - a.qty));
     return list;
@@ -138,6 +143,10 @@ export function ProductsTab() {
     }
   };
 
+  if (editing && products) return <ProductEditor key={editing.id} product={editing} products={products} onClose={() => setEditing(null)} onSaved={value => {
+    setProducts(current => current?.map(product => product.id === value.id ? value : product) || null); setEditing(null);
+  }} />;
+
   return (
     <div className="card products-card">
       <div className="card-head">
@@ -197,6 +206,7 @@ export function ProductsTab() {
             <option value="in">Còn hàng</option>
             <option value="low">Sắp hết</option>
             <option value="out">Hết hàng</option>
+            <option value="unknown">Chưa nhập tồn kho</option>
           </select>
         </div>
         <div className="table-summary">Hiển thị <b>{pageItems.length}</b> / {filtered.length} sản phẩm</div>
@@ -219,18 +229,19 @@ export function ProductsTab() {
                 Số lượng {sort === 'qty-desc' ? '↓' : sort === 'qty-asc' ? '↑' : '↕'}
               </th>
               <th style={{ textAlign: 'center' }}>Trạng thái tồn</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {!products &&
               Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}><td colSpan={5}><div className="skeleton" style={{ height: 36 }} /></td></tr>
+                <tr key={i}><td colSpan={6}><div className="skeleton" style={{ height: 36 }} /></td></tr>
               ))}
             {pageItems.map((p) => (
               <tr key={p.id} className={flashIds.has(p.id) ? 'flash' : ''}>
                 <td>
                   <div className="prod-cell">
-                    <div className="prod-avatar">{p.emoji}</div>
+                    <div className="prod-avatar">{p.imageUrl ? <img src={p.imageUrl} alt="" width={38} height={38} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : p.emoji}</div>
                     <div>
                       <div className="prod-title">{p.name}</div>
                       <div className="prod-sku">SKU: {p.sku}{p.material ? ` • ${p.material}` : ''}</div>
@@ -242,12 +253,13 @@ export function ProductsTab() {
                   <div className="variant-desc">{[p.colors.join(', '), p.sizes.length ? sizeLabel(p.sizes) : ''].filter(Boolean).join(' • ') || '—'}</div>
                 </td>
                 <td data-label="Giá" style={{ textAlign: 'right' }}><span className="price-val">{formatMoney(p.price)}</span></td>
-                <td data-label="Số lượng" style={{ textAlign: 'right' }}><span className="qty-val">{p.qty}</span></td>
-                <td style={{ textAlign: 'center' }}><StockBadge qty={p.qty} /></td>
+                <td data-label="Số lượng" style={{ textAlign: 'right' }}><span className="qty-val">{p.stockKnown === false ? '—' : p.qty}</span></td>
+                <td style={{ textAlign: 'center' }}><StockBadge qty={p.qty} known={p.stockKnown !== false} /></td>
+                <td><button type="button" className="btn btn-outline btn-sm" aria-label={`Sửa ${p.name}`} disabled={syncing || importing || connecting || loadingSource} onClick={() => setEditing(p)}><IconEdit width={14} height={14} aria-hidden="true" />Sửa</button></td>
               </tr>
             ))}
             {products && filtered.length === 0 && (
-              <tr><td colSpan={5}><div className="empty-state"><div className="emoji">🔍</div>Không tìm thấy sản phẩm phù hợp</div></td></tr>
+              <tr><td colSpan={6}><div className="empty-state"><div className="emoji">🔍</div>Không tìm thấy sản phẩm phù hợp</div></td></tr>
             )}
           </tbody>
         </table>

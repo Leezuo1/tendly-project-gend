@@ -5,6 +5,9 @@ import { Conversation } from '@/lib/types/inbox';
 import { EMOTION_LABELS } from '@/lib/services/inboxAi';
 import { CustomerAvatar } from './CustomerAvatar';
 import { IconChevrons } from '@/components/ui/Icons';
+import Link from 'next/link';
+import { Switch } from '@/components/ui/Switch';
+import { ConversationSources } from './ConversationSources';
 
 interface ThreadPaneProps {
   conversation: Conversation;
@@ -13,6 +16,9 @@ interface ThreadPaneProps {
   onUseAiSuggestion: (text: string) => Promise<boolean> | void;
   isSending?: boolean;
   onLoadOlder?: () => Promise<void>;
+  aiEnabled?: boolean;
+  savingAi?: boolean;
+  onToggleAutoReply?: (enabled: boolean) => Promise<void>;
   draftText: string;
   onDraftChange: (text: string) => void;
   onToast: (msg: string) => void;
@@ -41,6 +47,9 @@ export function ThreadPane({
   onGenerateAiSuggestion,
   isSending = false,
   onLoadOlder,
+  aiEnabled = false,
+  savingAi = false,
+  onToggleAutoReply,
 }: ThreadPaneProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const previousConversationRef = useRef<string | null>(null);
@@ -158,6 +167,16 @@ export function ThreadPane({
         </div>
       </div>
 
+      {conversation.messenger && onToggleAutoReply && <div className="thread-ai-control">
+        <div><strong>AI tự động trả lời</strong><p role="status">{savingAi ? 'Đang lưu…'
+          : !aiEnabled ? 'AI đang tắt trong cấu hình chung'
+          : !conversation.autoReply ? 'Đang tắt cho hội thoại này'
+          : conversation.waitingConfirmation || conversation.sourceContext?.blocked ? 'Tạm dừng · Chờ nhân viên xác nhận'
+          : 'Đang bật · Chỉ trả lời tin mới đủ căn cứ'}</p></div>
+        <Switch checked={conversation.autoReply === true} disabled={savingAi} label="AI tự động trả lời cho hội thoại này" onChange={enabled => void onToggleAutoReply(enabled)} />
+        {!aiEnabled && <Link href="/cau-hinh-ai?tab=settings&ai=chat">Mở cấu hình AI</Link>}
+      </div>}
+
       {/* Messages */}
       <div className="thread-messages" ref={messagesRef}>
         {conversation.messenger?.hasOlder && onLoadOlder && (
@@ -197,6 +216,8 @@ export function ThreadPane({
       {/* Compose + AI Suggestion */}
       <div className="thread-compose">
         <div className="compose-tools">
+        <ConversationSources context={conversation.sourceContext} />
+        {conversation.analysis && (conversation.analysis.needsHuman || conversation.analysis.canAutoReply === false) && <p className="thread-missing-facts"><strong>Cần xác nhận:</strong> {conversation.analysis.reason}</p>}
         {/* Đang chờ Gemini suy nghĩ */}
         {isThinkingAi && (
           <div className="ai-loading-box">
@@ -272,7 +293,7 @@ export function ThreadPane({
                 onClick={handleAskGemini}
                 disabled={isThinkingAi || !conversation.isUnreplied}
                 style={{ fontSize: 11.5, padding: '4px 10px', gap: 6, borderRadius: 8 }}
-                title="Tạo câu trả lời từ dữ liệu Cấu hình AI đã lưu"
+                title="Tạo câu trả lời từ dữ liệu FAQ & sản phẩm đã lưu"
               >
                 {isThinkingAi ? '⏳ Đang phân tích...' : '✨ Tạo câu trả lời AI'}
               </button>

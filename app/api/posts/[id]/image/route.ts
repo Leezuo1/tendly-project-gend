@@ -3,6 +3,13 @@ import { checkPostImage, InvalidPostImage, MAX_IMAGE_BYTES } from '@/lib/service
 import { postsErrorResponse, requireDashboardKey } from '@/lib/services/postsApi';
 import { deletePostImage, getPostImage, PostNotFound, setPostImage } from '@/lib/services/postsPostgres';
 import type { PostImageSource } from '@/lib/types/posts';
+import { managedMarketingPost } from '@/lib/services/marketingWorkspace';
+import { MarketingWorkflowError } from '@/lib/services/marketingBrief';
+
+async function guardCampaignImage(id: string) {
+  const pageId = process.env.PAGE_ID?.trim();
+  if (pageId && await managedMarketingPost(pageId, id)) throw new MarketingWorkflowError('Mở bài trong chiến dịch để thay ảnh và duyệt lại.', 409);
+}
 
 export const runtime = 'nodejs';
 
@@ -28,6 +35,7 @@ export const PUT = withAppAccess(async function PUT(request: Request, { params }
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
+    await guardCampaignImage((await params).id);
     if (Number(request.headers.get('content-length') ?? 0) > MAX_IMAGE_BYTES) {
       throw new InvalidPostImage('Ảnh lớn quá 4MB, chọn ảnh nhỏ hơn nhé.');
     }
@@ -44,6 +52,7 @@ export const DELETE = withAppAccess(async function DELETE(request: Request, { pa
   const denied = requireDashboardKey(request);
   if (denied) return denied;
   try {
+    await guardCampaignImage((await params).id);
     return Response.json({ post: await deletePostImage((await params).id) });
   } catch (error) {
     return postsErrorResponse(error);

@@ -66,12 +66,98 @@ const knowledge = {
 };
 const START = Date.UTC(2026, 9, 27, 12);
 
+const preparation = () => ({ host: 'Lan', scheduledAt: '', campaignId: '', receivingFields: 'SĐT, địa chỉ', handoff: 'Lan kiểm tra khiếu nại', holdPolicy: 'Shop xác nhận / hủy thủ công', allowPrivate: false, allowPublic: false,
+  catalog: knowledge.products.map(product => ({ sku: product.sku, codes: product.sku === 'AT-01' ? ['A1', '03'] : product.sku === 'DV-12' ? ['B2'] : [], sizeChart: '', sizeSource: '', fit: '' })) });
+
+test('Live preparation rejects duplicate host codes, unknown SKU, stock and unsourced size charts', () => {
+  const { parseLivePreparation } = loader()('lib/services/live/preparation.ts');
+  const prep = preparation();
+  assert.equal(parseLivePreparation(prep, knowledge.products).host, 'Lan');
+  for (const codes of [['03'], ['AT01'], ['m'], ['giá']]) {
+    const input = structuredClone(prep); input.catalog[1].codes = codes;
+    assert.throws(() => parseLivePreparation(input, knowledge.products));
+  }
+  const bad = structuredClone(prep); bad.catalog[0].sizeChart = 'S: ngực 80cm';
+  assert.throws(() => parseLivePreparation(bad, knowledge.products), /nguồn/);
+  bad.catalog[0].sku = 'invented'; assert.throws(() => parseLivePreparation(bad, knowledge.products), /SKU/);
+  assert.throws(() => parseLivePreparation(prep, knowledge.products.map(p => ({ ...p, stockKnown: false }))), /tồn kho/);
+});
+
+test('draft activation requires current explicit approval; separate send permissions remain enforced', async () => {
+  const load = loader(), engine = load('lib/services/live/engine.ts'), reply = load('lib/services/live/reply.ts');
+  const session = await engine.createSession('111', { platform: 'facebook', sourceKind: null, sourceId: null, sourcePostId: null, title: 'Nháp', waitForLive: true, draft: true, preparation: preparation() }, knowledge, pool, START);
+  assert.equal(session.status, 'draft'); assert.equal(session.waiting, false);
+  assert.equal(await engine.ingestComments('111', session.id, [{ commentId: 'a', authorId: '1', authorName: 'Khách', text: 'chốt A1', createdAt: START }], pool, START), 0);
+  await assert.rejects(engine.approveLivePreparation('111', session.id, 1, false, 'owner', pool), /Xác nhận/);
+  await engine.saveLiveDraft('111', session.id, 1, 'Nháp đã sửa', knowledge, preparation(), pool);
+  await assert.rejects(engine.approveLivePreparation('111', session.id, 1, true, 'owner', pool), error => error.status === 409);
+  await engine.approveLivePreparation('111', session.id, 2, true, 'owner', pool, START + 100);
+  const snapshot = await engine.buildSnapshot('111', session.id, pool);
+  assert.equal(snapshot.session.status, 'live'); assert.equal(snapshot.session.approvedBy, 'owner'); assert.equal(snapshot.session.waiting, true);
+  await assert.rejects(engine.approveLivePreparation('111', session.id, 2, true, 'owner', pool), error => error.status === 409);
+  await assert.rejects(reply.approveGroup('111', session.id, 'price:AT-01', 'Giá {gia}', 1, pool), /quyền nhắn riêng/);
+  await assert.rejects(reply.replyPublicly('111', session.id, 'price:AT-01', 'Giá {gia}', 1, pool), /quyền trả lời công khai/);
+});
+
+test('delayed comments use on-air history; host 03 is not quantity 3 and ambiguous codes need a human', async () => {
+  const load = loader(), { engine, session } = await liveSession(load);
+  await query('UPDATE live_sessions SET preparation_json=$2::jsonb WHERE id=$1', [session.id, JSON.stringify(preparation())]);
+  await engine.setOnAir('111', session.id, 'DV-12', pool, START + 2000);
+  await engine.setOnAir('111', session.id, null, pool, START + 4000);
+  const texts = ['giá bn', 'chốt 03 M', 'chốt A1 B2', 'giá bn', 'giá bn', 'A1 M?'];
+  const ats = [1000, 2500, 3000, 3500, 4500, 5000];
+  await engine.ingestComments('111', session.id, texts.map((text, i) => ({ commentId: `history${i}`, authorId: `${i}`, authorName: `Khách ${i}`, text, createdAt: START + ats[i] })), pool, START + 6000);
+  const snapshot = await engine.buildSnapshot('111', session.id, pool);
+  const by = Object.fromEntries(snapshot.recent.map(c => [c.commentId, c]));
+  assert.equal(by.history0.sku, 'AT-01'); assert.equal(by.history3.sku, 'DV-12'); assert.equal(by.history4.sku, null);
+  assert.equal(by.history1.qty, 1); assert.equal(by.history1.sku, 'AT-01');
+  assert.equal(by.history2.intent, 'question'); assert.equal(by.history2.sku, null);
+  assert.notEqual(by.history5.intent, 'order');
+  assert.equal(snapshot.orders.length, 1); assert.equal(snapshot.timeline.length, 3);
+  assert.ok(snapshot.groups.find(g => g.key === 'question:-').needsHuman);
+});
+
+test('size advice needs source and stock replies do not promise size availability', () => {
+  const { groupTemplate } = loader()('lib/services/live/templates.ts');
+  const prep = preparation(), p = knowledge.products[0];
+  assert.equal(groupTemplate('size_advice', p, knowledge, false, prep).needsHuman, true);
+  prep.catalog[0].sizeChart = 'S: ngực 80–84cm'; prep.catalog[0].sizeSource = 'Bảng của hãng';
+  const result = groupTemplate('size_advice', p, knowledge, false, prep);
+  assert.equal(result.needsHuman, false); assert.match(result.text, /Bảng của hãng/);
+  assert.match(groupTemplate('stock', p, knowledge).text, /kiểm tra/);
+});
+
+test('cancelled holds do not revive from comments or exceed stock when staff reopens an order', async () => {
+  const { engine, session } = await liveSession(loader());
+  const incoming = (id, authorId, text) => ({ commentId: id, authorId, authorName: 'Khách', text, createdAt: START + 1000 });
+  await engine.ingestComments('111', session.id, [incoming('cancel-a', 'a', 'chốt x10')], pool);
+  let snapshot = await engine.buildSnapshot('111', session.id, pool), order = snapshot.orders[0];
+  await engine.updateOrderStatus('111', session.id, order.id, 'cancelled', pool);
+  await engine.ingestComments('111', session.id, [incoming('cancel-b', 'b', 'chốt x10'), incoming('cancel-c', 'a', 'chốt x10')], pool);
+  snapshot = await engine.buildSnapshot('111', session.id, pool);
+  assert.equal(snapshot.orders.find(o => o.id === order.id).status, 'cancelled');
+  assert.equal(snapshot.stock.find(p => p.sku === 'AT-01').held, 10);
+  await assert.rejects(engine.updateOrderStatus('111', session.id, order.id, 'confirmed', pool), error => error.status === 409);
+});
+
+test('live excludes products with unknown shop stock and rejects a catalog without confirmed stock', async () => {
+  const engine = loader()('lib/services/live/engine.ts');
+  const source = structuredClone(knowledge);
+  source.products.forEach(p => { p.stockKnown = false; });
+  const input = { platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500', title: 'Kiểm tra tồn kho' };
+  await assert.rejects(engine.createSession('111', input, source, pool, START), /nhập tồn kho/);
+  source.products[0].stockKnown = true;
+  const session = await engine.createSession('111', input, source, pool, START);
+  const snapshot = await engine.buildSnapshot('111', session.id, pool);
+  assert.deepEqual(snapshot.products.map(p => p.sku), ['AT-01']);
+});
+
 /** Phiên Facebook (nguồn là bài đăng 111_500), mẫu đang lên sóng AT-01. */
 async function liveSession(load, now = START) {
   const engine = load('lib/services/live/engine.ts');
   const session = await engine.createSession('111', { platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500',
     title: 'Live thử' }, knowledge, pool, now);
-  await engine.setOnAir('111', session.id, 'AT-01', pool);
+  await engine.setOnAir('111', session.id, 'AT-01', pool, now);
   return { engine, session };
 }
 
@@ -243,7 +329,7 @@ test('Facebook source: reads comments from Graph, checks can_reply_privately, ne
   const reply = load('lib/services/live/reply.ts');
   const session = await engine.createSession('111', { platform: 'facebook', sourceKind: 'post', sourceId: '111_500', sourcePostId: '111_500',
     title: 'FB' }, knowledge, pool, START);
-  await engine.setOnAir('111', session.id, 'AT-01', pool);
+  await engine.setOnAir('111', session.id, 'AT-01', pool, START);
   const calls = [];
   const now = Date.now();
   globalThis.fetch = async (url, init = {}) => {
@@ -282,6 +368,9 @@ test('Facebook source: reads comments from Graph, checks can_reply_privately, ne
   assert.equal(sends(), before, 'bình luận "unknown"/"not_allowed" không bị gửi lại');
   const saved = await query(`SELECT direction, text FROM messenger_messages WHERE message_id='m-500_1'`);
   assert.equal(saved.rows[0].direction, 'out');
+  const source = (await query("SELECT care_context_json FROM live_comments WHERE message_id='m-500_1'")).rows[0].care_context_json;
+  assert.equal(source.sku, 'AT-01'); assert.equal(source.product.sku, 'AT-01');
+  assert.equal(source.commentText, 'giá bn shop');
 });
 
 test('AI is used sparingly: one batched call for unclear questions, one reply per advice group, counted per session', async () => {
@@ -514,6 +603,38 @@ test('public reply posts once under the newest comment of the group and reports 
   const after = (await engine.buildSnapshot('111', session.id, pool)).groups.find((g) => g.key === 'price:AT-01');
   assert.equal(after.publicReplied, true);
   assert.equal(after.pending, 0, 'đã trả lời công khai thì không nhắn riêng nữa');
-  await assert.rejects(reply.replyPublicly('111', session.id, group.key, group.replyText, group.revision, pool, START + 6000), /vừa được trả lời/);
+  await assert.rejects(reply.replyPublicly('111', session.id, group.key, group.replyText, group.revision, pool, START + 6000), /đã được trả lời/);
   assert.equal(posts.length, 1);
+});
+
+test('a lost public reply response stays unknown and cannot be sent twice', async () => {
+  const load = loader(), { engine, session } = await liveSession(load), reply = load('lib/services/live/reply.ts');
+  await engine.ingestComments('111', session.id, [{ commentId: 'public-lost', authorId: '1', authorName: 'Lan', text: 'giá bn', createdAt: START + 1000 }], pool);
+  const group = (await engine.buildSnapshot('111', session.id, pool)).groups[0];
+  let calls = 0; globalThis.fetch = async () => { calls++; throw new Error('lost'); };
+  await assert.rejects(reply.replyPublicly('111', session.id, group.key, group.replyText, group.revision, pool), error => error.status === 502);
+  await assert.rejects(reply.replyPublicly('111', session.id, group.key, group.replyText, group.revision, pool), error => error.status === 409);
+  assert.equal(calls, 1);
+  assert.match((await query('SELECT public_reply_id FROM live_groups WHERE session_id=$1 AND group_key=$2', [session.id, group.key])).rows[0].public_reply_id, /^unknown:/);
+  const snapshot = await engine.buildSnapshot('111', session.id, pool);
+  assert.equal(snapshot.groups[0].publicReplied, false); assert.equal(snapshot.groups[0].publicReplyUnknown, true);
+});
+
+test('changing a flash price invalidates drafts while each order reply keeps its recorded price', async () => {
+  const load = loader(), { engine, session } = await liveSession(load), reply = load('lib/services/live/reply.ts');
+  await engine.ingestComments('111', session.id, [{ commentId: 'before-deal', authorId: '101', authorName: 'Lan', text: 'chốt M trắng', createdAt: START + 1000 }], pool);
+  const old = (await engine.buildSnapshot('111', session.id, pool)).groups[0];
+  await engine.setFlashPrice('111', session.id, 'AT-01', 199000, pool);
+  await engine.ingestComments('111', session.id, [{ commentId: 'after-deal', authorId: '102', authorName: 'Hà', text: 'chốt M trắng', createdAt: START + 2000 }], pool);
+  await assert.rejects(reply.approveGroup('111', session.id, old.key, old.replyText, old.revision, pool, START + 4000), error => error.status === 409);
+  const group = (await engine.buildSnapshot('111', session.id, pool)).groups.find(g => g.key === old.key), sent = [];
+  globalThis.fetch = async (url, options) => {
+    if (!String(url).endsWith('/messages')) return Response.json({ can_reply_privately: true });
+    const body = JSON.parse(options.body); sent.push(body.message.text); return Response.json({ message_id: `deal-${sent.length}` });
+  };
+  await reply.approveGroup('111', session.id, group.key, group.replyText, group.revision, pool, START + 4000);
+  assert.equal(sent.length, 2); assert.match(sent[0], /259\.000đ/); assert.match(sent[1], /199\.000đ/);
+  await engine.endSession('111', session.id, pool, START + 5000);
+  assert.equal((await engine.buildSnapshot('111', session.id, pool)).products[0].flashPrice, null);
+  await assert.rejects(reply.approveGroup('111', session.id, group.key, group.replyText, group.revision, pool), /chưa hoạt động/);
 });

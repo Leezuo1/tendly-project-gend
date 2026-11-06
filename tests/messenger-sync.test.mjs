@@ -15,6 +15,12 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/011-messenger-ai.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/015-marketing-workspace.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
+  await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
+  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql']) {
+    await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
+  }
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/004-conversation-memory.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/003-messenger-profiles.sql', 'utf8'));
@@ -48,6 +54,8 @@ async function fixture() {
   await ready;
   await db.exec('TRUNCATE messenger_analysis_history, messenger_outbound_requests, messenger_messages, messenger_conversations, messenger_customers CASCADE');
   await db.exec('TRUNCATE messenger_ai_settings');
+  await db.exec('TRUNCATE marketing_workspaces');
+  await db.exec('TRUNCATE facebook_comments,live_sessions CASCADE');
   const load = loader();
   const writer = load('lib/services/messengerPostgres.ts');
   return { load, writer };
@@ -62,31 +70,45 @@ after(() => { for (const [key, value] of Object.entries(original)) {
 
 async function aiFixture(enabled = true) {
   const { load, writer } = await fixture();
-  const state = { canAutoReply: true, sends: 0, beforeReply: async () => {}, failSend: false, failAi: false };
+  const state = { canAutoReply: true, priority: 'normal', sends: 0, beforeReply: async () => {}, beforeTransport: async () => {}, failSend: false, failAi: false };
   const knowledge = { shop: { name: 'Shop', email: '', phone: '' },
     productSource: { name: 'Catalog', connected: true, lastSyncedAt: 1 }, products: [],
     faqs: [{ id: 'f1', question: 'Giờ mở cửa?', answer: '8 giờ', tag: '', keywords: [], active: true }], emailTriggers: [] };
-  const service = loader({
+  const aiLoad = loader({
+    'lib/services/messengerPostgres.ts': { ...load('lib/services/messengerPostgres.ts'), getMessengerPool: () => pool },
     'lib/services/gemini.ts': { generateGeminiJson: async (options) => {
       await state.beforeReply(options);
       if (state.failAi) throw new Error('AI unavailable');
       return { model: 'test', result: options.parse(JSON.stringify({ reply: 'Shop mở cửa lúc 8 giờ.', analysis: {
-        sentiment: 'neutral', emotion: 'neutral', priority: 'normal', needsHuman: false,
+        sentiment: 'neutral', emotion: 'neutral', priority: state.priority, needsHuman: false,
         reason: state.canAutoReply ? 'Dựa vào FAQ giờ mở cửa.' : 'Thiếu dữ liệu đơn hàng.',
         canAutoReply: state.canAutoReply,
       } })) };
     } },
-    'lib/services/messengerSend.ts': { sendMessengerMessage: (input) => load('lib/services/messengerSend.ts').sendMessengerMessage(input, pool, async () => {
+    'lib/services/messengerSend.ts': { ...load('lib/services/messengerSend.ts'), sendMessengerMessage: (input) => load('lib/services/messengerSend.ts').sendMessengerMessage(input, { ...pool, query: async (sql, values) => {
+      const result = await query(sql, values);
+      if (sql.includes('INSERT INTO messenger_outbound_requests')) await state.beforeTransport();
+      return result;
+    } }, async () => {
       state.sends++;
       if (state.failSend) throw new Error('Timeout after sending');
       return Response.json({ message_id: 'auto-' + state.sends });
     }) },
-  })('lib/services/messengerAi.ts');
-  await service.saveMessengerAiSettings('111', enabled, knowledge, pool);
+  });
+  const service = aiLoad('lib/services/messengerAi.ts');
+  const profile = aiLoad('lib/services/aiConfiguration.ts').defaultAiConfiguration().profiles.chat;
+  profile.enabled = enabled;
+  await aiLoad('lib/services/customerCare.ts').saveCustomerCareSettings('111', { profile, knowledge,
+    confirmed: true, pageAssigned: true, pageEnabled: true, updatedAt: null,
+    pageProfile: { name: '', address: '', tone: '', examples: '' } }, 'test-owner', pool);
   await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 10000]);
-  const incoming = async (id, extra = {}) => writer.savePostgresMessages([m(id, { timestamp: Date.now() - 10, ...extra })], pool);
+  const incoming = async (id, extra = {}) => {
+    await writer.savePostgresMessages([m(id, { timestamp: Date.now() - 10, ...extra })], pool);
+    // Existing automatic-send scenarios explicitly opt in each new thread; production defaults stay off.
+    await query('UPDATE messenger_conversations SET ai_auto_reply=true,ai_updated_at=1,ai_enabled_at=$1 WHERE ai_updated_at=0', [Date.now() - 10000]);
+  };
   const process = () => service.processMessengerAi('111', '222', undefined, pool);
-  return { state, service, writer, incoming, process, knowledge, load };
+  return { state, service, writer, incoming, process, knowledge, load: aiLoad, profile };
 }
 
 test('Messenger AI defaults off, analyzes without sending, and sends one grounded reply when enabled', async () => {
@@ -208,20 +230,300 @@ test('manual insufficient-evidence analysis persists review and reanalysis canno
   assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'review');
 });
 
-test('Messenger AI API protects settings, validates knowledge and customer, and permits disabling without browser knowledge', async () => {
+test('conversation auto reply defaults off, isolates customers and Pages, rejects stale edits and does not send old messages on enable', async () => {
+  const f = await aiFixture();
+  await f.writer.savePostgresMessages([m('default-off', { timestamp: Date.now() - 100 }), m('other-customer', { psid: '333' })], pool);
+  await f.process();
+  assert.equal(f.state.sends, 0);
+  const snapshot = await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool);
+  assert.ok(snapshot.conversations.every(thread => thread.autoReply === false));
+  assert.equal(snapshot.aiEnabled, true);
+  const enabled = await f.service.saveConversationAutoReply('111', '222', true, 0, pool);
+  await assert.rejects(f.service.saveConversationAutoReply('111', '222', false, 0, pool), error => error.status === 409);
+  await assert.rejects(f.service.saveConversationAutoReply('999', '222', true, 0, pool), error => error.status === 409);
+  await f.process(); assert.equal(f.state.sends, 0, 'enabling never sends the previous message');
+  await f.writer.savePostgresMessages([m('new-after-enable', { timestamp: Date.now() + 1 })], pool); await f.process();
+  assert.equal(f.state.sends, 1);
+  assert.equal((await query("SELECT ai_auto_reply FROM messenger_conversations WHERE id='[\"111\",\"333\"]'")).rows[0].ai_auto_reply, false);
+  const view = f.load('lib/services/messengerView.ts').mergeMessengerThread({ ...snapshot.conversations.find(t => t.psid === '222'), aiUpdatedAt: 0, autoReply: false },
+    { ...f.load('lib/services/messengerView.ts').mergeMessengerThread(snapshot.conversations[0]), aiUpdatedAt: enabled.updatedAt, autoReply: true });
+  assert.equal(view.autoReply, true, 'an older poll cannot undo an acknowledged switch');
+});
+
+test('global off overrides opted-in threads and re-enabling preserves opted-out threads without replay', async () => {
+  const f = await aiFixture();
+  const approvedAt = (await f.service.readMessengerAiSettings('111', pool)).approvedAt;
+  await f.incoming('first');
+  await f.incoming('other-off', { psid: '333' });
+  const other = (await query("SELECT ai_updated_at FROM messenger_conversations WHERE id='[\"111\",\"333\"]'")).rows[0];
+  await f.service.saveConversationAutoReply('111', '333', false, Number(other.ai_updated_at), pool);
+  await f.service.saveMessengerAiSettings('111', false, undefined, pool);
+  await f.incoming('during-off'); await f.process(); assert.equal(f.state.sends, 0);
+  await f.service.saveMessengerAiSettings('111', true, undefined, pool);
+  assert.equal((await f.service.readMessengerAiSettings('111', pool)).approvedAt, approvedAt, 'toggling does not falsely record a new policy approval');
+  await f.process(); assert.equal(f.state.sends, 0);
+  const rows = (await query('SELECT id,ai_auto_reply FROM messenger_conversations ORDER BY id')).rows;
+  assert.equal(rows.find(row => row.id === '["111","222"]').ai_auto_reply, true);
+  assert.equal(rows.find(row => row.id === '["111","333"]').ai_auto_reply, false);
+  await f.incoming('after-global-enable', { timestamp: Date.now() + 1 }); await f.process(); assert.equal(f.state.sends, 1);
+});
+
+test('turning a conversation off or off/on during generation blocks that job; final transport gate also rechecks the switch', async () => {
+  for (const mode of ['off', 'off-on', 'transport']) {
+    const f = await aiFixture(); await f.incoming('racing-switch');
+    const flip = async () => {
+      const off = await f.service.saveConversationAutoReply('111', '222', false, 1, pool);
+      if (mode === 'off-on') await f.service.saveConversationAutoReply('111', '222', true, off.updatedAt, pool);
+    };
+    if (mode === 'transport') f.state.beforeTransport = flip; else f.state.beforeReply = flip;
+    await f.process(); assert.equal(f.state.sends, 0, mode);
+    assert.notEqual((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'unknown');
+    if (mode === 'transport') assert.equal((await query('SELECT status FROM messenger_outbound_requests')).rows[0].status, 'failed');
+  }
+});
+
+test('urgent requests are held for review even if the model marks them safe to send', async () => {
+  const f = await aiFixture(); f.state.priority = 'high';
+  await f.incoming('urgent'); await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'review');
+});
+
+test('confirmed server rules and Page voice reach every generation; a configuration change during generation blocks the old output', async () => {
+  const f = await aiFixture();
+  const care = f.load('lib/services/customerCare.ts');
+  const page = { name: 'Nhà Linh', address: 'Nhà Linh – chị', tone: 'Điềm đạm', examples: 'Chị cho Nhà Linh xin mã sản phẩm nhé.' };
+  await query('INSERT INTO marketing_workspaces(page_id,document,updated_at) VALUES($1,$2,1)', ['111', JSON.stringify({ profiles: { 111: page } })]);
+  const current = await f.service.readMessengerAiSettings('111', pool);
+  const input = { profile: f.profile, knowledge: f.knowledge, pageProfile: page, pageAssigned: true, pageEnabled: true, confirmed: true, updatedAt: current.updatedAt };
+  await care.saveCustomerCareSettings('111', input, 'owner', pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 10000]);
+  let system;
+  f.state.beforeReply = async options => { system = options.system; };
+  await f.incoming('server-rules'); await f.process();
+  assert.ok(system.includes(page.address)); assert.ok(system.includes(page.tone)); assert.ok(system.includes(page.examples));
+  const rules = care.careRules({ ...f.profile, platformRules: { facebook: { enabled: true, values: { address: 'em – anh/chị' } } } }, page);
+  assert.equal(rules.address, 'em – anh/chị'); assert.equal(rules.tone, page.tone);
+  await f.incoming('old-config', { timestamp: Date.now() + 1 });
+  f.state.beforeReply = async () => {
+    const settings = await f.service.readMessengerAiSettings('111', pool);
+    await care.saveCustomerCareSettings('111', { ...input, updatedAt: settings.updatedAt,
+      knowledge: { ...f.knowledge, faqs: [{ ...f.knowledge.faqs[0], answer: '9 giờ' }] } }, 'owner', pool);
+  };
+  await f.process(); assert.equal(f.state.sends, 1, 'old configuration output must not send');
+  await assert.rejects(care.saveCustomerCareSettings('111', input, 'owner', pool), error => error.status === 409);
+});
+
+test('Customer Care API previews without persisting or sending, requires confirmation, and uses only approved server knowledge for Inbox suggestions', async () => {
   const f = await aiFixture(false);
-  const route = loader({ 'lib/services/messengerAi.ts': {
-    readMessengerAiSettings: (pageId) => f.service.readMessengerAiSettings(pageId, pool),
-    saveMessengerAiSettings: (pageId, enabled, knowledge) => f.service.saveMessengerAiSettings(pageId, enabled, knowledge, pool),
-    processMessengerAi: (pageId, psid, knowledge) => f.service.processMessengerAi(pageId, psid, knowledge, pool),
-  } })('app/api/messenger/ai/route.ts');
+  const route = f.load('app/api/customer-care/route.ts');
+  const req = (method, body) => new Request('http://localhost/api/customer-care', { method, headers: { origin: 'http://localhost' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const initial = await route.GET(req('GET'));
+  assert.equal(initial.status, 200); assert.equal(initial.headers.get('Cache-Control'), 'no-store');
+  const settings = await initial.json();
+  const input = { profile: f.profile, knowledge: f.knowledge, pageAssigned: true, pageEnabled: true, confirmed: false,
+    updatedAt: settings.updatedAt, pageProfile: settings.currentPageProfile };
+  assert.equal((await route.PUT(req('PUT', input))).status, 400);
+  assert.equal((await route.PUT(req('PUT', { ...input, confirmed: true, pageProfile: { ...settings.currentPageProfile, name: 'wrong' } }))).status, 409);
+  const preview = await route.POST(req('POST', { action: 'preview', profile: f.profile, knowledge: f.knowledge, message: 'Giờ mở cửa?' }));
+  assert.equal(preview.status, 200); assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT * FROM messenger_ai_jobs')).rows.length, 0);
+  const applied = await route.PUT(req('PUT', { ...input, confirmed: true }));
+  assert.equal(applied.status, 200); assert.equal((await applied.json()).approvedBy, 'test-owner');
+  assert.equal((await route.PUT(req('PUT', { ...input, confirmed: true }))).status, 409);
+  await f.incoming('manual-server');
+  f.state.beforeReply = async options => { assert.ok(options.system.includes('8 giờ')); assert.ok(!options.system.includes('UnapprovedPolicy')); };
+  const suggestion = await route.POST(req('POST', { action: 'suggest', psid: '222', messageId: 'manual-server', knowledge: { UnapprovedPolicy: true } }));
+  assert.equal(suggestion.status, 200); assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT * FROM messenger_analysis_history')).rows.length, 1);
+  assert.equal((await route.POST(req('POST', { action: 'suggest', psid: '333', messageId: 'manual-server' }))).status, 409);
+});
+
+async function sourceFixture() {
+  const f = await aiFixture();
+  const product = { id: 'p1', sku: 'AT01', name: 'Áo thun', category: 'Áo', material: 'Cotton', colors: ['Đen'], sizes: ['L'], qty: 4, price: 250000 };
+  f.knowledge.products = [product];
+  const settings = await f.service.readMessengerAiSettings('111', pool);
+  await f.load('lib/services/customerCare.ts').saveCustomerCareSettings('111', { profile: f.profile, knowledge: f.knowledge,
+    confirmed: true, pageAssigned: true, pageEnabled: true, updatedAt: settings.updatedAt, pageProfile: settings.pageProfile }, 'owner', pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 10000]);
+  const api = f.load('lib/services/marketingBrief.ts');
+  const campaign = { ...api.emptyCampaignBrief('111'), id: 'campaign-1', name: 'Áo mùa hè', productIds: ['p1'], message: 'Áo thun mùa hè',
+    version: 1, approvedAt: Date.now(), approvedBy: 'owner', knowledge: f.knowledge,
+    profile: api.emptyMarketingProfile(), configuration: f.load('lib/services/aiConfiguration.ts').defaultAiConfiguration(),
+    offer: { kind: 'discount', details: 'Giảm 10%', conditions: 'Chỉ áp dụng AT01, tối đa 1 sản phẩm', confirmed: true,
+      startsAt: new Date(Date.now() - 3600000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString() } };
+  const workspace = { ...api.emptyMarketingWorkspace(), campaigns: [campaign], reviews: [{ postId: 'post-local', campaignId: campaign.id,
+    campaignVersion: 1, publication: 'published', externalId: '111_555', campaignSnapshot: structuredClone(campaign) }] };
+  const saveWorkspace = () => query(`INSERT INTO marketing_workspaces(page_id,document,updated_at) VALUES('111',$1::jsonb,1)
+    ON CONFLICT(page_id) DO UPDATE SET document=EXCLUDED.document`, [JSON.stringify(workspace)]);
+  await saveWorkspace();
+  const linkPost = async ({ mid = 'private-post', psid = '222', pageId = '111', postId = '111_555', commentId = '555_600', status = 'sent', recipientId = psid } = {}) => {
+    const sentAt = Date.now() - 2000;
+    const snapshot = { commentText: 'Áo AT01 có ưu đãi không?', postText: 'Áo thun mùa hè', revision: 1 };
+    await query(`INSERT INTO facebook_comments(page_id,comment_id,post_id,author_id,author_name,text,created_at,event_at,status,
+      post_text,message_id,recipient_id,sent_at,care_context_json) VALUES($1,$2,$3,'444','Trùng tên',$4,$5,$5,$6,$7,$8,$9,$10,$11::jsonb)`,
+    [pageId, commentId, postId, snapshot.commentText, sentAt - 100, status, snapshot.postText, mid, recipientId, sentAt, JSON.stringify(snapshot)]);
+    await f.writer.savePostgresMessages([m(mid, { pageId, psid, direction: 'out', timestamp: sentAt, text: 'Tin nhắn riêng về AT01.' })], pool);
+  };
+  const linkLive = async ({ mid = 'private-live', sessionId = 'live-1', commentId = '999_600', flashPrice = 180000 } = {}) => {
+    const sentAt = Date.now() - 2000;
+    await query(`INSERT INTO live_sessions(id,page_id,platform,source_kind,source_id,source_post_id,title,status,knowledge_json,started_at,live_at,flash_json)
+      VALUES($1,'111','facebook','live_video','999','111_999','Live áo thun','live',$2::jsonb,$3,$3,$4::jsonb)`,
+    [sessionId, JSON.stringify(f.knowledge), sentAt - 1000, JSON.stringify({ AT01: flashPrice })]);
+    const snapshot = { commentText: 'Áo AT01 bao nhiêu?', sku: 'AT01', product: { id: product.id, sku: product.sku, name: product.name }, flashPrice };
+    await query(`INSERT INTO live_comments(session_id,comment_id,author_id,author_name,text,created_at,received_at,intent,sku,reply_status,message_id,sent_at,care_context_json)
+      VALUES($1,$2,'444','Trùng tên',$3,$4,$4,'price','AT01','sent',$5,$4,$6::jsonb)`, [sessionId, commentId, snapshot.commentText, sentAt, mid, JSON.stringify(snapshot)]);
+    await f.writer.savePostgresMessages([m(mid, { direction: 'out', timestamp: sentAt, text: 'Giá trong phiên 180.000đ.' })], pool);
+  };
+  return { ...f, workspace, campaign, saveWorkspace, linkPost, linkLive,
+    readSources: (psid, messageId, at) => f.load('lib/services/conversationSources.ts').readConversationSources('111', psid, messageId, pool, at) };
+}
+
+test('source links use exact Page/message/recipient evidence, not commenter IDs or duplicate names; unknown sends stay unlinked', async () => {
+  const f = await sourceFixture();
+  await f.linkPost();
+  await f.incoming('question');
+  await f.incoming('same-name', { psid: '444' });
+  const sources = await f.readSources('222', 'question');
+  assert.equal(sources.resolution, 'linked'); assert.equal(sources.blocked, false);
+  assert.equal(sources.sources[0].campaign.id, f.campaign.id);
+  assert.equal(sources.sources[0].campaign.offerActive, true);
+  assert.equal(sources.sources[0].products[0].sku, 'AT01');
+  assert.equal(sources.sources[0].products[0].price, undefined, 'historical catalog prices must not replace confirmed Chat prices');
+  const missing = await f.load('lib/services/customerCare.ts').generateCareReply({ ...f.knowledge, products: [] }, f.profile, null, 'Giá áo này?', [], sources);
+  assert.equal(missing.analysis.canAutoReply, false); assert.match(missing.analysis.reason, /chưa có trong tri thức Chat/);
+  assert.equal((await f.readSources('444', 'same-name')).resolution, 'none', 'a commenter ID is never treated as a PSID');
+  await f.linkPost({ mid: 'unknown-private', commentId: '555_601', status: 'unknown', psid: '333' });
+  await f.linkPost({ mid: 'foreign-private', pageId: '999', postId: '999_555', commentId: '555_602' });
+  await f.linkPost({ mid: 'wrong-recipient', commentId: '555_603', psid: '333', recipientId: '444' });
+  await f.incoming('no-proof', { psid: '333' });
+  assert.equal((await f.readSources('333', 'no-proof')).resolution, 'none');
+  assert.equal(await f.load('lib/services/conversationSources.ts').readConversationSources('999', '222', 'question', pool), null);
+  const snap = await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool);
+  assert.equal(snap.conversations.find(thread => thread.psid === '222').sourceContext.sources[0].commentId, '555_600');
+});
+
+test('multiple sources never select the newest implicitly; a direct reply resolves only its own source and history keeps the evidence', async () => {
+  const f = await sourceFixture(); await f.linkPost(); await f.linkLive(); await f.incoming('ambiguous');
+  let context = await f.readSources('222', 'ambiguous');
+  assert.equal(context.resolution, 'ambiguous'); assert.equal(context.selectedId, null); assert.equal(context.blocked, true);
+  await f.process(); assert.equal(f.state.sends, 0);
+  const saved = (await query("SELECT * FROM messenger_analysis_history WHERE message_id='ambiguous'")).rows[0];
+  assert.equal(saved.source_context_json.resolution, 'ambiguous');
+  assert.match(saved.reply, /bài đăng hoặc phiên nào/);
+  await f.incoming('explicit', { replyToMessageId: 'private-post', timestamp: Date.now() + 1 });
+  context = await f.readSources('222', 'explicit');
+  assert.equal(context.resolution, 'reply'); assert.equal(context.selectedId, 'private-post'); assert.equal(context.blocked, false);
+  await f.incoming('unknown-reference', { replyToMessageId: 'not-a-linked-message', timestamp: Date.now() + 2 });
+  assert.equal((await f.readSources('222', 'unknown-reference')).resolution, 'unresolved');
+  const memory = await f.load('lib/services/conversationMemory.ts').readConversationMemories('111', ['["111","222"]'], pool);
+  assert.equal(memory.get('["111","222"]')[0].sourceContext.sources.length, 2);
+});
+
+test('campaign boundaries, changed approvals and edited comments block sending while preserving the original offer and comment', async () => {
+  const f = await sourceFixture(); await f.linkPost(); await f.incoming('offer');
+  const active = await f.readSources('222', 'offer');
+  const expired = await f.readSources('222', 'offer', Date.parse(f.campaign.offer.endsAt));
+  assert.equal(expired.blocked, true); assert.equal(expired.sources[0].campaign.offerActive, false);
+  assert.equal(expired.sources[0].campaign.offer.details, 'Giảm 10%');
+  assert.notEqual(active.fingerprint, expired.fingerprint);
+  f.workspace.campaigns[0].version++; f.workspace.campaigns[0].approvedAt = null; await f.saveWorkspace();
+  assert.equal((await f.readSources('222', 'offer')).blocked, true);
+  await query("UPDATE facebook_comments SET text='Nội dung đã sửa',revision=revision+1 WHERE page_id='111'");
+  const changed = await f.readSources('222', 'offer');
+  assert.equal(changed.sources[0].commentText, 'Áo AT01 có ưu đãi không?');
+  assert.ok(changed.sources[0].issues.some(issue => issue.includes('Bình luận đã thay đổi')));
+  await f.process(); assert.equal(f.state.sends, 0);
+});
+
+test('Live carries the exact SKU and flash snapshot, deduplicates shared post replies and expires when the session ends or price changes', async () => {
+  const f = await sourceFixture(); await f.linkLive();
+  await f.linkPost({ mid: 'private-live', postId: '111_999', commentId: '999_600' });
+  await f.incoming('live-question');
+  const active = await f.readSources('222', 'live-question');
+  assert.equal(active.sources.length, 1); assert.equal(active.sources[0].kind, 'live');
+  assert.equal(active.sources[0].live.flashPrice, 180000); assert.equal(active.sources[0].live.flashActive, true);
+  await query("UPDATE live_sessions SET flash_json='{}'::jsonb WHERE id='live-1'");
+  const changed = await f.readSources('222', 'live-question');
+  assert.equal(changed.blocked, true); assert.equal(changed.sources[0].live.flashPrice, 180000);
+  await query("UPDATE live_sessions SET status='ended',ended_at=$1,flash_json=$2::jsonb WHERE id='live-1'", [Date.now(), JSON.stringify({ AT01: 180000 })]);
+  const ended = await f.readSources('222', 'live-question');
+  assert.equal(ended.blocked, true); assert.equal(ended.sources[0].live.flashActive, false);
+  const reply = await f.load('lib/services/customerCare.ts').generateCareReply(f.knowledge, f.profile, null, 'Giá live còn không?', [], ended);
+  assert.equal(reply.analysis.canAutoReply, false); assert.equal(reply.analysis.needsHuman, true);
+});
+
+test('source changes during generation or just before transport prevent stale sends; source snapshots reach the prompt and persisted history', async () => {
+  for (const stage of ['normal', 'generation', 'transport']) {
+    const f = await sourceFixture(); await f.linkPost(); await f.incoming('source-race');
+    let prompt;
+    const change = async () => { f.workspace.campaigns[0].version++; await f.saveWorkspace(); };
+    f.state.beforeReply = async options => { prompt = options.system; if (stage === 'generation') await change(); };
+    if (stage === 'transport') f.state.beforeTransport = change;
+    await f.process();
+    assert.ok(prompt.includes('Áo mùa hè')); assert.ok(prompt.includes('Chỉ áp dụng AT01'));
+    assert.equal(f.state.sends, stage === 'normal' ? 1 : 0, stage);
+    if (stage === 'transport') assert.equal((await query('SELECT status FROM messenger_outbound_requests')).rows[0].status, 'failed');
+    if (stage === 'normal') {
+      const saved = (await query('SELECT source_context_json FROM messenger_analysis_history')).rows[0];
+      assert.equal(saved.source_context_json.sources[0].campaign.id, 'campaign-1');
+    }
+  }
+});
+
+test('the final transport gate checks offer expiry again even when the configuration and conversation versions are unchanged', async () => {
+  const originalNow = Date.now;
+  let tick = originalNow(); Date.now = () => tick;
+  try {
+    const f = await sourceFixture(); await f.linkPost(); await f.incoming('expiry-race');
+    f.state.beforeTransport = async () => { tick = Date.parse(f.campaign.offer.endsAt); };
+    await f.process(); assert.equal(f.state.sends, 0);
+    assert.equal((await query('SELECT status FROM messenger_outbound_requests')).rows[0].status, 'failed');
+  } finally { Date.now = originalNow; }
+});
+
+test('a direct reply to an older source is resolved beyond the bounded recent-source list', async () => {
+  const f = await sourceFixture();
+  for (let i = 0; i < 24; i++) await f.linkPost({ mid: `private-${i}`, commentId: `555_${600 + i}` });
+  await f.incoming('many-sources');
+  const ambiguous = await f.readSources('222', 'many-sources');
+  assert.equal(ambiguous.resolution, 'ambiguous'); assert.equal(ambiguous.sources.length, 5);
+  await f.incoming('reply-oldest', { replyToMessageId: 'private-0', timestamp: Date.now() + 1 });
+  const explicit = await f.readSources('222', 'reply-oldest');
+  assert.equal(explicit.resolution, 'reply'); assert.equal(explicit.selectedId, 'private-0'); assert.equal(explicit.sources[0].id, 'private-0');
+});
+
+test('Inbox hides a suggestion when source facts change; legacy memory saves cannot erase its stored source evidence', async () => {
+  const f = await sourceFixture(); await f.linkPost(); await f.incoming('current-context');
+  const sources = await f.readSources('222', 'current-context');
+  const result = await f.load('lib/services/customerCare.ts').generateCareReply(f.knowledge, f.profile, null, 'Ưu đãi áo?', [], sources);
+  const memory = f.load('lib/services/conversationMemory.ts');
+  await memory.saveConversationMemory('111', '222', 'current-context', result, pool);
+  const { sourceContext: omitted, ...legacy } = result;
+  assert.equal(omitted.fingerprint, sources.fingerprint);
+  await memory.saveConversationMemory('111', '222', 'current-context', legacy, pool);
+  assert.equal((await query('SELECT source_context_json FROM messenger_analysis_history')).rows[0].source_context_json.fingerprint, sources.fingerprint);
+  const read = f.load('lib/services/messengerInboxDb.ts'), view = f.load('lib/services/messengerView.ts');
+  let thread = (await read.readMessengerInbox('111', 100, pool)).conversations[0];
+  const before = view.mergeMessengerThread(thread); assert.ok(before.aiSuggestion);
+  f.workspace.campaigns[0].version++; await f.saveWorkspace();
+  thread = (await read.readMessengerInbox('111', 100, pool)).conversations[0];
+  const after = view.mergeMessengerThread(thread, before);
+  assert.equal(after.aiSuggestion, undefined); assert.equal(after.aiStatus, 'error');
+  assert.equal(f.load('lib/services/inboxAi.ts').applyConversationAnalysis(after, 'current-context', result).aiSuggestion, undefined);
+});
+
+test('Messenger AI API validates switches and customer, keeps confirmed knowledge and permits disabling without browser knowledge', async () => {
+  const f = await aiFixture(false);
+  const route = f.load('app/api/messenger/ai/route.ts');
   const req = (method, body) => new Request('http://localhost/api/messenger/ai', { method,
-    headers: { Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    headers: { origin: 'http://localhost', Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` }, ...(body ? { body: JSON.stringify(body) } : {}) });
   const response = await route.GET(req('GET'));
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal((await response.json()).autoReply, false);
   assert.equal((await route.PUT(req('PUT', { autoReply: 'yes' }))).status, 400);
-  assert.equal((await route.PUT(req('PUT', { autoReply: true }))).status, 400);
+  assert.equal((await route.PUT(req('PUT', { autoReply: true }))).status, 200);
   assert.equal((await route.POST(req('POST', { psid: 'bad', knowledge: f.knowledge }))).status, 400);
   assert.equal((await route.PUT(req('PUT', { autoReply: true, knowledge: f.knowledge }))).status, 200);
   assert.equal((await route.PUT(req('PUT', { autoReply: false }))).status, 200);

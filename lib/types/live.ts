@@ -7,6 +7,14 @@
 export type LivePlatform = 'facebook';
 export type LiveSourceKind = 'live_video' | 'post';
 
+export interface LivePreparation {
+  host: string; scheduledAt: string; campaignId: string;
+  receivingFields: string; handoff: string; holdPolicy: string;
+  allowPrivate: boolean; allowPublic: boolean;
+  catalog: { sku: string; codes: string[]; sizeChart: string; sizeSource: string; fit: string }[];
+  voice?: { address: string; tone: string };
+}
+
 export type LiveIntent =
   | 'order' | 'price' | 'size_advice' | 'stock' | 'view' | 'shipping'
   | 'return' | 'complaint' | 'question' | 'other';
@@ -21,7 +29,11 @@ export interface LiveSession {
   sourceKind: LiveSourceKind | null;
   sourceId: string | null;
   title: string;
-  status: 'live' | 'ended';
+  status: 'draft' | 'live' | 'ended';
+  preparation?: LivePreparation | null;
+  preparationRevision?: number;
+  approvedAt?: number | null;
+  approvedBy?: string;
   onAirSku: string | null;
   startedAt: number;
   endedAt: number | null;
@@ -84,6 +96,7 @@ export interface LiveGroup {
   handledAt: number | null;
   /** Đã trả lời công khai bằng comment của Trang. */
   publicReplied: boolean;
+  publicReplyUnknown?: boolean;
 }
 
 export interface LiveOrderItem {
@@ -179,6 +192,8 @@ export interface LiveSummary {
 export interface LiveSnapshot {
   now: number;
   session: LiveSession;
+  timeline?: { at: number; sku: string | null }[];
+  policies?: { question: string; answer: string }[];
   stats: LiveStats;
   onAir: { sku: string; name: string; price: number; remaining: number } | null;
   /** Hàng chờ "Lên sóng tiếp theo". */
@@ -191,7 +206,7 @@ export interface LiveSnapshot {
   /** Có khi phiên đã kết thúc. */
   summary: LiveSummary | null;
   /** Sản phẩm của phiên (để chọn mẫu đang lên sóng). */
-  /** price = giá đang áp dụng (đã tính flash sale), basePrice = giá gốc trong Cấu hình AI. */
+  /** price = giá đang áp dụng (đã tính flash sale), basePrice = giá gốc trong FAQ & sản phẩm. */
   products: { sku: string; name: string; price: number; basePrice: number; flashPrice: number | null; stock: number }[];
 }
 
@@ -199,7 +214,7 @@ export interface LiveSessionListItem {
   id: string;
   title: string;
   platform: LivePlatform;
-  status: 'live' | 'ended';
+  status: 'draft' | 'live' | 'ended';
   startedAt: number;
   endedAt: number | null;
   comments: number;

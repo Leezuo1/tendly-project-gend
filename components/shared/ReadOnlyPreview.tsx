@@ -11,8 +11,8 @@ const pages = {
   marketing: { title: 'Marketing', tabs: ['Hàng chờ duyệt', 'Bình luận Facebook', 'Bài đăng', 'Soạn bài AI'], columns: ['Nội dung đề xuất', 'Nhóm khách hàng', 'Hiệu suất'] },
   livestream: { title: 'Livestream', tabs: ['Phiên trực tiếp', 'Sản phẩm', 'Đơn nháp'], columns: ['Bình luận', 'Nhóm câu hỏi', 'Đơn hàng'] },
   'smart-sourcing': { title: 'Smart Sourcing', tabs: ['Từ khóa', 'Sản phẩm', 'Nguồn hàng'], columns: ['Từ khóa theo ngành', 'Sản phẩm nổi bật', 'Nguồn cung'] },
-  'cau-hinh-ai': { title: 'Cấu hình AI', tabs: ['Sản phẩm', 'FAQ', 'Email tự động'], columns: ['Danh mục sản phẩm', 'Câu hỏi thường gặp', 'Kịch bản chăm sóc'] },
-  'cai-dat': { title: 'Cài đặt', tabs: ['Tài khoản & nhân viên', 'Tích hợp kênh'], columns: ['Thông tin shop', 'Nhân viên', 'Kênh kết nối'] },
+  'cau-hinh-ai': { title: 'Cấu hình AI', tabs: ['Vai trò AI', 'Tri thức chung', 'Gán Fanpage'], columns: ['Mục tiêu & văn phong', 'Input & output', 'Chế độ hoạt động'] },
+  'cai-dat': { title: 'Cài đặt', tabs: ['Tài khoản & nhân viên', 'Tích hợp kênh', 'Nguồn sản phẩm', 'FAQ', 'Email tự động'], columns: ['Thông tin shop', 'Nguồn sản phẩm & FAQ', 'Kênh kết nối'] },
 };
 export function ReadOnlyPreview({ pathname }: { pathname: string }) {
   const { session, refresh } = useAppSecurity();

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ConversationList } from './ConversationList';
@@ -8,16 +9,19 @@ import { useMobileViewport } from '@/lib/hooks/useMobileViewport';
 import { ThreadPane } from './ThreadPane';
 import { CustomerProfilePane } from './CustomerProfilePane';
 import { Toast } from '@/components/shared/Toast';
-import { askShopAi, currentAiKnowledge } from '@/lib/services/aiChat';
+import { askShopAi } from '@/lib/services/aiChat';
 import { applyConversationAnalysis, automaticAnalysisCandidates, latestCustomerMessage, markConversationAnswered, sessionContext, sortReplyQueue } from '@/lib/services/inboxAi';
 import { mergeMessengerThread, messengerChatMessage } from '@/lib/services/messengerView';
 import type { MessengerInboxSnapshot } from '@/lib/types/messengerInbox';
 import type { MessengerMessage } from '@/lib/types/messenger';
 import { useInboxSession } from '@/lib/services/inboxCredentials';
-import type { AiChatReply, AiSessionMessage } from '@/lib/types/ai';
+import type { AiChatReply } from '@/lib/types/ai';
 import { ConfirmDialog } from '@/components/ui/Modal';
+import { applyContextTags, readContextTagRules } from '@/lib/services/contextTags';
+import { useMockDbVersion } from '@/lib/hooks/useMockDbVersion';
 
 export function InboxShell() {
+  const dbVersion = useMockDbVersion();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const selectedIdRef = useRef('');
@@ -76,6 +80,7 @@ export function InboxShell() {
         if (!response.ok) throw new Error(data.error || 'Không đồng bộ được Messenger.');
         if (cancelled) return;
         const snapshot = data as MessengerInboxSnapshot;
+        if (typeof snapshot.aiEnabled === 'boolean') { setAutoReply(snapshot.aiEnabled); setAiSettingsReady(true); }
         snapshot.conversations = snapshot.conversations.filter((thread) => {
           const hiddenAt = hiddenConversations.current.get(thread.id);
           if (hiddenAt === undefined) return true;
@@ -121,8 +126,12 @@ export function InboxShell() {
     };
   }, [conversations]);
 
+  const taggedConversations = useMemo(() => {
+    const rules = dbVersion < 0 ? [] : readContextTagRules();
+    return conversations.map(conversation => applyContextTags(conversation, rules));
+  }, [conversations, dbVersion]);
   const filteredConversations = useMemo(() => {
-    return sortReplyQueue(conversations.filter((conv) => {
+    return sortReplyQueue(taggedConversations.filter((conv) => {
       if (filter === 'urgent' && (!conv.isUnreplied || !conv.isUrgent)) return false;
       if (filter === 'unreplied' && !conv.isUnreplied) return false;
 
@@ -132,18 +141,19 @@ export function InboxShell() {
         const matchesPreview = conv.preview.toLowerCase().includes(query);
         const matchesMessages = conv.messages.some((m) => m.text.toLowerCase().includes(query));
         const matchesArea = conv.profile.shippingArea.toLowerCase().includes(query);
-        if (!matchesName && !matchesPreview && !matchesMessages && !matchesArea) {
+        const matchesTag = conv.tags.some(tag => tag.label.toLowerCase().includes(query));
+        if (!matchesName && !matchesPreview && !matchesMessages && !matchesArea && !matchesTag) {
           return false;
         }
       }
 
       return true;
     }));
-  }, [conversations, filter, searchQuery]);
+  }, [taggedConversations, filter, searchQuery]);
 
   const selectedConv = useMemo(() => {
-    return conversations.find((c) => c.id === selectedId) || conversations[0];
-  }, [conversations, selectedId]);
+    return taggedConversations.find((c) => c.id === selectedId) || taggedConversations[0];
+  }, [taggedConversations, selectedId]);
 
   const handleSelectConv = (id: string) => {
     const changed = id !== selectedIdRef.current;
@@ -195,20 +205,16 @@ export function InboxShell() {
   const analyzeMessage = useCallback(async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages, automatic = false) => {
     try {
       let data: AiChatReply;
-      if (conversation.messenger && automatic) {
-        const response = await fetch('/api/messenger/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ psid: conversation.messenger.psid, knowledge: currentAiKnowledge() }) });
+      if (conversation.messenger) {
+        const response = await fetch(automatic ? '/api/messenger/ai' : '/api/customer-care', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ psid: conversation.messenger.psid, ...(!automatic ? { action: 'suggest', messageId } : {}) }) });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Không phân tích được hội thoại.');
-        if (!result.reply || result.messageId !== messageId) return;
+        if (!result.reply) throw new Error('Chưa có gợi ý. Kiểm tra cấu hình AI Chat hoặc chờ lượt phân tích đang chạy.');
+        if (result.messageId !== messageId) return;
         data = result.reply;
       } else {
         data = await askShopAi(text, sessionContext(contextMessages, messageId));
-        if (conversation.messenger) {
-          const response = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ psid: conversation.messenger.psid, messageId, ...data }) });
-          if (!response.ok) throw new Error('Không lưu được phân tích vào database.');
-        }
       }
       setConversations((prev) => prev.map((c) => c.id === conversation.id
         ? applyConversationAnalysis(c, messageId, data) : c));
@@ -257,14 +263,13 @@ export function InboxShell() {
           await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ psid: conversation.messenger.psid, action: 'summarize' }) });
         }
-        for (const job of result.jobs as { messageId: string; text: string; context: AiSessionMessage[] }[]) {
+        for (const job of result.jobs as { messageId: string }[]) {
           if (cancelled) return;
           const current = conversationsRef.current.find((c) => c.id === selectedId);
           if (!current) return;
           if (pendingRequests.current.size || (current.isUnreplied && latestCustomerMessage(current)?.id === job.messageId)) break;
-          const data: AiChatReply = await askShopAi(job.text || '[Tệp đính kèm]', job.context);
-          const saved = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ psid: conversation.messenger.psid, messageId: job.messageId, ...data }) });
+          const saved = await fetch('/api/customer-care', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'suggest', psid: conversation.messenger.psid, messageId: job.messageId }) });
           if (!saved.ok) throw new Error('Không lưu được phân tích lịch sử.');
         }
         if (!cancelled) timer = setTimeout(backfill, result.jobs.length ? 3000 : 15000);
@@ -304,24 +309,7 @@ export function InboxShell() {
           <div className="inbox-shell" data-mobile-thread-open={mobileThreadOpen}>
             <ConversationList
               toolbar={<div className="messenger-toolbar">
-                  <button type="button" className="inbox-ai-toggle" role="switch" aria-checked={autoReply}
-                    aria-label="AI tự động trả lời"
-                    disabled={!aiSettingsReady || savingAiSettings}
-                    onClick={async () => {
-                      setSavingAiSettings(true);
-                      try {
-                        const response = await fetch('/api/messenger/ai', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ autoReply: !autoReply, ...(!autoReply ? { knowledge: currentAiKnowledge() } : {}) }) });
-                        const result = await response.json();
-                        if (!response.ok) throw new Error(result.error);
-                        setAutoReply(result.autoReply === true);
-                        showToast(result.autoReply ? 'Đã bật tự trả lời tin mới đủ căn cứ.' : 'Đã tắt AI tự động trả lời.');
-                      } catch (error) { showToast(error instanceof Error ? error.message : 'Không lưu được cài đặt AI.'); }
-                      finally { setSavingAiSettings(false); }
-                    }}>
-                    <span>AI tự động trả lời <b>{savingAiSettings ? 'Đang lưu…' : !aiSettingsReady ? 'Đang tải…' : autoReply ? 'Bật' : 'Tắt'}</b></span>
-                    <span className="inbox-ai-track" aria-hidden="true"><span /></span>
-                  </button>
+                  <Link href="/cau-hinh-ai?tab=settings&ai=chat">Cấu hình AI · {!aiSettingsReady ? 'Đang tải…' : autoReply ? 'Đang bật' : 'Đang tắt'}</Link>
                   {syncStatus && <p role="status">{syncStatus}</p>}
                   {hasMore && limit < 1000 && <button className="btn btn-outline btn-sm" onClick={() => setLimit((n) => n + 100)}>Tải thêm hội thoại</button>}
               </div>}
@@ -350,6 +338,23 @@ export function InboxShell() {
                   onToast={showToast}
                   onGenerateAiSuggestion={handleGenerateAiSuggestion}
                   isSending={sendingIds.has(selectedConv.id)}
+                  aiEnabled={autoReply}
+                  savingAi={savingAiSettings}
+                  onToggleAutoReply={async (enabled) => {
+                    const target = selectedConv;
+                    if (!target.messenger || savingAiSettings) return;
+                    setSavingAiSettings(true);
+                    try {
+                      const response = await fetch('/api/messenger/ai', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ psid: target.messenger.psid, autoReply: enabled, updatedAt: target.aiUpdatedAt ?? 0 }) });
+                      const result = await response.json();
+                      if (!response.ok) throw new Error(result.error);
+                      setConversations(previous => previous.map(c => c.id === target.id && (c.aiUpdatedAt ?? 0) <= result.updatedAt
+                        ? { ...c, autoReply: result.autoReply, aiUpdatedAt: result.updatedAt } : c));
+                      showToast(`${enabled ? 'Đã bật' : 'Đã tắt'} tự trả lời cho ${target.name}.`);
+                    } catch (error) { showToast(error instanceof Error ? error.message : 'Không lưu được chế độ hội thoại.'); }
+                    finally { setSavingAiSettings(false); }
+                  }}
                   onLoadOlder={async () => {
                     const target = selectedConv;
                     const oldest = target.messages[0];

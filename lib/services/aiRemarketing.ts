@@ -7,6 +7,7 @@ Nhiệm vụ: viết MỘT tin nhắn Messenger để chủ động nhắn lại
 - Bám vào điều khách đã hỏi/quan tâm gần nhất (sản phẩm, size, màu, giá, giao hàng...). Nếu shop đã trả lời đủ, hỏi thăm khách cần hỗ trợ thêm gì hoặc gợi ý bước tiếp theo (chốt size, đặt hàng).
 - Nếu khách đang phàn nàn hoặc không hài lòng: KHÔNG chào bán; xin lỗi ngắn gọn và đề nghị hỗ trợ cụ thể.
 - DỮ LIỆU SẢN PHẨM và FAQ là nguồn duy nhất cho giá, tồn kho, chính sách. Không bịa giảm giá, quà tặng, mã khuyến mãi, thời hạn hay phí ship.
+- stockKnown = false là shop chưa xác nhận tồn kho; không nói hết hàng, còn hàng, khan hiếm hoặc đã giữ hàng.
 - Tin nhắn ngắn (tối đa 60 từ), tự nhiên như người thật, xưng "shop"/"mình" và gọi khách bằng tên nếu có, tối đa 2 emoji. Không hashtag, không link.
 - Messenger chỉ cho phép tin nhắn liên quan cuộc trò chuyện đang diễn ra: không viết tin quảng cáo đại trà, không gây áp lực.
 - reason: một câu ngắn giải thích vì sao nên nhắn khách này (để chủ shop duyệt).
@@ -37,7 +38,7 @@ export function buildRemarketingPrompt(conversation: DraftConversation, knowledg
       text: m.text,
       minutesAgo: Math.max(0, Math.round((now - m.at) / 60_000)),
     })),
-    products: knowledge.products.map(({ sku, name, colors, sizes, qty, price }) => ({ sku, name, colors, sizes, qty, price })),
+    products: knowledge.products.map(({ sku, name, colors, sizes, qty, price, stockKnown, description, features, benefits, usp, limitations }) => ({ sku, name, colors, sizes, qty, price, stockKnown, description, features, benefits, usp, limitations })),
     activeFaqs: knowledge.faqs.map(({ question, answer }) => ({ question, answer })),
   });
   return { system: REMARKETING_SYSTEM_PROMPT, user };

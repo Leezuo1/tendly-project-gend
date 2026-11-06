@@ -47,7 +47,27 @@ export interface Channel {
   comingSoon?: boolean;
 }
 
-export interface Product {
+export interface ProductDetails {
+  brand?: string;
+  description?: string;
+  features?: string[];
+  benefits?: string[];
+  usp?: string;
+  targetAudience?: string;
+  useCases?: string[];
+  keywords?: string[];
+  relatedProductIds?: string[];
+  relatedReason?: string;
+  limitations?: string;
+  careInstructions?: string;
+  imageUrl?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  sourceUpdatedAt?: string;
+  stockKnown?: boolean;
+}
+
+export interface Product extends ProductDetails {
   id: string;
   sku: string;
   name: string;
@@ -100,6 +120,8 @@ export interface EmailLog {
 }
 
 export interface MockDb {
+  contextTagRules?: import('./contextTags').ContextTagRule[];
+  productCatalogVersion?: number;
   settingsShopSaved?: boolean;
   settingsMembersSaved?: boolean;
   settingsMessengerEnabled?: boolean;

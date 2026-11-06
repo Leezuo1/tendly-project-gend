@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { marketingCommentContext } from '@/lib/services/marketingCommentContext';
 import { assertOperationAllowed, canRunAutomation, runAutomaticAccess } from '@/lib/services/appSecurity';
 import type { AiKnowledge } from '@/lib/types/ai';
 import type { CommentsData, FacebookComment, FacebookCommentEvent } from '@/lib/types/facebookComments';
@@ -58,7 +59,7 @@ export async function readFacebookComments(pageId: string, db: Database = getMes
 
 export async function saveCommentSettings(pageId: string, autoReply: boolean, knowledge: AiKnowledge,
   db: Database = getMessengerPool()) {
-  if (autoReply && !knowledge.products.length) throw new InvalidMarketingRequest('Cần có sản phẩm trong Cấu hình AI trước khi bật tự gửi.');
+  if (autoReply && !knowledge.products.length) throw new InvalidMarketingRequest('Cần có sản phẩm trong FAQ & sản phẩm trước khi bật tự gửi.');
   await db.query(`INSERT INTO facebook_comment_settings(page_id,auto_reply,knowledge_json,updated_at,enabled_at)
     VALUES($1,$2,$3::jsonb,$4,$4) ON CONFLICT(page_id) DO UPDATE SET
     auto_reply=EXCLUDED.auto_reply,knowledge_json=EXCLUDED.knowledge_json,
@@ -130,7 +131,8 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
   if (live.can_reply_privately !== true || live.message !== row.text) {
     throw new FacebookCommentError('Meta không cho phép nhắn riêng hoặc bình luận đã thay đổi.');
   }
-  const reserved = await db.query(`UPDATE facebook_comments SET status='sending',draft=$4,reason='Đang gửi qua Meta'
+  const reserved = await db.query(`UPDATE facebook_comments SET status='sending',draft=$4,reason='Đang gửi qua Meta',
+    care_context_json=jsonb_build_object('commentText',text,'postText',post_text,'revision',revision)
     WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND status=ANY($6::text[])
     AND ($5::bigint IS NULL OR EXISTS (SELECT 1 FROM facebook_comment_settings s
       WHERE s.page_id=$1 AND s.auto_reply AND s.updated_at=$5 AND facebook_comments.created_at>=s.enabled_at))
@@ -225,9 +227,11 @@ async function analyzeComment(pageId: string, db: Database, signal: AbortSignal,
     }
     const post = await graphRead(row.post_id, 'message', signal);
     const postText = typeof post.message === 'string' ? post.message.slice(0, 30_000) : '';
-    const knowledge = parseAiKnowledge(settings.knowledge_json);
+    const campaign = await marketingCommentContext(pageId, row.post_id, db);
+    const knowledge = parseAiKnowledge(campaign?.knowledge ?? settings.knowledge_json);
     const { result: draft } = await generateGeminiJson({
       system: `${buildAiSystemPrompt(knowledge)}
+${campaign ? `NGỮ CẢNH CAMPAIGN CỦA ĐÚNG BÀI: ${JSON.stringify(campaign.context)}. Chỉ nhắc ưu đãi trong offer khi có giá trị. Nếu expiredOffer=true hoặc sourceIsCurrent=false thì needsHuman=true; không xác nhận deal còn hiệu lực. Hồ sơ là cách giao tiếp, không cấp quyền bỏ qua điều kiện gửi.` : ''}
 Bạn đang xử lý một BÌNH LUẬN trên Fanpage để soạn MỘT tin nhắn riêng.
 - productQuestion=true chỉ khi khách hỏi giá, thông tin, tồn kho hoặc cách mua sản phẩm. Tag bạn bè, emoji, spam, lời khen đơn thuần: false.
 - Dùng bài đăng để xác định đúng sản phẩm, nhưng giá/tồn kho chỉ lấy từ danh mục. Không đoán sản phẩm khi bài có nhiều mẫu hoặc không khớp danh mục.
@@ -243,7 +247,7 @@ Bạn đang xử lý một BÌNH LUẬN trên Fanpage để soạn MỘT tin nh�
       WHERE page_id=$1 AND comment_id=$2 AND revision=$3 AND processing_at=$4 AND status='processing' RETURNING comment_id`,
     [pageId, row.comment_id, row.revision, now, status, postText, draft.message, draft.reason]);
     if (saved.rowCount && !commentId && settings.auto_reply && Number(row.created_at) >= Number(settings.enabled_at) &&
-        draft.productQuestion && !draft.needsHuman && draft.message) {
+        draft.productQuestion && !draft.needsHuman && draft.message && (!campaign || (campaign.context.sourceIsCurrent && !campaign.context.expiredOffer))) {
       await runAutomaticAccess(Number(row.created_at), () => sendCommentPrivateReply(pageId, row.comment_id, draft.message, row.revision, db, Number(settings.updated_at)));
     }
   } catch (error) {

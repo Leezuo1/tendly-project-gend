@@ -2,11 +2,18 @@ import type { Pool } from 'pg';
 import type { MessengerMessage } from '@/lib/types/messenger';
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
 import { assertOperationAllowed } from '@/lib/services/appSecurity';
+import { readConversationSources } from '@/lib/services/conversationSources';
 
 export class MessengerSendError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
-export interface SendMessengerInput { psid: string; text: string; requestId: string }
+export class AutomationStoppedError extends MessengerSendError {
+  constructor() { super('Tự trả lời đã dừng do cấu hình hoặc hội thoại thay đổi.', 409); }
+}
+export interface SendMessengerInput {
+  psid: string; text: string; requestId: string;
+  automation?: { messageId: string; settingsVersion: number; conversationVersion: number; sourceFingerprint: string };
+}
 
 export async function sendMessengerMessage(input: SendMessengerInput,
   db: Pool = getMessengerPool(), transport: typeof fetch = fetch) {
@@ -45,7 +52,26 @@ export async function sendMessengerMessage(input: SendMessengerInput,
       : 'Chưa xác định được kết quả gửi. Kiểm tra Messenger trước khi gửi lại để tránh trùng.', 409);
   }
   let response: Response;
-  try { await assertOperationAllowed(db); }
+  try {
+    await assertOperationAllowed(db);
+    if (input.automation) {
+      const { messageId, settingsVersion, conversationVersion } = input.automation;
+      const allowed = await db.query(`SELECT j.message_id FROM messenger_ai_jobs j
+        JOIN messenger_conversations c ON c.id=j.conversation_id JOIN messenger_ai_settings s ON s.page_id=j.page_id
+        WHERE j.page_id=$1 AND c.id=$2 AND j.message_id=$3 AND j.status='sending'
+        AND s.auto_reply AND s.profile_json IS NOT NULL AND s.updated_at=$4
+        AND c.ai_auto_reply AND c.ai_updated_at=$5 AND c.hidden_at IS NULL
+        AND j.sent_at>s.enabled_at AND j.sent_at>c.ai_enabled_at AND j.sent_at>COALESCE(c.last_out_at,0)
+        AND $6::bigint-j.sent_at<86400000
+        AND j.message_id=(SELECT message_id FROM messenger_messages WHERE conversation_id=c.id ORDER BY sent_at DESC,message_id DESC LIMIT 1)
+        AND NOT EXISTS(SELECT 1 FROM messenger_ai_jobs other WHERE other.conversation_id=c.id
+          AND other.message_id<>j.message_id AND other.status IN ('processing','review','sending','unknown') AND other.sent_at>COALESCE(c.last_out_at,0))`,
+      [pageId, JSON.stringify([pageId, input.psid]), messageId, settingsVersion, conversationVersion, Date.now()]);
+      if (!allowed.rows.length) throw new AutomationStoppedError();
+      const sources = await readConversationSources(pageId, input.psid, messageId, db);
+      if (!sources || sources.blocked || sources.fingerprint !== input.automation.sourceFingerprint) throw new AutomationStoppedError();
+    }
+  }
   catch (error) {
     await db.query(`UPDATE messenger_outbound_requests SET status='failed' WHERE page_id=$1 AND request_id=$2`, [pageId, input.requestId]);
     throw error;

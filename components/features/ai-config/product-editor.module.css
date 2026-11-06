@@ -1,0 +1,28 @@
+:global(.admin-root) .root { min-width: 0; }
+.root .header { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding-bottom: 24px; }
+.root .header h2 { margin-top: 12px; font-size: 22px; line-height: 1.5; }
+.root .header p, .root .intro p { margin-top: 6px; font-size: 13px; color: var(--ink-soft); line-height: 1.7; }
+.root .fields { border: 0; min-width: 0; }
+.root .section { display: grid; grid-template-columns: minmax(160px, .6fr) minmax(0, 1.6fr); gap: 32px; padding: 28px 0; border-top: 1px solid var(--line); }
+.root .intro h3 { font-size: 15px; font-weight: 600; }
+.root .photo { width: 150px; height: 184px; object-fit: cover; border-radius: 6px; margin-top: 18px; background: var(--sand); }
+.root .sourceLink { display: inline-block; margin-top: 12px; color: var(--coral-deep); text-decoration: underline; text-underline-offset: 3px; font-size: 12px; }
+.root .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 18px; min-width: 0; }
+.root .full { grid-column: 1 / -1; }
+.root :global(.field) { min-width: 0; margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.root :global(.field) input, .root :global(.field) textarea { margin-top: 8px; font-size: 14px; font-weight: 400; }
+.root .related { display: grid; gap: 12px; min-width: 0; }
+.root .related > label:not(:global(.field)) { display: flex; align-items: start; gap: 10px; min-height: 40px; font-size: 13px; font-weight: 400; padding: 6px 0; }
+.root .related input[type='checkbox'] { width: 18px; height: 18px; flex: none; margin-top: 3px; accent-color: var(--coral-deep); }
+.root .related small { display: block; font-size: 11px; color: var(--ink-soft); }
+.root .footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; border-top: 1px solid var(--line); padding-top: 20px; }
+.root .footer span { font-size: 12px; color: var(--ink-soft); }
+.root .footer > div { display: flex; gap: 10px; }
+.root .error { color: var(--coral-deep); padding: 12px 0; font-size: 13px; }
+@media (max-width: 880px) {
+  .root .section, .root .grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .root .header { flex-wrap: wrap; }
+  .root .header h2 { font-size: 19px; }
+  .root :global(.field) input, .root :global(.field) textarea { font-size: 16px; }
+  .root .footer { flex-wrap: wrap; }
+}

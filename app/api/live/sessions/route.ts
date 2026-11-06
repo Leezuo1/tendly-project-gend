@@ -20,7 +20,7 @@ export const GET = withAppAccess(async function GET(request: Request) {
 });
 
 /**
- * Bắt đầu phiên: { platform: 'facebook', sourceKind: 'auto'|'live_video'|'post', sourceId?, title, knowledge } (knowledge = Cấu hình AI).
+ * Bắt đầu phiên: { platform: 'facebook', sourceKind: 'auto'|'live_video'|'post', sourceId?, title, knowledge } (knowledge = FAQ & sản phẩm).
  * sourceKind 'auto': tạo phiên trước, Tendly tự nhận video Live khi người bán bật stream trên Facebook.
  */
 export const POST = withAppAccess(async function POST(request: Request) {
@@ -50,7 +50,7 @@ export const POST = withAppAccess(async function POST(request: Request) {
       sourcePostId = await facebookSourcePostId(pageId, body.sourceKind, body.sourceId);
     }
     const knowledge = parseAiKnowledge(body.knowledge);
-    const session = await createSession(pageId, { platform, sourceKind, sourceId, sourcePostId, title, waitForLive }, knowledge);
+    const session = await createSession(pageId, { platform, sourceKind, sourceId, sourcePostId, title, waitForLive, draft: true, preparation: body.preparation }, knowledge);
     return liveJson({ session }, 201);
   } catch (error) {
     return liveErrorResponse(error);

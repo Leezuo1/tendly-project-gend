@@ -38,7 +38,7 @@ export const POST = withAppAccess(async function POST(request: Request) {
     sessionContext = parseSessionContext(body.sessionContext);
   } catch (error) {
     return NextResponse.json({
-      error: error instanceof InvalidAiKnowledge ? error.message : 'Cấu hình AI hoặc ngữ cảnh chat không hợp lệ.',
+      error: error instanceof InvalidAiKnowledge ? error.message : 'FAQ & sản phẩm hoặc ngữ cảnh chat không hợp lệ.',
     }, { status: 400 });
   }
 

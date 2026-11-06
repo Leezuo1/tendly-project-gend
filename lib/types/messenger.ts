@@ -4,6 +4,7 @@ export interface MessengerAttachment {
 }
 
 export interface MessengerMessage {
+  replyToMessageId?: string;
   pageId: string;
   psid: string;
   messageId: string;

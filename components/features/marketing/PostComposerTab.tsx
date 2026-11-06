@@ -8,9 +8,13 @@ import { getDashboardKey, postsClient, PostsApiError, prepareUploadImage, setDas
 import type { GeneratedPostDraft, MarketingPost, PostChannel, PostDraft, PostGoal, PostImageSource, PostTone } from '@/lib/types/posts';
 import { formatMoney, normalize } from '@/lib/utils/format';
 import { PostImageField, SavedPostImage, type ImageBusy } from './PostImageField';
+import { ReviewDetails, REVIEW_STATUS } from './ReviewDetails';
+import type { PostReviewResult } from '@/lib/types/postReview';
+import type { PostGenerationRequest } from '@/lib/types/posts';
 
 interface PostComposerTabProps {
   onToast: (msg: string) => void;
+  archiveOnly?: boolean;
 }
 
 const BRAND_STORAGE = 'tendly.brandVoice';
@@ -19,7 +23,8 @@ const TIKTOK_LIMIT = 150;
 
 /** Ảnh của bản nháp chưa lưu: giữ blob trên trình duyệt, chỉ gửi lên server khi bấm lưu/đăng. */
 type DraftImage = { blob: Blob; url: string; source: PostImageSource };
-type EditableDraft = GeneratedPostDraft & { key: string; saving?: boolean; image?: DraftImage; imageBusy?: ImageBusy };
+type EditableDraft = GeneratedPostDraft & { key: string; saving?: boolean; image?: DraftImage; imageBusy?: ImageBusy; review?: PostReviewResult; reviewCurrent?: boolean; request: PostGenerationRequest; productSkus: string[]; candidate?: PostReviewResult; candidateBase?: string; reviewing?: boolean };
+const draftSignature = (draft: EditableDraft) => JSON.stringify([draft.title, draft.content, draft.hashtags, draft.imageIdea, draft.imagePrompt, draft.image?.url]);
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : 'lỗi không rõ');
 const releaseImage = (d: EditableDraft) => d.image && URL.revokeObjectURL(d.image.url);
@@ -39,7 +44,7 @@ function readBrandVoice() {
   }
 }
 
-export function PostComposerTab({ onToast }: PostComposerTabProps) {
+export function PostComposerTab({ onToast, archiveOnly = false }: PostComposerTabProps) {
   // ---- form ----
   const [channel, setChannel] = useState<PostChannel>('facebook');
   const [goal, setGoal] = useState<PostGoal>('new-product');
@@ -51,7 +56,8 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
   const [variants, setVariants] = useState(2);
   const [generating, setGenerating] = useState(false);
   const [drafts, setDrafts] = useState<EditableDraft[]>([]);
-  const [draftMeta, setDraftMeta] = useState<{ channel: PostChannel; goal: PostGoal; skus: string[] } | null>(null);
+  const [review, setReview] = useState<PostReviewResult | null>(null);
+  const [reviewRequest, setReviewRequest] = useState<PostGenerationRequest | null>(null);
   const [error, setError] = useState('');
 
   // ---- bài đã lưu ----
@@ -66,7 +72,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
   const [needKey, setNeedKey] = useState<'NEED_DASHBOARD_KEY' | 'NO_DASHBOARD_KEY' | null>(null);
   const [keyInput, setKeyInput] = useState('');
 
-  // sản phẩm lấy từ Cấu hình AI (mock DB trên trình duyệt), đọc sau khi hydrate
+  // sản phẩm lấy từ FAQ & sản phẩm (mock DB trên trình duyệt), đọc sau khi hydrate
   const dbVersion = useMockDbVersion();
   const products = useMemo(() => (dbVersion < 0 ? [] : snapshot.products()), [dbVersion]);
   const shownProducts = useMemo(() => {
@@ -116,10 +122,10 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
     });
   };
 
-  const onGenerate = async (e: FormEvent) => {
-    e.preventDefault();
+  const onGenerate = async (e?: FormEvent, retry = false) => {
+    e?.preventDefault();
     setError('');
-    if (!productIds.length && !notes.trim()) {
+    if (!retry && !productIds.length && !notes.trim()) {
       setError('Chọn ít nhất 1 sản phẩm hoặc ghi chú nội dung muốn viết.');
       return;
     }
@@ -130,13 +136,14 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
     }
     setGenerating(true);
     try {
-      const { drafts: result } = await postsClient.generate({ channel, goal, tone, productIds, notes, brandVoice, variants });
-      drafts.forEach(releaseImage);
-      setDrafts(result.map((d, i) => ({ ...d, key: `${Date.now()}-${i}` })));
-      setDraftMeta({
-        channel, goal,
-        skus: products.filter((p) => productIds.includes(p.id)).map((p) => p.sku),
-      });
+      const pending = retry ? review?.variants.filter(item => !item.finalDraft).map(item => item.original) : undefined;
+      const req = retry && reviewRequest && pending?.length ? { ...reviewRequest, variants: pending.length } : { channel, goal, tone, productIds, notes, brandVoice, variants };
+      const result = await postsClient.generate(req, pending);
+      setReview(result.review); setReviewRequest(req);
+      if (!result.drafts.length) { setError('Chưa có phương án qua Review. Xem vấn đề cần xử lý và bản gốc bên dưới.'); return; }
+      const next = result.review.variants.filter(item => item.finalDraft).map((item, i) => ({ ...item.finalDraft!, key: `${Date.now()}-${i}`, review: { ...result.review, variants: [item] }, reviewCurrent: true, request: req, productSkus: products.filter(p => req.productIds.includes(p.id)).map(p => p.sku) }));
+      if (!retry) drafts.forEach(releaseImage);
+      setDrafts(previous => retry ? [...previous, ...next] : next);
     } catch (err) {
       if (err instanceof PostsApiError && (err.code === 'NEED_DASHBOARD_KEY' || err.code === 'NO_DASHBOARD_KEY')) setNeedKey(err.code);
       else setError(err instanceof Error ? err.message : 'AI chưa viết được bài, thử lại nhé.');
@@ -146,7 +153,17 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
   };
 
   const updateDraft = (key: string, patch: Partial<EditableDraft>) =>
-    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch, ...(['title', 'content', 'hashtags', 'imageIdea', 'imagePrompt', 'image'].some(field => field in patch) ? { reviewCurrent: false } : {}) } : d)));
+
+  const reviewDraft = async (draft: EditableDraft) => {
+    updateDraft(draft.key, { reviewing: true });
+    try {
+      const original = { title: draft.title, content: draft.content, hashtags: draft.hashtags, imageIdea: draft.imageIdea, imagePrompt: draft.imagePrompt };
+      const result = await postsClient.generate({ ...draft.request, variants: 1 }, [original]);
+      updateDraft(draft.key, { candidate: result.review, candidateBase: draftSignature(draft) });
+    } catch (error) { handleError(error); }
+    finally { updateDraft(draft.key, { reviewing: false }); }
+  };
 
   /** Thay ảnh của bản nháp (hoặc bỏ ảnh khi image = undefined), giải phóng ảnh cũ khỏi bộ nhớ. */
   const replaceDraftImage = (key: string, image: DraftImage | undefined) => {
@@ -177,7 +194,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
 
   /** Lưu bản nháp vào database; publish=true thì đăng luôn lên Fanpage. */
   const saveDraft = async (draft: EditableDraft, publish: boolean) => {
-    if (!draftMeta) return;
+    if (publish && !draft.reviewCurrent) { onToast('Rà soát và áp dụng bản hiện hành trước khi đăng.'); return; }
     if (!draft.content.trim()) {
       onToast('Nội dung bài viết đang trống');
       return;
@@ -188,7 +205,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
     updateDraft(draft.key, { saving: true });
     try {
       let post = await postsClient.create({
-        channel: draftMeta.channel, goal: draftMeta.goal, productSkus: draftMeta.skus,
+        channel: draft.request.channel, goal: draft.request.goal, productSkus: draft.productSkus,
         title: draft.title, content: draft.content, hashtags: draft.hashtags, imageIdea: draft.imageIdea,
       });
       let imageSaved = true;
@@ -270,10 +287,10 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
         </div>
       )}
 
-      <form className="card" onSubmit={onGenerate}>
+      {!archiveOnly && <form className="card" onSubmit={onGenerate}>
         <div className="card-head">
           <h2>✨ Soạn bài với AI</h2>
-          <span className="hint">AI viết dựa trên sản phẩm &amp; FAQ trong Cấu hình AI</span>
+          <span className="hint">AI viết dựa trên sản phẩm &amp; FAQ trong FAQ & sản phẩm</span>
         </div>
 
 
@@ -316,14 +333,14 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
                 <button
                   type="button"
                   key={p.id}
-                  className={`pc-product${productIds.includes(p.id) ? ' selected' : ''}${p.qty === 0 ? ' out' : ''}`}
+                  className={`pc-product${productIds.includes(p.id) ? ' selected' : ''}${p.stockKnown !== false && p.qty === 0 ? ' out' : ''}`}
                   onClick={() => toggleProduct(p.id)}
-                  title={p.qty === 0 ? 'Hết hàng — AI sẽ không quảng bá như còn hàng' : undefined}
+                  title={p.stockKnown === false ? 'Chưa nhập tồn kho của shop' : p.qty === 0 ? 'Hết hàng — AI sẽ không quảng bá như còn hàng' : undefined}
                 >
                   <span className="pc-product-emoji">{p.emoji}</span>
                   <span className="pc-product-info">
                     <span className="pc-product-name">{p.name}</span>
-                    <span className="pc-product-meta">{p.sku} · {formatMoney(p.price)} · {p.qty === 0 ? 'Hết hàng' : `Còn ${p.qty}`}</span>
+                    <span className="pc-product-meta">{p.sku} · {formatMoney(p.price)} · {p.stockKnown === false ? 'Chưa nhập tồn kho' : p.qty === 0 ? 'Hết hàng' : `Còn ${p.qty}`}</span>
                   </span>
                 </button>
               ))}
@@ -377,27 +394,33 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
         {error && <p className="pc-error">{error}</p>}
         <div className="pc-actions">
           <button type="submit" className="btn btn-primary" disabled={generating}>
-            {generating ? <><span className="pc-spinner" /> AI đang viết...</> : '✨ Tạo bài với AI'}
+            {generating ? <><span className="pc-spinner" /> Đang soạn và rà soát…</> : 'Soạn và rà soát với AI'}
           </button>
         </div>
-      </form>
+      </form>}
 
-      {drafts.length > 0 && draftMeta && (
+      {review && review.status !== 'completed' && <section className="card"><h2>{REVIEW_STATUS[review.status]}</h2><p>{review.variants.filter(item => item.finalDraft).length}/{review.variants.length} phương án qua Review.</p><ul className="mw-review-issues" role="alert">{review.variants.flatMap(item => item.issues).map((issue, i) => <li key={i}>{issue.message}</li>)}</ul><ReviewDetails review={review} /><button className="btn btn-outline btn-sm" disabled={generating} onClick={() => void onGenerate(undefined, true)}>Thử lại Review các bản chưa đạt</button></section>}
+
+      {drafts.length > 0 && (
         <div className="card">
           <div className="card-head">
-            <h2>Bản nháp AI vừa viết</h2>
-            <span className="hint">{POST_CHANNELS[draftMeta.channel].label} · sửa thoải mái trước khi lưu/đăng</span>
+            <h2>Bản nháp sau Review</h2>
+            <span className="hint">Chỉnh nội dung rồi rà lại trước khi sử dụng</span>
           </div>
           <div className="pc-drafts">
             {drafts.map((d, i) => {
-              const tooLong = draftMeta.channel === 'tiktok' && d.content.length > TIKTOK_LIMIT;
+              const draftChannel = d.request.channel;
+              const tooLong = draftChannel === 'tiktok' && d.content.length > TIKTOK_LIMIT;
               return (
                 <div key={d.key} className="pc-draft">
                   <div className="pc-draft-head">Phương án {i + 1}</div>
-                  <label className="pc-mini-label">{titleLabel(draftMeta.channel)}</label>
+                  {d.reviewCurrent === false && <p className="pc-hint">Nội dung / ảnh đã chỉnh sau Review. Kiểm tra lại trước khi sử dụng.</p>}
+                  {d.review && <ReviewDetails review={d.review} />}
+                  {d.candidate && <section className="pc-review-candidate"><h3>Bản đề xuất sau khi rà lại</h3>{d.candidate.variants[0]?.finalDraft && <><p className="mw-copy">{d.candidate.variants[0].finalDraft.content}</p><button className="btn btn-primary btn-sm" disabled={d.candidateBase !== draftSignature(d)} onClick={() => setDrafts(previous => previous.map(current => current.key === d.key && d.candidateBase === draftSignature(current) ? { ...current, ...d.candidate!.variants[0].finalDraft!, review: d.candidate, reviewCurrent: true, candidate: undefined, candidateBase: undefined } : current))}>Áp dụng bản đề xuất</button></>}{d.candidateBase !== draftSignature(d) && <p className="pc-hint">Nội dung / ảnh đã đổi; rà lại bản đang sửa trước khi áp dụng.</p>}<ReviewDetails review={d.candidate} /><button className="btn btn-text btn-sm" onClick={() => updateDraft(d.key, { candidate: undefined })}>Bỏ đề xuất</button></section>}
+                  <label className="pc-mini-label">{titleLabel(draftChannel)}</label>
                   <input className="pc-input" value={d.title} onChange={(e) => updateDraft(d.key, { title: e.target.value })} />
                   <label className="pc-mini-label">
-                    Nội dung <span className={tooLong ? 'pc-count over' : 'pc-count'}>{d.content.length}{draftMeta.channel === 'tiktok' ? `/${TIKTOK_LIMIT}` : ''} ký tự</span>
+                    Nội dung <span className={tooLong ? 'pc-count over' : 'pc-count'}>{d.content.length}{draftChannel === 'tiktok' ? `/${TIKTOK_LIMIT}` : ''} ký tự</span>
                   </label>
                   <textarea className="pc-input" rows={8} value={d.content} onChange={(e) => updateDraft(d.key, { content: e.target.value })} />
                   <label className="pc-mini-label">Hashtag</label>
@@ -407,7 +430,7 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
                     onChange={(e) => updateDraft(d.key, { hashtags: parseTags(e.target.value) })}
                   />
                   {d.imageIdea && (
-                    <div className="pc-idea"><b>{ideaLabel(draftMeta.channel)}:</b> {d.imageIdea}</div>
+                    <div className="pc-idea"><b>{ideaLabel(draftChannel)}:</b> {d.imageIdea}</div>
                   )}
                   <label className="pc-mini-label">Ảnh kèm bài</label>
                   <PostImageField
@@ -431,13 +454,14 @@ export function PostComposerTab({ onToast }: PostComposerTabProps) {
                     />
                   </details>
                   <div className="pc-draft-actions">
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => copy(fullText(d, draftMeta.channel))}>Sao chép</button>
+                    <button type="button" className="btn btn-outline btn-sm" disabled={d.reviewing || d.saving} onClick={() => void reviewDraft(d)}>{d.reviewing ? 'Đang rà soát…' : 'Rà lại bản đang sửa'}</button>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => copy(fullText(d, draftChannel))}>Sao chép</button>
                     <button type="button" className="btn btn-outline btn-sm" disabled={d.saving || Boolean(d.imageBusy)} onClick={() => saveDraft(d, false)}>Lưu nháp</button>
-                    {draftMeta.channel === 'facebook' && (
+                    {draftChannel === 'facebook' && (
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
-                        disabled={d.saving || Boolean(d.imageBusy) || !facebookReady}
+                        disabled={d.saving || Boolean(d.imageBusy) || !facebookReady || !d.reviewCurrent}
                         title={facebookReady ? undefined : 'Chưa cấu hình PAGE_ID / PAGE_ACCESS_TOKEN trên server'}
                         onClick={() => saveDraft(d, true)}
                       >

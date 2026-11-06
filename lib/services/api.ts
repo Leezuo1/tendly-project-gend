@@ -4,6 +4,7 @@
 import { readDb, resetDb, writeDb } from '@/lib/services/mockDb';
 import { createSeed, PLANS } from '@/lib/data/admin';
 import { openInboxSession } from '@/lib/services/inboxCredentials';
+import { parseProductDetails } from '@/lib/services/productDetails';
 import type {
   Channel, ChannelId, EmailLog, EmailTrigger, Faq, Member, MemberRole, Plan, Product,
   ProductSource, Shop, Subscription, TriggerKind,
@@ -146,15 +147,57 @@ function applyShopee(products: Product[], source: ProductSource) {
     // Giữ sản phẩm CSV/đã sửa; chỉ thay dòng Shopee cũ và bỏ mẫu chưa từng chỉnh sửa.
     const manual = d.products.filter((p) => !p.id.startsWith('shopee:') && samples.get(p.id) !== JSON.stringify(p));
     if (products.length + manual.length > 500) throw new ApiError('Danh mục vượt giới hạn 500 dòng của nguồn AI.');
-    d.products = [...products, ...manual];
+    const previous = new Map(d.products.map(product => [product.id, product]));
+    d.products = [...products.map(product => {
+      const old = previous.get(product.id);
+      if (!old) return { ...product, stockKnown: true };
+      const details = parseProductDetails({ ...old });
+      delete details.stockKnown;
+      return { ...product, ...details, stockKnown: true };
+    }), ...manual];
+    const availableIds = new Set(d.products.map(product => product.id));
+    for (const product of d.products) {
+      if (product.relatedProductIds) product.relatedProductIds = product.relatedProductIds.filter(id => id !== product.id && availableIds.has(id));
+    }
     d.productSource = source;
   });
   return { products: clone(db.products), source: clone(db.productSource) };
 }
 
 export const productApi = {
+  async importSourced(input: Omit<Product, 'id'>): Promise<Product> {
+    const sku = input.sku.trim(), name = input.name.trim();
+    if (!sku || sku.length > 100 || !name || name.length > 500 || !Number.isSafeInteger(input.price) || input.price < 0) throw new ApiError('Nhập SKU, tên và giá bán VND hợp lệ.');
+    const details = parseProductDetails({ ...input });
+    const product: Product = { ...input, ...details, id: uid('p'), sku, name, qty: 0, stockKnown: false };
+    writeDb(db => {
+      if (db.products.some(row => row.sku.trim().toLowerCase() === sku.toLowerCase())) throw new ApiError('SKU đã tồn tại. Chọn mã khác; sản phẩm hiện có được giữ nguyên.');
+      if (db.products.length >= 500) throw new ApiError('Danh mục đã đạt 500 sản phẩm.');
+      db.products.push(product);
+    });
+    return respond(product);
+  },
   list: () => respond<Product[]>(readDb().products),
   getSource: () => respond<ProductSource>({ ...readDb().productSource, connected: false }, 100),
+
+  async update(id: string, input: Omit<Product, 'id'>): Promise<Product> {
+    const current = readDb().products.find(product => product.id === id);
+    if (!current) throw new ApiError('Không tìm thấy sản phẩm.');
+    const sku = input.sku.trim(), name = input.name.trim();
+    if (!sku || sku.length > 100 || !name || name.length > 500) throw new ApiError('Nhập mã sản phẩm (tối đa 100 ký tự) và tên (tối đa 500 ký tự).');
+    // Legacy CSV and Shopee rows can share a SKU; reject duplicates when changing it.
+    if (sku.toLowerCase() !== current.sku.toLowerCase() && readDb().products.some(product => product.id !== id && product.sku.toLowerCase() === sku.toLowerCase())) throw new ApiError('Mã sản phẩm đã được sử dụng.');
+    if (!Number.isSafeInteger(input.qty) || input.qty < 0 || !Number.isSafeInteger(input.price) || input.price < 0) throw new ApiError('Giá và số lượng phải là số nguyên không âm.');
+    if (typeof input.category !== 'string' || input.category.length > 200 || typeof input.material !== 'string' || input.material.length > 1000) throw new ApiError('Danh mục hoặc chất liệu không hợp lệ.');
+    for (const list of [input.colors, input.sizes]) {
+      if (!Array.isArray(list) || list.length > 100 || list.some(item => typeof item !== 'string' || item.length > 200)) throw new ApiError('Màu hoặc size không hợp lệ.');
+    }
+    const details = parseProductDetails({ ...input });
+    if (details.relatedProductIds?.some(relatedId => relatedId === id || !readDb().products.some(product => product.id === relatedId))) throw new ApiError('Sản phẩm liên quan không tồn tại hoặc trùng với chính sản phẩm này.');
+    const updated = { ...current, ...input, ...details, id, sku, name };
+    writeDb(db => { db.products[db.products.findIndex(product => product.id === id)] = updated; });
+    return respond(updated, 150);
+  },
 
   async loadShopee(): Promise<{ products: Product[]; source: ProductSource }> {
     const data = await shopeeFetch('/api/shopee') as { products: Product[]; source: ProductSource };
@@ -181,10 +224,10 @@ export const productApi = {
       rows.forEach((row) => {
         const existing = d.products.find((p) => !p.id.startsWith('shopee:') && p.sku.toLowerCase() === row.sku.toLowerCase());
         if (existing) {
-          Object.assign(existing, row, { id: existing.id });
+          Object.assign(existing, row, { id: existing.id, stockKnown: row.stockKnown ?? true });
           updated++;
         } else {
-          d.products.push({ ...row, id: uid('p') });
+          d.products.push({ ...row, id: uid('p'), stockKnown: row.stockKnown ?? true });
           added++;
         }
       });

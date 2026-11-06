@@ -42,11 +42,11 @@ export async function savePostgresMessages(messages: MessengerMessage[], databas
       await client.query(`INSERT INTO messenger_conversations(id,customer_id,page_id,created_at)
         VALUES($1,$1,$2,$3) ON CONFLICT DO NOTHING`, [key, message.pageId, receivedAt]);
       const result = await client.query(`INSERT INTO messenger_messages
-        (page_id,message_id,conversation_id,direction,sent_at,received_at,text,attachments_json)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb)
+        (page_id,message_id,conversation_id,direction,sent_at,received_at,text,attachments_json,reply_to_mid)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)
         ON CONFLICT(page_id,message_id) DO NOTHING RETURNING message_id`,
       [message.pageId, message.messageId, key, message.direction, message.timestamp, receivedAt,
-        message.text, JSON.stringify(message.attachments)]);
+        message.text, JSON.stringify(message.attachments), message.replyToMessageId ?? null]);
       if (!result.rowCount) continue;
       inserted++;
       await client.query(`UPDATE messenger_conversations SET

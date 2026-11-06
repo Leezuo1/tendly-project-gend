@@ -11,13 +11,15 @@ export async function hideConversation(pageId: string, psid: string, db: Pick<Po
 export async function saveConversationMemory(pageId: string, psid: string, messageId: string, result: AiChatReply,
   db: Pick<Pool, 'query'> = getMessengerPool()) {
   const saved = await db.query(`INSERT INTO messenger_analysis_history
-    (page_id,message_id,conversation_id,analysis,reply,model,source_summary,analyzed_at)
-    SELECT m.page_id,m.message_id,m.conversation_id,$4::jsonb,$5,$6,$7,$8 FROM messenger_messages m
+    (page_id,message_id,conversation_id,analysis,reply,model,source_summary,analyzed_at,source_context_json)
+    SELECT m.page_id,m.message_id,m.conversation_id,$4::jsonb,$5,$6,$7,$8,$9::jsonb FROM messenger_messages m
     JOIN messenger_conversations c ON c.id=m.conversation_id
     WHERE m.page_id=$1 AND m.conversation_id=$2 AND m.message_id=$3 AND m.direction='in' AND c.hidden_at IS NULL
     ON CONFLICT(page_id,message_id) DO UPDATE SET analysis=EXCLUDED.analysis,reply=EXCLUDED.reply,
-      model=EXCLUDED.model,source_summary=EXCLUDED.source_summary,analyzed_at=EXCLUDED.analyzed_at RETURNING message_id`,
-  [pageId, JSON.stringify([pageId, psid]), messageId, JSON.stringify(result.analysis), result.reply, result.model, result.sourceSummary, Date.now()]);
+      model=EXCLUDED.model,source_summary=EXCLUDED.source_summary,analyzed_at=EXCLUDED.analyzed_at,
+      source_context_json=COALESCE(EXCLUDED.source_context_json,messenger_analysis_history.source_context_json) RETURNING message_id`,
+  [pageId, JSON.stringify([pageId, psid]), messageId, JSON.stringify(result.analysis), result.reply, result.model, result.sourceSummary, Date.now(),
+    result.sourceContext ? JSON.stringify(result.sourceContext) : null]);
   if (saved.rowCount && result.analysis.canAutoReply === false) {
     await db.query(`INSERT INTO messenger_ai_jobs(page_id,message_id,conversation_id,sent_at,status,updated_at)
       SELECT page_id,message_id,conversation_id,sent_at,'review',$3 FROM messenger_messages WHERE page_id=$1 AND message_id=$2
@@ -36,7 +38,8 @@ export async function readConversationMemories(pageId: string, ids: string[], db
   for (const row of result.rows) {
     const entries = memory.get(row.conversation_id) || [];
     entries.push({ messageId: row.message_id, timestamp: Number(row.sent_at), messageText: row.text,
-      analyzedAt: Number(row.analyzed_at), analysis: row.analysis, reply: row.reply, model: row.model, sourceSummary: row.source_summary });
+      analyzedAt: Number(row.analyzed_at), analysis: row.analysis, reply: row.reply, model: row.model, sourceSummary: row.source_summary,
+      ...(row.source_context_json ? { sourceContext: row.source_context_json } : {}) });
     memory.set(row.conversation_id, entries);
   }
   return memory;
