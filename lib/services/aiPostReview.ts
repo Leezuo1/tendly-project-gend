@@ -104,8 +104,10 @@ export async function reviewPostDrafts(originals: GeneratedPostDraft[], evidence
 
 export function marketingGenerationContext(campaign: MarketingCampaign, account: MarketingAccount) {
   const platform = account.platform === 'shopee' ? undefined : account.platform;
-  const baseRules = effectiveAiRules(campaign.configuration.profiles.content, platform);
+  const shop = campaign.configuration.profiles.content, baseRules = effectiveAiRules(shop, platform);
   return { account: { id: account.id, name: account.name, platform: account.platform },
+    // Cá nhân hóa của shop cho Page (bản chép vào campaign lúc tạo brief), nằm dưới thiết lập chung của Tendly.
+    shopAi: { goal: shop.goal, output: shop.output, instructions: shop.instructions || undefined },
     brief: { ...campaign, knowledge: undefined, configuration: undefined },
     knowledge: { ...campaign.knowledge, products: campaign.knowledge.products.filter(p => campaign.productIds.includes(p.id)), emailTriggers: [] },
     contentRules: { ...baseRules, ...Object.fromEntries(Object.entries(campaign.profile).filter(([, value]) => value.trim())), tone: campaign.tone || campaign.profile.tone || baseRules.tone, format: campaign.format || campaign.profile.format || baseRules.format, cta: campaign.cta || campaign.profile.cta || baseRules.cta },
