@@ -3,15 +3,12 @@ import { NextResponse } from 'next/server';
 import { buildAiSystemPrompt, InvalidAiKnowledge, knowledgeSummary, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { AI_RESPONSE_SCHEMA, EMOTION_RESPONSE_PROMPT, parseAiChatOutput, parseSessionContext } from '@/lib/services/aiAnalysis';
 import { globalAiSystemPrompt } from '@/lib/services/aiGlobalSettings';
+import { GEMINI_CANDIDATE_MODELS } from '@/lib/services/gemini';
 
 export const runtime = 'nodejs';
 
-const CANDIDATE_MODELS = [
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
-  'gemini-flash-latest',
-  'gemini-3.8-flash',
-];
+// Cả 5 AI dùng chung một danh sách model Gemini (lib/services/gemini.ts).
+const CANDIDATE_MODELS = GEMINI_CANDIDATE_MODELS;
 
 interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
