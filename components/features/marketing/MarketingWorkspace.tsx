@@ -5,8 +5,8 @@ import { ConfirmDialog } from '@/components/ui/Modal';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
 import { dashboardRequest, prepareUploadImage } from '@/lib/services/postsClient';
-import { emptyMarketingProfile, MARKETING_GOALS } from '@/lib/services/marketingBrief';
-import type { MarketingCampaign, MarketingProfile, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
+import { MARKETING_GOALS } from '@/lib/services/marketingBrief';
+import type { MarketingCampaign, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
 import { CampaignBriefForm } from './CampaignBriefForm';
 import { MarketingScheduleTab } from './MarketingScheduleTab';
 import { CampaignPerformanceTab } from './CampaignPerformanceTab';
@@ -14,7 +14,19 @@ import { ReviewDetails, REVIEW_STATUS } from './ReviewDetails';
 import { MarketingContentPlanPanel } from './MarketingContentPlanPanel';
 import { MarketingDraft } from './MarketingDraft';
 
-export type MarketingWorkflowSection = 'campaigns' | 'composer' | 'approvals' | 'schedule' | 'performance' | 'profiles';
+export type MarketingWorkflowSection = 'campaigns' | 'composer' | 'approvals' | 'schedule' | 'performance';
+
+/** Sau khi shop sửa bài/dàn ý/ảnh, AI Review tự chạy lại; null khi chưa đủ điều kiện (brief hoặc kế hoạch chưa duyệt). */
+export function autoReview(action: string, input: Record<string, unknown>, next: MarketingWorkspaceView): { action: string; input: object } | null {
+  if (action === 'editPlan') return { action: 'reviewPlan', input: { id: input.id } };
+  if (action !== 'editPost' && action !== 'image') return null;
+  const meta = next.workspace.reviews.find(item => item.postId === input.postId);
+  const campaign = meta && next.workspace.campaigns.find(item => item.id === meta.campaignId);
+  const plan = campaign?.approvedAt && next.workspace.contentPlans?.find(p => p.campaignId === campaign.id && p.campaignVersion === campaign.version && p.approvedAt);
+  if (!meta || meta.publication !== 'draft' || !plan || !plan.items.length) return null;
+  const itemId = plan.items.some(item => item.id === meta.plan?.itemId) ? meta.plan!.itemId : plan.items[0].id;
+  return { action: 'review', input: { postId: meta.postId, plan: { id: plan.id, version: plan.version, itemId } } };
+}
 interface Props { section: MarketingWorkflowSection; onNavigate: (section: string, postId?: string) => void; }
 type Ask = (title: string, message: string, action: () => Promise<unknown>) => void;
 export function MarketingWorkspace({ section, onNavigate }: Props) {
@@ -26,11 +38,18 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
   const [detailPlanId, setDetailPlanId] = useState('');
   const [detailPostId, setDetailPostId] = useState('');
   const [editing, setEditing] = useState<MarketingCampaign | 'new' | null>(null);
-  const [accountId, setAccountId] = useState('');
   const [approval, setApproval] = useState<{ title: string; message: string; action: () => Promise<unknown> } | null>(null);
   const { session } = useAppSecurity();
   const load = useCallback(async () => { try { setView(await marketingWorkspaceClient.read()); setError(''); } catch (e) { setError((e as Error).message); } }, []);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
+  // Review chạy ngay sau khi lưu; Review lỗi không làm mất bản đã lưu.
+  const reviewAfter = async (action: string, input: Record<string, unknown>, saved: MarketingWorkspaceView) => {
+    const next = autoReview(action, input, saved);
+    if (!next) return;
+    setNotice('Đã lưu. AI đang Review…');
+    try { setView(await marketingWorkspaceClient.act(saved.revision, next.action, next.input)); setNotice('Đã lưu và Review xong. Xem đề xuất của AI rồi duyệt.'); }
+    catch (e) { setError(`Đã lưu, nhưng Review tự động chưa xong: ${(e as Error).message} Bấm "Review lại" để thử lại.`); }
+  };
   const act = async (action: string, input: object): Promise<boolean> => {
     if (!view || busy) return false;
     if (['generatePlan', 'generate', 'review', 'applyReview'].includes(action) && document.querySelector('.mw-root [data-unsaved="true"]')) { setError('Lưu hoặc hủy phần đang sửa trước khi tiếp tục với AI.'); return false; }
@@ -38,6 +57,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
     try {
       const next = await marketingWorkspaceClient.act(view.revision, action, input);
       setView(next); setNotice('Đã cập nhật');
+      await reviewAfter(action, input as Record<string, unknown>, next);
       if (action === 'generatePlan') { setDetailPostId(''); setDetailPlanId(next.workspace.contentPlans?.[0]?.id ?? ''); }
       if (action === 'generate' || action === 'retryReview') {
         const created = next.workspace.reviews.find(r => !view.workspace.reviews.some(old => old.postId === r.postId));
@@ -55,7 +75,9 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
     try {
       const image = file ? await prepareUploadImage(file) : undefined;
       const response = await dashboardRequest(`/api/marketing/workspace/image?postId=${encodeURIComponent(postId)}&revision=${view.revision}`, { method: file ? 'PUT' : 'DELETE', body: image });
-      setView(await response.json()); setNotice('Đã cập nhật ảnh. Review và duyệt lại trước khi đăng.');
+      const saved: MarketingWorkspaceView = await response.json();
+      setView(saved); setNotice('Đã cập nhật ảnh.');
+      await reviewAfter('image', { postId }, saved);
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -63,7 +85,6 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
   const campaigns = view.workspace.campaigns;
   const campaign = campaigns.find(item => item.id === campaignId) ?? campaigns[0];
   const filtered = view.workspace.reviews.filter(item => section === 'approvals' || item.campaignId === campaign?.id);
-  const selectedAccountId = accountId || view.accounts[0]?.id || '';
   return <div className="mw-root">
     {error && <div className="mw-error" role="alert">{error} <button className="btn btn-text btn-sm" onClick={() => void load()}>Tải dữ liệu mới</button></div>}
     <p className="mw-status" aria-live="polite">{busy ? 'Đang xử lý yêu cầu…' : notice}</p>
@@ -89,7 +110,6 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
         {!filtered.length && <p className="mw-empty">Chưa có bài trong mục này.</p>}
       </>}
       {section === 'schedule' && <MarketingScheduleTab view={view} act={act} confirm={confirm} />}
-      {section === 'profiles' && <><div className="mw-section-head"><div><h2>Hồ sơ từng tài khoản</h2><p>Cùng nền tảng, mỗi Page vẫn có đối tượng và giọng riêng. Chỉnh hồ sơ sẽ yêu cầu duyệt lại brief liên quan.</p></div></div><label className="mw-account-picker">Tài khoản<select value={selectedAccountId} onChange={event => { if (document.querySelector('.mw-root [data-unsaved="true"]')) setError('Lưu hoặc hủy hồ sơ đang chỉnh trước khi đổi tài khoản.'); else setAccountId(event.target.value); }}>{view.accounts.map(account => <option value={account.id} key={account.id}>{view.workspace.profiles[account.id]?.name || account.name}</option>)}</select></label><MarketingProfileForm key={`${selectedAccountId}:${view.revision}`} initial={view.workspace.profiles[selectedAccountId] ?? { ...emptyMarketingProfile(), name: view.accounts.find(account => account.id === selectedAccountId)?.name ?? '' }} onSave={profile => confirm('Áp dụng hồ sơ kênh?', 'Brief liên quan sẽ quay về chờ duyệt. Bài và lịch không tự thay nội dung theo hồ sơ mới.', () => act('profile', { accountId: selectedAccountId, profile }))} /></>}
       {section === 'performance' && <><div className="mw-section-head"><div><h2>Kết quả theo chiến dịch</h2><p>Hoạt động Facebook và kết quả mẫu được hiển thị riêng; chưa quy đổi tương tác thành doanh thu.</p></div></div><div className="mw-list">{campaigns.map(item => { const reviews = view.workspace.reviews.filter(review => review.campaignId === item.id); const mock = view.accounts.find(account => account.id === item.accountId)?.mock; return <article className="mw-item" key={item.id}><h3>{item.name}{mock && <span className="mw-chip">Kênh mẫu</span>}</h3><p>{reviews.length} bài · {reviews.filter(review => review.approvedAt).length} bài đã duyệt · {reviews.filter(review => review.publication === 'published').length} bài {mock ? 'hoàn tất mẫu' : 'đã đăng'}</p></article>; })}</div><CampaignPerformanceTab /></>}
       </>}
     </fieldset>
@@ -97,8 +117,3 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
   </div>;
 }
 
-function MarketingProfileForm({ initial, onSave }: { initial: MarketingProfile; onSave: (profile: MarketingProfile) => void }) {
-  const [profile, setProfile] = useState(initial);
-  const labels: Record<keyof MarketingProfile, string> = { name: 'Tên tài khoản', purpose: 'Vai trò của kênh', audience: 'Đối tượng chính', pain: 'Nhu cầu / rào cản', address: 'Cách xưng hô', tone: 'Giọng văn', approach: 'Cách tiếp cận', format: 'Định dạng ưu tiên', cta: 'CTA mặc định', avoid: 'Từ / tuyên bố cần tránh', examples: 'Ví dụ đúng giọng đã được duyệt' };
-  return <form className="mw-editor" data-unsaved={JSON.stringify(profile) !== JSON.stringify(initial)} onSubmit={event => { event.preventDefault(); onSave(profile); }}><div className="mw-form-grid">{(Object.keys(labels) as (keyof MarketingProfile)[]).map(key => <label key={key}>{labels[key]}<textarea rows={2} required={key === 'name' || key === 'tone'} maxLength={1500} value={profile[key]} onChange={event => setProfile({ ...profile, [key]: event.target.value })} /></label>)}</div><div className="mw-summary"><h3>Cấu hình sẽ áp dụng</h3><p>{profile.address} · {profile.tone}</p><p>{profile.audience || 'Đối tượng theo brief'} · {profile.approach || 'Cách tiếp cận theo brief'}</p><p>Thứ tự: quy tắc AI → nền tảng → hồ sơ tài khoản → brief. Quyền đăng và dữ kiện không được ghi đè bằng văn phong.</p></div><div className="mw-actions"><button className="btn btn-outline" type="button" onClick={() => setProfile(initial)}>Hủy thay đổi</button><button className="btn btn-primary" type="submit">Xem và xác nhận hồ sơ</button></div></form>;
-}

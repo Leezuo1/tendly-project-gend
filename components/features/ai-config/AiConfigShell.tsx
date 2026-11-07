@@ -19,8 +19,9 @@ import type { MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
 import type { LiveSessionListItem } from '@/lib/types/live';
 import styles from './ai-configuration.module.css';
 import { CustomerCareSettings } from './CustomerCareSettings';
+import { ChannelProfiles } from './ChannelProfiles';
 
-const TABS = [{ key: 'manage', label: 'Quản lý AI' }, { key: 'settings', label: 'Thiết lập AI' }] as const;
+const TABS = [{ key: 'manage', label: 'Quản lý AI' }, { key: 'settings', label: 'Thiết lập AI' }, { key: 'channels', label: 'Hồ sơ kênh' }] as const;
 const LABELS: Record<AiRoleId, string> = { chat: 'AI Chat', content: 'AI Soạn nội dung', review: 'AI Kiểm tra nội dung', sourcing: 'AI Smart Sourcing', livestream: 'AI Livestream' };
 const ORDER: AiRoleId[] = ['chat', 'content', 'review', 'sourcing', 'livestream'];
 
@@ -126,7 +127,7 @@ export function AiConfigShell() {
     <Tabs tabs={[...TABS]} active={tab} onChange={value => setTab(value, { ai: selected })} />
     {error && <div className={styles.error} role="alert">{error} <button type="button" className="btn btn-outline btn-sm" onClick={() => void load()}>Tải lại thiết lập</button></div>}
     {!ready && !error && <p className={styles.loading} role="status">Đang tải thiết lập…</p>}
-    <form id="ai-profile-settings" onSubmit={save}><fieldset className={styles.fieldset} disabled={saving}>
+    {tab === 'channels' ? <ChannelProfiles /> : <form id="ai-profile-settings" onSubmit={save}><fieldset className={styles.fieldset} disabled={saving}>
       {tab === 'manage' ? <div className={styles.management}>
         {usageErrors.length > 0 && <div className={styles.usageError} role="status">{usageErrors.join(' ')} <button className="btn btn-text btn-sm" type="button" onClick={() => void loadUsage()}>Tải lại</button></div>}
         {ORDER.map(id => id === 'chat' ? (ready || error) && <CustomerCareSettings key={id} mode="manage" initialProfile={config.profiles.chat} /> : ready && <section key={id} className={styles.aiRow}>
@@ -163,6 +164,6 @@ export function AiConfigShell() {
         </section>}
       </div>}
       {tab === 'settings' && selected !== 'chat' && <footer className={styles.saveBar}><p aria-live="polite">{saving ? 'Đang lưu…' : dirty ? 'Có thay đổi chưa lưu' : page?.revision ? 'Đã lưu thiết lập' : 'Chưa có thay đổi'}</p><button className="btn btn-primary" type="submit" disabled={saving || !ready || !dirty}>Lưu thiết lập</button></footer>}
-    </fieldset></form>
+    </fieldset></form>}
   </div>;
 }
