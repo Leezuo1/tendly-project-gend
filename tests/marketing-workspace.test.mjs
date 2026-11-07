@@ -25,6 +25,7 @@ async function fixture() {
   let failPublication = false, failReview = false;
   let reviewHook;
   let reviewContent = 'Giá 221.000đ, nhắn tin để tư vấn.';
+  let outlineReview;
   const calls = [];
   const cache = new Map();
   const load = file => {
@@ -40,7 +41,7 @@ async function fixture() {
       const draft = { title: 'Áo thun', content: 'Giá 259.000đ.', hashtags: [], imageIdea: 'Ảnh áo', imagePrompt: '' };
       const input = review ? JSON.parse(options.user) : null;
       const variants = review ? input.variants.map(({ draftId, draft: original }) => {
-        const content = input.channel === 'outline' ? original.content : reviewContent, finalDraft = { ...original, content };
+        const content = input.channel === 'outline' ? outlineReview ?? original.content : reviewContent, finalDraft = { ...original, content };
         return { draftId, status: original.content === content ? 'unchanged' : 'corrected', finalDraft, changes: original.content === content ? [] : [{ field: 'content', before: original.content, after: content, reason: 'Sửa giá theo nguồn', sourceIds: [input.evidence.sources.find(s => s.kind === 'product').id] }], issues: [] };
       }) : [draft];
       return { result: options.parse(JSON.stringify({ variants })), model: 'test-model' };
@@ -68,7 +69,7 @@ async function fixture() {
     return { id: created.id, version: created.version, itemId: created.items[0].id };
   };
   return { load, service, briefApi, config, knowledge, brief, act, state, plan, pool, publishes: () => publishes, calls,
-    onReview: hook => { reviewHook = hook; }, failPublication: () => { failPublication = true; }, failReview: () => { failReview = true; }, restoreReview: () => { failReview = false; }, setReviewContent: content => { reviewContent = content; } };
+    onReview: hook => { reviewHook = hook; }, failPublication: () => { failPublication = true; }, failReview: () => { failReview = true; }, restoreReview: () => { failReview = false; }, setReviewContent: content => { reviewContent = content; }, setOutlineReview: content => { outlineReview = content; } };
 }
 
 test('brief validation and finite weekly preview handle missing data, date limits and offer validity', async () => {
@@ -347,7 +348,7 @@ test('editing a plan invalidates post approval and schedules; stale candidates s
   let state = await f.state();
   assert.equal(state.workspace.reviews[0].approvedAt, null); assert.equal(state.workspace.schedules[0].status, 'paused');
   assert.equal(state.workspace.contentPlans[0].review, undefined);
-  await assert.rejects(f.act('approvePlan', { id: plan.id }), /Review đầy đủ/);
+  await assert.rejects(f.act('approvePlan', { id: plan.id }), /Chờ AI Review/);
   await f.act('reviewPlan', { id: plan.id }); await f.act('approvePlan', { id: plan.id });
   await assert.rejects(f.act('approvePost', { postId }), /Chọn dàn ý/);
   await assert.rejects(f.act('applyReview', { attemptId: attempt.id, draftId: 'draft-0' }), /Chọn dàn ý/);
@@ -394,7 +395,7 @@ test('plan review failures retain the original and retry safely; plan validation
   await f.act('generatePlan', { campaignId: campaign.id });
   let plan = (await f.state()).workspace.contentPlans[0];
   assert.equal(plan.review.status, 'failed'); assert.ok(plan.items[0].outline);
-  await assert.rejects(f.act('approvePlan', { id: plan.id }), /Review đầy đủ/);
+  await assert.rejects(f.act('approvePlan', { id: plan.id }), /Chờ AI Review/);
   f.restoreReview(); const before = f.calls.length;
   await f.act('reviewPlan', { id: plan.id });
   assert.equal(f.calls.length, before + 1);
@@ -416,7 +417,28 @@ test('source changes during plan Review retain a blocked plan and require fresh 
   const plan = (await f.state()).workspace.contentPlans[0];
   assert.ok(plan.items[0].outline); assert.equal(plan.review.status, 'blocked');
   assert.ok(plan.review.variants.every(v => !v.finalDraft && v.issues.some(i => i.type === 'conflict')));
-  await assert.rejects(f.act('approvePlan', { id: plan.id }), /Review đầy đủ/);
+  await assert.rejects(f.act('approvePlan', { id: plan.id }), /Căn cứ Review đã thay đổi/);
   await f.act('reviewPlan', { id: plan.id }); await f.act('approvePlan', { id: plan.id });
   assert.ok((await f.state()).workspace.contentPlans[0].approvedAt);
+});
+
+test('approving a plan keeps the owner outline; Review only suggests. Channel sample posts reach Review evidence', async () => {
+  const f = await fixture();
+  const profile = { ...f.briefApi.emptyMarketingProfile(), name: 'Fanpage', samples: ['Chào cả nhà, shop về mẫu mới nè!', '  '] };
+  await assert.rejects(f.act('profile', { accountId: '123', profile: { ...profile, samples: Array(6).fill('x') } }), /Tối đa 5/);
+  await f.act('profile', { accountId: '123', profile });
+  assert.deepEqual((await f.state()).workspace.profiles['123'].samples, ['Chào cả nhà, shop về mẫu mới nè!']);
+  await f.act('campaign', { brief: { ...f.brief, accountId: '123' }, knowledge: f.knowledge, configuration: f.config });
+  const campaign = (await f.state()).workspace.campaigns[0];
+  await f.act('approveCampaign', { id: campaign.id });
+  f.setOutlineReview('AI rewrite of the outline');
+  await f.act('generatePlan', { campaignId: campaign.id });
+  const plan = (await f.state()).workspace.contentPlans[0];
+  assert.equal(plan.review.variants[0].finalDraft.content, 'AI rewrite of the outline');
+  await f.act('approvePlan', { id: plan.id });
+  const approved = (await f.state()).workspace.contentPlans[0];
+  assert.ok(approved.approvedAt); assert.equal(approved.items[0].outline, plan.items[0].outline);
+  const account = f.service.marketingAccounts('123')[0];
+  const catalog = await f.load('lib/services/marketingReviewSources.ts').marketingReviewCatalog('123', (await f.state()).workspace.campaigns[0], account, f.pool);
+  assert.deepEqual(catalog.find(source => source.id === 'campaign:samples')?.data.samples, ['Chào cả nhà, shop về mẫu mới nè!']);
 });

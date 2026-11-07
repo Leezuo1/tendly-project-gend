@@ -183,12 +183,12 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
         invalidatePlanPosts(state, [plan.id]);
       } else {
         if (plan.approvedAt) return;
-        if (!plan.review || plan.review.status !== 'completed' || plan.review.variants.length !== plan.items.length || plan.review.variants.some(v => !v.finalDraft)) throw new MarketingWorkflowError('Review đầy đủ dàn ý trước khi duyệt kế hoạch.');
+        // Review chỉ góp ý: phải chạy xong trên đúng phiên bản này, còn quyết định và nội dung dàn ý thuộc về chủ shop.
+        if (!plan.review || plan.review.status === 'failed') throw new MarketingWorkflowError('Chờ AI Review dàn ý xong trước khi duyệt kế hoạch.');
         const account = accounts.find(a => a.id === campaign.accountId)!;
         const catalog = await marketingReviewCatalog(pageId, campaign, account, db);
         requireFreshReviewEvidence(plan.review.evidence, [...catalog, planReviewSource(plan, catalog[0].scope)]);
         for (const other of (state.contentPlans ?? []).filter(p => p.campaignId === campaign.id && p.id !== plan.id && p.approvedAt)) { other.approvedAt = null; invalidatePlanPosts(state, [other.id]); }
-        plan.items = parseContentPlan({ pillars: plan.pillars, items: plan.items.map((item, i) => ({ ...item, title: plan.review!.variants[i].finalDraft!.title, outline: plan.review!.variants[i].finalDraft!.content })) }).items;
         plan.approvedAt = Date.now(); plan.approvedBy = actor;
       }
     } else if (action === 'applyReview' || action === 'discardReview') {
