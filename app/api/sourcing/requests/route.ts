@@ -4,6 +4,7 @@ import { prepareSourcingRequest, readSourcingSelection, runSourcingRequest, save
 import { SourcingInputError } from '@/lib/services/sourcingSearch';
 import { SourcingRunError } from '@/lib/services/sourcingRuns';
 import { SourcingProviderError } from '@/lib/services/sourcingApify';
+import { analyzeSourcingRun } from '@/lib/services/sourcingAnalysis';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 async function handle(request: Request) {
@@ -18,6 +19,7 @@ async function handle(request: Request) {
     const body = await readMarketingJson(request);
     if (body.action === 'prepare') return Response.json({ id: await prepareSourcingRequest(owner, body.criteria, body.id, body.revision), ...await sourcingWorkspace(owner) });
     if (body.action === 'run') return Response.json({ run: await runSourcingRequest(owner, body.id, body.revision, body.confirmed) }, { status: 202 });
+    if (body.action === 'analyze') return Response.json({ analysis: await analyzeSourcingRun(owner, body.runId) });
     if (body.action === 'decision') { await saveSourcingDecision(owner, body); return Response.json(await sourcingWorkspace(owner)); }
     throw new SourcingInputError('Thao tác không hợp lệ.');
   } catch (error) {

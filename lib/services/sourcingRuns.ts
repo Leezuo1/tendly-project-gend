@@ -9,11 +9,11 @@ export class SourcingRunError extends Error {
 
 type Run = {
   id: string; owner: string; kind: SourcingKind; status: string; context_json: Record<string, unknown>;
-  provider_run_id: string | null; result_json: unknown; error: string | null; created_at: string; updated_at: string;
+  provider_run_id: string | null; result_json: unknown; error: string | null; created_at: string; updated_at: string; analysis_json?: unknown;
 };
 export function publicSourcingRun(row: Run) {
   return { id: row.id, kind: row.kind, status: row.status, context: row.context_json,
-    result: row.result_json, error: row.error, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at) };
+    result: row.result_json, error: row.error, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at), analysis: row.analysis_json ?? null };
 }
 
 export async function createSourcingRun(owner: string, kind: SourcingKind, input: Record<string, unknown>, request?: { id: string; revision: number }) {

@@ -18,6 +18,14 @@ export interface SourcingRun {
   id: string; kind: 'tiktok' | 'suppliers'; status: string; context: Record<string, unknown>;
   result: null | { posts?: SourcingPost[]; candidates?: SupplierCandidate[]; message?: string; duplicateCount?: number; rejectedCount?: number };
   error: string | null; createdAt: number; updatedAt: number;
+  analysis?: SourcingAnalysis | null;
+}
+/** Bài phân tích của AI Smart Sourcing; sources là key của kết quả làm căn cứ. */
+export interface SourcingAnalysis {
+  summary: string; relevantCount: number;
+  findings: { title: string; detail: string; sources: string[] }[];
+  productIdeas: { name: string; reason: string; sources: string[] }[];
+  caveats: string[]; model: string; createdAt: number;
 }
 export interface SourcingRequest {
   id: string; revision: number; criteria: SourcingCriteria; plan: SourcingPlan;

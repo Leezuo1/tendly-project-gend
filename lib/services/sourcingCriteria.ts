@@ -31,13 +31,6 @@ export function parseSourcingCriteria(value: unknown): SourcingCriteria {
 
 // Một số Actor trả emoji dạng chuỗi thoát (backslash-u + 4 số hex); giải mã để hiển thị đúng.
 export const decodeEscapes = (text: string) => text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
-const words = (text: string) => text.toLocaleLowerCase('vi').split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 2);
-/** Tỉ lệ từ của truy vấn khớp nhất xuất hiện trong bài (0–1). TikTok trả bài theo thuật toán nên nhiều bài không liên quan. */
-export function sourcingRelevance(item: SourcingItem, queries: string[]) {
-  const haystack = new Set(words(`${item.title} ${item.text}`));
-  return Math.max(0, ...queries.map(query => { const terms = [...new Set(words(query))]; return terms.length ? terms.filter(term => haystack.has(term)).length / terms.length : 0; }));
-}
-export const RELEVANT_AT = 0.5;
 
 export function sourcingItems(run: SourcingRun): SourcingItem[] {
   if (!['succeeded', 'empty'].includes(run.status) || !run.result) return [];

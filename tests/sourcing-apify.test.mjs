@@ -7,7 +7,7 @@ import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
 const db = new PGlite();
-const ready = (async () => { for (const file of ['014-sourcing.sql', '019-sourcing-workflow.sql', '020-ai-global-settings.sql']) await db.exec(readFileSync(`db/migrations/${file}`, 'utf8')); })();
+const ready = (async () => { for (const file of ['014-sourcing.sql', '019-sourcing-workflow.sql', '020-ai-global-settings.sql', '022-sourcing-analysis.sql']) await db.exec(readFileSync(`db/migrations/${file}`, 'utf8')); })();
 const query = async (sql, values) => {
   const result = await db.query(sql, values);
   return { rows: result.rows, rowCount: result.rows.length || result.affectedRows || 0 };

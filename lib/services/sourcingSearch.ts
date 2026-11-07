@@ -11,6 +11,17 @@ const seedKeywords: Record<string, string[]> = {
 
 export class SourcingInputError extends Error {}
 
+/** Truy vấn TikTok bám ngành hàng của shop: từ khóa chưa nhắc tới sản phẩm/ngành thì ghép với sản phẩm quan tâm hoặc từ khóa chính của ngành. */
+export function scopedTiktokQueries(industry: string, keywords: string[], product = '') {
+  const seeds = seedKeywords[industry] ?? [];
+  const terms = keywords.map(keyword => keyword.trim()).filter(Boolean);
+  if (!terms.length) return product.trim() ? [product.trim()] : [...seeds];
+  const lower = (text: string) => text.toLocaleLowerCase('vi');
+  const anchor = product.trim() || seeds[0] || '';
+  const scoped = (keyword: string) => !anchor || [anchor, ...seeds].some(term => lower(keyword).includes(lower(term)));
+  return [...new Set(terms.map(keyword => scoped(keyword) ? keyword : `${anchor} ${keyword}`.slice(0, 120)))];
+}
+
 export function prepareSourcingSearch(input: Record<string, unknown>, now = new Date()) {
   const industry = typeof input.industry === 'string' ? input.industry.trim() : '';
   if (!industries.includes(industry)) throw new SourcingInputError('Ngành hàng không hợp lệ.');

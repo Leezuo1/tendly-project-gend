@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { parseSourcingCriteria, sourcingItems } from '@/lib/services/sourcingCriteria';
-import { prepareSourcingSearch, SourcingInputError } from '@/lib/services/sourcingSearch';
+import { scopedTiktokQueries, SourcingInputError } from '@/lib/services/sourcingSearch';
 import { sourcingRequest } from '@/lib/services/sourcingApify';
 import { createSourcingRun, publicSourcingRun, SourcingRunError } from '@/lib/services/sourcingRuns';
 import type { SourcingRequest, SourcingRun } from '@/lib/types/sourcing';
@@ -19,7 +19,7 @@ export async function sourcingWorkspace(owner: string) {
 }
 export async function prepareSourcingRequest(owner: string, value: unknown, id?: unknown, revision?: unknown) {
   const criteria = parseSourcingCriteria(value);
-  if (criteria.kind === 'tiktok' && !criteria.keywords.length) criteria.keywords = criteria.product ? [criteria.product] : prepareSourcingSearch({ industry: criteria.industry }).keywords;
+  if (criteria.kind === 'tiktok') criteria.keywords = scopedTiktokQueries(criteria.industry, criteria.keywords, criteria.product);
   const prepared = sourcingRequest(criteria.kind, { ...criteria });
   const queries = criteria.kind === 'tiktok' ? criteria.keywords : prepared.context.queries;
   const plan = { queries, market: 'VN', language: 'vi', days: 7, resultLimit: criteria.resultLimit, maxChargeUsd: 0.5, timeoutSeconds: 300 };
