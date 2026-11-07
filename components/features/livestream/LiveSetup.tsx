@@ -71,14 +71,13 @@ export function LiveSetup({ initial, onSaved, onCancel, onToast }: Props) {
 
 export function LiveDraftReview({ snapshot, onSaved, onToast, apply }: { snapshot: LiveSnapshot; onSaved: (id: string) => void; onToast: (message: string) => void; apply: (snapshot: LiveSnapshot) => void }) {
   const [editing, setEditing] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [withMini, setWithMini] = useState(true);
   const starting = useRef(false);
   const { session, products } = snapshot, prep = session.preparation!;
-  if (editing) return <LiveSetup initial={snapshot} onSaved={id => { setEditing(false); setConfirmed(false); onSaved(id); }} onCancel={() => setEditing(false)} onToast={onToast} />;
+  if (editing) return <LiveSetup initial={snapshot} onSaved={id => { setEditing(false); onSaved(id); }} onCancel={() => setEditing(false)} onToast={onToast} />;
   const start = async () => {
-    if (!confirmed || starting.current) return;
+    if (starting.current) return;
     starting.current = true; setBusy(true);
     const activation = liveClient.activate(session.id, session.preparationRevision!);
     const mini = withMini ? openLiveMini(activation.then(value => value.session.id)) : null;
@@ -86,15 +85,14 @@ export function LiveDraftReview({ snapshot, onSaved, onToast, apply }: { snapsho
     catch (e) { onToast((e as Error).message); onSaved(session.id); }
     finally { starting.current = false; setBusy(false); }
   };
-  return <section className="card live-setup"><div className="card-head"><div><h2>{session.title}</h2></div><button className="btn btn-outline btn-sm" disabled={busy} onClick={() => { setConfirmed(false); setEditing(true); }}>Chỉnh nháp</button></div>
+  return <section className="card live-setup"><div className="card-head"><div><h2>{session.title}</h2></div><button className="btn btn-outline btn-sm" disabled={busy} onClick={() => setEditing(true)}>Chỉnh nháp</button></div>
     <p><b>Host:</b> {prep.host} · {prep.scheduledAt ? new Date(prep.scheduledAt).toLocaleString('vi-VN') : 'Chưa đặt thời gian'} · {session.sourceId ? `Nguồn ${session.sourceId}` : 'Tự nhận Live của Page'}</p>
     <div className="live-table-wrap"><table className="live-review-table"><thead><tr><th>SKU / sản phẩm</th><th>Mã host</th><th>Giá / lượng phiên</th><th>Tư vấn size</th></tr></thead><tbody>{products.map(product => { const entry = prep.catalog.find(item => item.sku === product.sku); return <tr key={product.sku}><td><b>{product.sku}</b><br />{product.name}</td><td>{entry?.codes.join(', ') || 'Chưa đặt'}</td><td>{formatMoney(product.price)}<br />{product.stock} sản phẩm</td><td>{entry?.sizeChart ? <>{entry.sizeChart}<br /><small>Nguồn: {entry.sizeSource} · {entry.fit}</small></> : 'Thiếu bảng có nguồn → host kiểm tra'}</td></tr>; })}</tbody></table></div>
     <p><b>Nhận hàng:</b> {prep.receivingFields}<br /><b>Chuyển người:</b> {prep.handoff}<br /><b>Giữ lượng:</b> {prep.holdPolicy}</p>
     <p><b>Quyền gửi:</b> nhắn riêng {prep.allowPrivate ? 'có duyệt' : 'tắt'} · công khai {prep.allowPublic ? 'có duyệt' : 'tắt'}. Mọi nhóm đều chờ shop duyệt.</p>
     <p><b>Xưng hô / giọng Page:</b> {prep.voice?.address || 'Chưa khai báo'} · {prep.voice?.tone || 'Chưa khai báo'}</p>
     <details><summary>FAQ & chính sách đã lưu ({snapshot.policies?.length || 0})</summary>{snapshot.policies?.map((policy, index) => <p key={index}><b>{policy.question}</b><br />{policy.answer}</p>)}{!snapshot.policies?.length && <p>Chưa có FAQ. Câu hỏi thiếu chính sách cần host xử lý.</p>}</details>
-    <label className="live-check"><input type="checkbox" checked={confirmed} disabled={busy} onChange={e => setConfirmed(e.target.checked)} />Tôi đã kiểm tra sản phẩm, giá, lượng phiên, FAQ/chính sách và quyền gửi ở trên.</label>
     <label className="live-check"><input type="checkbox" checked={withMini} disabled={busy} onChange={e => setWithMini(e.target.checked)} />Mở cửa sổ hỗ trợ nổi khi bắt đầu</label>
-    <div className="live-row"><span className="hint">Tồn theo SKU là bản chụp của phiên; xác nhận size/màu riêng trước khi hứa hàng.</span><button className="btn btn-primary" disabled={!confirmed || busy} onClick={() => void start()}>{busy ? 'Đang bắt đầu…' : 'Duyệt dữ liệu & bắt đầu phiên'}</button></div>
+    <div className="live-row"><span className="hint">Tồn theo SKU là bản chụp của phiên; xác nhận size/màu riêng trước khi hứa hàng.</span><button className="btn btn-primary" disabled={busy} onClick={() => void start()}>{busy ? 'Đang bắt đầu…' : 'Duyệt dữ liệu & bắt đầu phiên'}</button></div>
   </section>;
 }

@@ -18,7 +18,6 @@ export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' 
   const [assigned, setAssigned] = useState(false);
   const [pageEnabled, setPageEnabled] = useState(false);
   const [knowledge, setKnowledge] = useState<AiKnowledge | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState('Khách muốn đổi size thì cần đáp ứng điều kiện nào?');
   const [preview, setPreview] = useState<AiChatReply | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,12 +29,12 @@ export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' 
       const value = await (await dashboardRequest('/api/customer-care')).json() as Settings & { currentPageProfile: CarePageProfile };
       setSettings(value); setProfile(value.profile ?? initialProfile); setPage(value.currentPageProfile);
       setAssigned(value.pageAssigned); setPageEnabled(value.pageEnabled);
-      setKnowledge(value.knowledge ?? currentAiKnowledge()); setConfirmed(false); setPreview(null); setError('');
+      setKnowledge(value.knowledge ?? currentAiKnowledge()); setPreview(null); setError('');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa tải được AI Chat.'); }
     finally { setBusy(false); }
   }, [initialProfile]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
-  const reset = () => { setConfirmed(false); setPreview(null); };
+  const reset = () => setPreview(null);
   function change(patch: Partial<AiProfile>) { setProfile(current => ({ ...current, ...patch })); reset(); }
   const override = profile.platformRules.facebook;
   const rules = override?.enabled ? { ...profile.rules, ...override.values } : profile.rules;
@@ -57,8 +56,8 @@ export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' 
     setBusy(true); setError('');
     try {
       const value = await (await dashboardRequest('/api/customer-care', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, knowledge, pageAssigned: assigned, pageEnabled, confirmed, updatedAt: settings?.updatedAt, pageProfile: page }) })).json() as Settings;
-      setSettings(value); setProfile(value.profile!); setKnowledge(value.knowledge); setPage(value.pageProfile); setConfirmed(false);
+        body: JSON.stringify({ profile, knowledge, pageAssigned: assigned, pageEnabled, confirmed: true, updatedAt: settings?.updatedAt, pageProfile: page }) })).json() as Settings;
+      setSettings(value); setProfile(value.profile!); setKnowledge(value.knowledge); setPage(value.pageProfile);
       toast('Đã xác nhận và áp dụng cấu hình AI Chat.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa áp dụng được AI Chat.'); }
     finally { setBusy(false); }
@@ -68,7 +67,7 @@ export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' 
     try {
       const value = await (await dashboardRequest('/api/customer-care', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'preview', profile, knowledge, message }) })).json() as AiChatReply & { pageProfile: CarePageProfile };
-      setPreview(value); setPage(value.pageProfile); setConfirmed(false);
+      setPreview(value); setPage(value.pageProfile);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa thử được câu trả lời.'); }
     finally { setBusy(false); }
   }
@@ -102,8 +101,7 @@ export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' 
       <div className={styles.careScope}><h3>Giới hạn hành động</h3><p>AI hỏi lại khi thiếu căn cứ, chuyển nhân viên khi khách yêu cầu người thật hoặc có tranh chấp. Hoàn tiền, cấp voucher, đổi hàng và thay đổi đơn luôn cần quyền và phê duyệt riêng.</p></div>
       <div className={styles.ruleField}><label htmlFor="care-test">Thử tình huống</label><textarea id="care-test" rows={3} maxLength={8000} value={message} disabled={busy} onChange={event => { setMessage(event.target.value); setPreview(null); }} /><button type="button" className="btn btn-outline" disabled={busy || !settings || !message.trim()} onClick={() => void testReply()}>Thử câu trả lời</button>
         {preview && <div className={styles.carePreview} role="status"><strong>Câu trả lời thử · Chưa gửi cho khách</strong><p>{preview.reply}</p><p>{preview.analysis.needsHuman || !preview.analysis.canAutoReply ? 'Cần nhân viên kiểm tra' : 'Đủ căn cứ theo phân tích AI'} · {preview.analysis.reason}</p><small>{preview.sourceSummary}</small></div>}</div>
-      <label className={styles.checkLabel}><input type="checkbox" checked={confirmed} disabled={busy || !settings} onChange={event => setConfirmed(event.target.checked)} />Tôi xác nhận tri thức, chính sách và quy tắc trên để áp dụng cho AI Chat.</label>
-      <div className={styles.saveBar}><p role="status">{settings?.approvedAt ? `Đã xác nhận lúc ${new Date(settings.approvedAt).toLocaleString('vi-VN')} · ${settings.approvedBy}` : 'Chưa có cấu hình được xác nhận'}{busy && ' · Đang xử lý…'}</p><button type="button" className="btn btn-primary" disabled={busy || !settings || !confirmed} onClick={() => void apply()}>Xác nhận & áp dụng AI Chat</button></div>
+      <div className={styles.saveBar}><p role="status">{settings?.approvedAt ? `Đã xác nhận lúc ${new Date(settings.approvedAt).toLocaleString('vi-VN')} · ${settings.approvedBy}` : 'Chưa có cấu hình được xác nhận'}{busy && ' · Đang xử lý…'}</p><button type="button" className="btn btn-primary" disabled={busy || !settings} onClick={() => void apply()}>Xác nhận & áp dụng AI Chat</button></div>
     </div>
   </section>;
 }

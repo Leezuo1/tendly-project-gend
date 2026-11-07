@@ -47,7 +47,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const requested = useRef(new Set<string>());
@@ -95,14 +95,14 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   };
   const prepare = () => work(async () => {
     const next = await api({ action: 'prepare', criteria, ...(selected && !selected.runId ? { id: selected.id, revision: selected.revision } : {}) });
-    setView(next); setSelectedId(next.id!); setCriteria(next.requests.find(r => r.id === next.id)!.criteria); setConfirmed(false);
+    setView(next); setSelectedId(next.id!); setCriteria(next.requests.find(r => r.id === next.id)!.criteria);
   });
   const collect = () => work(async () => {
-    if (!selected || dirty || !confirmed) return;
+    if (!selected || dirty) return;
     try { await api({ action: 'run', id: selected.id, revision: selected.revision, confirmed: true }); }
-    finally { await load(); setConfirmed(false); }
+    finally { await load(); }
   });
-  const change = <K extends keyof SourcingCriteria>(key: K, value: SourcingCriteria[K]) => { setCriteria(old => ({ ...old, [key]: value })); setConfirmed(false); };
+  const change = <K extends keyof SourcingCriteria>(key: K, value: SourcingCriteria[K]) => { setCriteria(old => ({ ...old, [key]: value })); };
   const items = run ? sourcingItems(run) : [];
   const analyze = useCallback(async (runId: string) => {
     setAnalysisError(''); setAnalysisOpen(true);
@@ -120,8 +120,8 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   }, [run, analyze]);
   const stage = !selected ? 0 : !selected.runId ? 1 : !run || ['starting', 'running', 'unknown'].includes(run.status) ? 2 : 3;
   const isSupplier = criteria.kind === 'suppliers';
-  const newRequest = () => { setSelectedId(''); setConfirmed(false); setTransfer(null); setCriteria(old => ({ ...defaultSourcingCriteria(industry), minPrice: old.minPrice, maxPrice: old.maxPrice, maxMoq: old.maxMoq, region: old.region })); };
-  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria({ ...request.criteria, industry }); setConfirmed(false); setTransfer(null); };
+  const newRequest = () => { setSelectedId(''); setTransfer(null); setCriteria(old => ({ ...defaultSourcingCriteria(industry), minPrice: old.minPrice, maxPrice: old.maxPrice, maxMoq: old.maxMoq, region: old.region })); };
+  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria({ ...request.criteria, industry }); setTransfer(null); };
   return <>
     <div className={styles.context}>
       <span><strong>{shopName}</strong> · {industry}</span>
@@ -160,7 +160,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
         <section className={styles.panel} aria-labelledby="sourcing-run">
           {!selected ? <div className={styles.idle}>
             <h2 id="sourcing-run">Lượt tìm</h2>
-            <p>Nhập nhu cầu ở bên trái rồi bấm <strong>Xem truy vấn</strong>. Bạn sẽ thấy chính xác truy vấn được gửi đi và trần phí trước khi xác nhận thu thập.</p>
+            <p>Nhập nhu cầu ở bên trái rồi bấm <strong>Xem truy vấn</strong>. Bạn sẽ thấy chính xác truy vấn được gửi đi và trần phí trước khi thu thập.</p>
             <p className={styles.muted}>Thu thập xong, AI đọc toàn bộ dữ liệu thô, bỏ bài lạc đề và viết phân tích kèm nguồn cho từng nhận định.</p>
           </div> : <>
             <div className={styles.panelHead}><h2 id="sourcing-run">{selected.criteria.product || selected.plan.queries[0] || 'Lượt tìm'}</h2>{run && <span className={styles.status} data-status={run.status}>{statusLabel[run.status] || run.status}</span>}</div>
@@ -171,8 +171,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
             </div>
             {dirty && <p className={styles.warning}>Tiêu chí bên trái đã thay đổi. Bấm “{selected.runId ? 'Tìm lại với tiêu chí này' : 'Xem truy vấn'}” để cập nhật truy vấn.</p>}
             {!selected.runId ? <div className={styles.confirm}>
-              <label className={styles.check}><input type="checkbox" checked={confirmed} disabled={dirty || busy} onChange={e => setConfirmed(e.target.checked)} />Tôi đồng ý chạy các truy vấn trên với trần phí đã nêu.</label>
-              <button className="btn btn-primary" disabled={busy || dirty || !confirmed} onClick={collect}>Thu thập dữ liệu</button>
+              <button className="btn btn-primary" disabled={busy || dirty} onClick={collect}>Thu thập dữ liệu</button>
             </div>
             : !run || ['starting', 'running'].includes(run.status) ? <div role="status" className={styles.working}><span className={styles.pulse} aria-hidden="true" /><div><strong>{run?.status === 'running' ? 'Đang thu thập dữ liệu…' : 'Đang khởi chạy lượt tìm…'}</strong><p className={styles.muted}>Thường mất 1–3 phút. Bạn có thể rời trang; kết quả vẫn được lưu và AI sẽ phân tích khi bạn quay lại.</p></div></div>
             : ['failed', 'unknown'].includes(run.status) ? <div className={styles.error}><strong>{run.status === 'failed' ? 'Thu thập không thành công' : 'Chưa rõ kết quả lượt chạy'}</strong><p>{run.error || 'Không nhận được kết quả từ nhà cung cấp dữ liệu.'}</p><p>{run.status === 'unknown' ? 'Kiểm tra lượt chạy trong Apify Console trước khi tạo lượt mới để tránh tính phí trùng.' : 'Thử lại với một lượt tìm mới.'}</p></div>
@@ -196,8 +195,8 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
         </section>
         {transfer && <Transfer key={`${transfer.runId}:${transfer.item.key}:${transfer.kind}`} {...transfer} industry={industry} owner={owner} busy={busy} work={work} onClose={() => setTransfer(null)} onDone={message => { setNotice(message); setTransfer(null); }} />}
         {view.requests.length > 0 && <section className={styles.panel} aria-labelledby="sourcing-history">
-          <div className={styles.panelHead}><h2 id="sourcing-history">Lượt tìm gần đây</h2><span className={styles.muted}>{view.requests.length}</span></div>
-          <ul className={styles.history}>{view.requests.slice(0, 8).map(request => <li key={request.id}><button type="button" aria-current={request.id === selectedId ? 'true' : undefined} disabled={busy} onClick={() => openRequest(request)}>
+          <div className={styles.panelHead}><h2 id="sourcing-history">Lượt tìm gần đây</h2>{view.requests.length > 3 && <button type="button" className={styles.historyToggle} aria-expanded={historyOpen} aria-controls="sourcing-history-list" aria-label={historyOpen ? 'Thu gọn lịch sử' : 'Hiển thị tất cả lịch sử'} onClick={() => setHistoryOpen(open => !open)}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></button>}</div>
+          <ul id="sourcing-history-list" className={styles.history}>{(historyOpen ? view.requests : view.requests.slice(0, 3)).map(request => <li key={request.id}><button type="button" aria-current={request.id === selectedId ? 'true' : undefined} disabled={busy} onClick={() => openRequest(request)}>
             <svg className={styles.historyIcon} aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <span className={styles.historyTitle}>{request.criteria.product || request.plan.queries.join(' · ') || 'Lượt tìm'}</span>
             <span className={styles.muted}>{request.criteria.kind === 'tiktok' ? 'TikTok' : 'Google'} · {new Date(request.updatedAt).toLocaleDateString('vi-VN')}</span>
@@ -321,7 +320,6 @@ function Transfer({ item, runId, kind, industry, owner, busy, work, onClose, onD
   const [sku, setSku] = useState('');
   const [name, setName] = useState(item.title.slice(0, 500));
   const [price, setPrice] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
   return <section ref={panel} tabIndex={-1} className="card" aria-label="Xác nhận chuyển dữ liệu">
     <h2>{kind === 'product' ? 'Nhập sản phẩm mới' : 'Tạo brief ý tưởng nháp'}</h2><p>Nguồn: <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a></p>
     <form onSubmit={e => { e.preventDefault(); void work(async () => {
@@ -337,9 +335,8 @@ function Transfer({ item, runId, kind, industry, owner, busy, work, onClose, onD
       }
     }); }}>
       <fieldset className={styles.fields} disabled={busy}>
-        {kind === 'product' ? <><label className={styles.field}>SKU mới<input required maxLength={100} value={sku} onChange={e => { setSku(e.target.value); setConfirmed(false); }} /></label><label className={styles.field}>Tên sản phẩm<input required maxLength={500} value={name} onChange={e => { setName(e.target.value); setConfirmed(false); }} /></label><label className={styles.field}>Giá bán do shop xác nhận (VND)<input type="number" min="0" max="1000000000" required value={price} onChange={e => { setPrice(e.target.value); setConfirmed(false); }} /></label><p>Tồn kho: chưa xác nhận · Lượng ban đầu: 0 · Giá nhập, size, màu: chưa có nguồn.</p></> : <p>Tên brief: Ý tưởng: {item.title}<br />Sản phẩm đang bán: chưa chọn · Ưu đãi: chưa có · Trạng thái: nháp, chờ shop hoàn thiện và duyệt.</p>}
-        <label className={styles.check}><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />Tôi xác nhận các trường sẽ được chuyển ở trên.</label>
-        <div className={styles.actions}><button disabled={!confirmed} type="submit" className="btn btn-primary">{kind === 'product' ? 'Xác nhận nhập sản phẩm mới' : 'Xác nhận tạo brief nháp'}</button><button type="button" className="btn btn-outline" onClick={onClose}>Hủy</button><Link href={kind === 'product' ? '/cai-dat?tab=products' : '/marketing?tab=campaigns'}>Mở {kind === 'product' ? 'danh mục' : 'Marketing'} →</Link></div>
+        {kind === 'product' ? <><label className={styles.field}>SKU mới<input required maxLength={100} value={sku} onChange={e => setSku(e.target.value)} /></label><label className={styles.field}>Tên sản phẩm<input required maxLength={500} value={name} onChange={e => setName(e.target.value)} /></label><label className={styles.field}>Giá bán do shop xác nhận (VND)<input type="number" min="0" max="1000000000" required value={price} onChange={e => setPrice(e.target.value)} /></label><p>Tồn kho: chưa xác nhận · Lượng ban đầu: 0 · Giá nhập, size, màu: chưa có nguồn.</p></> : <p>Tên brief: Ý tưởng: {item.title}<br />Sản phẩm đang bán: chưa chọn · Ưu đãi: chưa có · Trạng thái: nháp, chờ shop hoàn thiện và duyệt.</p>}
+        <div className={styles.actions}><button type="submit" className="btn btn-primary">{kind === 'product' ? 'Xác nhận nhập sản phẩm mới' : 'Xác nhận tạo brief nháp'}</button><button type="button" className="btn btn-outline" onClick={onClose}>Hủy</button><Link href={kind === 'product' ? '/cai-dat?tab=products' : '/marketing?tab=campaigns'}>Mở {kind === 'product' ? 'danh mục' : 'Marketing'} →</Link></div>
       </fieldset>
     </form>
   </section>;
