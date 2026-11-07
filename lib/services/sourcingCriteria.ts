@@ -29,30 +29,42 @@ export function parseSourcingCriteria(value: unknown): SourcingCriteria {
   return criteria;
 }
 
+// Một số Actor trả emoji dạng chuỗi thoát (backslash-u + 4 số hex); giải mã để hiển thị đúng.
+export const decodeEscapes = (text: string) => text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+const words = (text: string) => text.toLocaleLowerCase('vi').split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 2);
+/** Tỉ lệ từ của truy vấn khớp nhất xuất hiện trong bài (0–1). TikTok trả bài theo thuật toán nên nhiều bài không liên quan. */
+export function sourcingRelevance(item: SourcingItem, queries: string[]) {
+  const haystack = new Set(words(`${item.title} ${item.text}`));
+  return Math.max(0, ...queries.map(query => { const terms = [...new Set(words(query))]; return terms.length ? terms.filter(term => haystack.has(term)).length / terms.length : 0; }));
+}
+export const RELEVANT_AT = 0.5;
+
 export function sourcingItems(run: SourcingRun): SourcingItem[] {
   if (!['succeeded', 'empty'].includes(run.status) || !run.result) return [];
-  return run.kind === 'tiktok' ? (run.result.posts ?? []).map(post => ({ key: JSON.stringify([post.source, post.externalId]), title: post.text.slice(0, 160), text: post.text,
-    url: post.url, source: post.source, collectedAt: post.collectedAt, metrics: post.metrics, price: null, currency: null, unit: null, moq: null, region: null }))
-    : (run.result.candidates ?? []).map(item => ({ key: JSON.stringify(['google', item.url]), title: item.title, text: item.description, url: item.url,
+  return run.kind === 'tiktok' ? (run.result.posts ?? []).map(post => { const text = decodeEscapes(post.text); return { key: JSON.stringify([post.source, post.externalId]), title: text.split('\n')[0].slice(0, 160), text,
+    url: post.url, source: post.source, collectedAt: post.collectedAt, metrics: post.metrics, price: null, currency: null, unit: null, moq: null, region: null }; })
+    : (run.result.candidates ?? []).map(item => ({ key: JSON.stringify(['google', item.url]), title: decodeEscapes(item.title), text: decodeEscapes(item.description), url: item.url,
       source: 'google', collectedAt: item.collectedAt || new Date(run.updatedAt).toISOString(), price: item.price ?? null, currency: item.currency ?? null, unit: item.unit ?? null, moq: item.moq ?? null, region: item.region ?? null }));
 }
 export function compareSourcingItem(item: SourcingItem, criteria: SourcingCriteria) {
   const matched: string[] = [], missing: string[] = [], mismatched: string[] = [];
-  if (criteria.minPrice !== null || criteria.maxPrice !== null) {
+  // Giá/MOQ/khu vực/chứng từ là thông tin nhà cung cấp; bài TikTok không có nên không đối chiếu.
+  const supplier = item.source !== 'tiktok';
+  if (supplier && (criteria.minPrice !== null || criteria.maxPrice !== null)) {
     if (item.price === null || item.currency !== criteria.currency || item.unit !== criteria.unit) missing.push('Giá nhập / tiền tệ / đơn vị');
     else if ((criteria.minPrice !== null && item.price < criteria.minPrice) || (criteria.maxPrice !== null && item.price > criteria.maxPrice)) mismatched.push('Giá ngoài khoảng yêu cầu'); else matched.push('Khoảng giá');
   }
-  if (criteria.maxMoq !== null) {
+  if (supplier && criteria.maxMoq !== null) {
     if (item.moq === null || item.unit !== criteria.unit) missing.push('MOQ / đơn vị');
     else if (item.moq > criteria.maxMoq) mismatched.push('MOQ vượt giới hạn'); else matched.push('MOQ');
   }
-  if (criteria.region) { if (!item.region) missing.push('Khu vực nhà cung cấp'); else if (item.region !== criteria.region) mismatched.push('Khu vực'); else matched.push('Khu vực'); }
+  if (supplier && criteria.region) { if (!item.region) missing.push('Khu vực nhà cung cấp'); else if (item.region !== criteria.region) mismatched.push('Khu vực'); else matched.push('Khu vực'); }
   const haystack = `${item.title} ${item.text}`.toLocaleLowerCase('vi');
   for (const term of criteria.required.split(',').map(t => t.trim()).filter(Boolean)) {
     if (haystack.includes(term.toLocaleLowerCase('vi'))) matched.push(`Có nhắc: ${term}`); else missing.push(`Chưa thấy: ${term}`);
   }
   for (const term of criteria.excluded.split(',').map(t => t.trim()).filter(Boolean)) if (haystack.includes(term.toLocaleLowerCase('vi'))) mismatched.push(`Có từ loại trừ: ${term}`);
-  if (criteria.quality) missing.push('Chất lượng / chứng từ cần kiểm tra');
-  if (criteria.leadTime) missing.push('Thời gian cung ứng');
+  if (supplier && criteria.quality) missing.push('Chất lượng / chứng từ cần kiểm tra');
+  if (supplier && criteria.leadTime) missing.push('Thời gian cung ứng');
   return { matched, missing, mismatched };
 }

@@ -9,7 +9,8 @@ import { readPageAiProfile } from '@/lib/services/aiSettingsClient';
 import { currentAiKnowledge } from '@/lib/services/aiChat';
 import { productApi } from '@/lib/services/api';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
-import { compareSourcingItem, defaultSourcingCriteria, sourcingItems } from '@/lib/services/sourcingCriteria';
+import { compareSourcingItem, defaultSourcingCriteria, RELEVANT_AT, sourcingItems, sourcingRelevance } from '@/lib/services/sourcingCriteria';
+import { Modal } from '@/components/ui/Modal';
 import type { SourcingCriteria, SourcingDecision, SourcingItem, SourcingRequest, SourcingRun } from '@/lib/types/sourcing';
 import styles from './sourcing.module.css';
 
@@ -47,8 +48,9 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmed, setConfirmed] = useState(false);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('relevant');
   const [search, setSearch] = useState('');
+  const [openKey, setOpenKey] = useState('');
   const [transfer, setTransfer] = useState<{ item: SourcingItem; runId: string; kind: 'product' | 'marketing' } | null>(null);
   const inFlight = useRef(false);
   const selected = view.requests.find(request => request.id === selectedId);
@@ -104,10 +106,13 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   });
   const change = <K extends keyof SourcingCriteria>(key: K, value: SourcingCriteria[K]) => { setCriteria(old => ({ ...old, [key]: value })); setConfirmed(false); };
   const items = run ? sourcingItems(run) : [];
-  const visible = items.filter(item => {
-    const decision = view.decisions.find(d => d.runId === run?.id && d.itemKey === item.key);
-    return (filter === 'all' || decision?.status === filter || (filter === 'missing' && compareSourcingItem(item, selected!.criteria).missing.length > 0)) && `${item.title} ${item.text}`.toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi'));
-  });
+  const queries = selected ? selected.criteria.kind === 'suppliers' ? [selected.criteria.product] : selected.plan.queries : [];
+  const scored = items.map(item => ({ item, score: sourcingRelevance(item, queries), decision: view.decisions.find(d => d.runId === run?.id && d.itemKey === item.key) }));
+  const relevantCount = scored.filter(entry => entry.score >= RELEVANT_AT).length;
+  const visible = scored.filter(({ item, score, decision }) => (filter === 'all' || (filter === 'relevant' && score >= RELEVANT_AT) || decision?.status === filter
+    || (filter === 'missing' && compareSourcingItem(item, selected!.criteria).missing.length > 0)) && `${item.title} ${item.text}`.toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi')))
+    .sort((a, b) => b.score - a.score || (b.item.metrics?.views ?? 0) - (a.item.metrics?.views ?? 0));
+  const opened = scored.find(entry => entry.item.key === openKey);
   return <>
     <div className={styles.context}><div><strong>{shopName}</strong><span>{industry} · Việt Nam</span></div><Link href="/cau-hinh-ai?tab=settings&ai=sourcing">Quy tắc AI →</Link></div>
     {error && <p role="alert" className={styles.error}>{error} <button className="btn btn-outline btn-sm" onClick={() => work(async () => { await load(); })}>Tải lại tiến trình</button></p>}
@@ -144,8 +149,13 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
         </section>
         <section className="card">
           <div className={styles.sectionHead}><div><h2>3. Đối chiếu kết quả</h2></div><span>{visible.length}/{items.length}</span></div>
-          <div className={styles.pair}><label className={styles.field}>Tìm trong kết quả<input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tên hoặc nội dung" /></label><label className={styles.field}>Hiển thị<select value={filter} onChange={e => setFilter(e.target.value)}><option value="all">Tất cả kết quả</option><option value="missing">Còn thiếu thông tin</option><option value="shortlist">Danh sách ngắn</option><option value="checked">Shop đã kiểm tra</option><option value="rejected">Đã loại</option></select></label></div>
-          {!items.length ? <p className={styles.empty}>Kết quả sẽ xuất hiện sau khi hoàn tất thu thập.</p> : <><p className={styles.muted}>{run?.kind === 'tiktok' ? 'Tương tác của bài không phải doanh số. Một lần thu thập chưa chứng minh xu hướng tăng.' : 'Kết quả tìm kiếm là đầu mối tham khảo; cần kiểm tra giá, MOQ, khả năng bán sỉ và chất lượng trực tiếp.'}</p>{visible.map(item => <Result key={`${run!.id}:${item.key}`} item={item} criteria={selected!.criteria} decision={view.decisions.find(d => d.runId === run!.id && d.itemKey === item.key)} busy={busy} onDecide={(status, note) => decide(item, status, note)} onTransfer={kind => setTransfer({ item, kind, runId: run!.id })} />)}{!visible.length && <p>Không có kết quả phù hợp bộ lọc.</p>}</>}
+          <div className={styles.pair}><label className={styles.field}>Tìm trong kết quả<input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tên hoặc nội dung" /></label><label className={styles.field}>Hiển thị<select value={filter} onChange={e => setFilter(e.target.value)}><option value="relevant">Liên quan đến truy vấn ({relevantCount})</option><option value="all">Tất cả, kể cả không liên quan ({items.length})</option>{run?.kind === 'suppliers' && <option value="missing">Còn thiếu thông tin</option>}<option value="shortlist">Danh sách ngắn</option><option value="checked">Shop đã kiểm tra</option><option value="rejected">Đã loại</option></select></label></div>
+          {!items.length ? <p className={styles.empty}>Kết quả sẽ xuất hiện sau khi hoàn tất thu thập.</p> : <><p className={styles.muted}>{run?.kind === 'tiktok' ? 'Tương tác của bài không phải doanh số. Một lần thu thập chưa chứng minh xu hướng tăng.' : 'Kết quả tìm kiếm là đầu mối tham khảo; cần kiểm tra giá, MOQ, khả năng bán sỉ và chất lượng trực tiếp.'}</p><ul className={styles.resultList}>{visible.map(({ item, score, decision }) => <li key={`${run!.id}:${item.key}`}><ResultCard item={item} relevant={score >= RELEVANT_AT} decision={decision} onOpen={() => setOpenKey(item.key)} /></li>)}</ul>
+            {!visible.length && <p className={styles.empty}>{filter === 'relevant' && items.length ? `Không có kết quả nào nhắc tới truy vấn trong ${items.length} bài thu thập được. Thử từ khóa cụ thể hơn hoặc chọn "Tất cả".` : 'Không có kết quả phù hợp bộ lọc.'}</p>}</>}
+          {opened && run && <Modal open title="Chi tiết kết quả" width={880} onClose={() => setOpenKey('')}>
+            <ResultDetail key={`${run.id}:${opened.item.key}`} item={opened.item} relevant={opened.score >= RELEVANT_AT} criteria={selected!.criteria} decision={opened.decision} busy={busy}
+              onDecide={(status, note) => decide(opened.item, status, note)} onTransfer={kind => { setOpenKey(''); setTransfer({ item: opened.item, kind, runId: run.id }); }} />
+          </Modal>}
         </section>
         {transfer && <Transfer key={`${transfer.runId}:${transfer.item.key}:${transfer.kind}`} {...transfer} industry={industry} owner={owner} busy={busy} work={work} onClose={() => setTransfer(null)} onDone={message => { setNotice(message); setTransfer(null); }} />}
       </div>
@@ -153,20 +163,38 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   </>;
 }
 
-function Result({ item, criteria, decision, busy, onDecide, onTransfer }: { item: SourcingItem; criteria: SourcingCriteria; decision?: SourcingDecision; busy: boolean; onDecide: (status: SourcingDecision['status'], note: string) => void; onTransfer: (kind: 'product' | 'marketing') => void }) {
+const DECISION_LABEL = { shortlist: 'Danh sách ngắn', checked: 'Shop đã kiểm tra', rejected: 'Đã loại' } as const;
+const METRIC_LABEL: Record<string, string> = { views: 'Lượt xem', likes: 'Thích', comments: 'Bình luận', shares: 'Chia sẻ' };
+const metricsText = (metrics: SourcingItem['metrics']) => metrics ? Object.entries(metrics).filter(([, value]) => value !== null).map(([key, value]) => `${number.format(value!)} ${METRIC_LABEL[key].toLocaleLowerCase('vi')}`).join(' · ') : '';
+const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
+
+function ResultCard({ item, relevant, decision, onOpen }: { item: SourcingItem; relevant: boolean; decision?: SourcingDecision; onOpen: () => void }) {
+  return <button type="button" className={styles.resultCard} onClick={onOpen}>
+    <span className={styles.resultTitle}>{item.title || 'Bài không có nội dung'}</span>
+    <span className={styles.resultMeta}>{item.source === 'tiktok' ? metricsText(item.metrics) || 'TikTok' : host(item.url)}</span>
+    <span className={styles.resultTags}>{!relevant && <span className={styles.badgeMuted}>Ít liên quan</span>}{decision && <span className={styles.badge}>{DECISION_LABEL[decision.status]}</span>}<span className={styles.resultOpen}>Xem chi tiết →</span></span>
+  </button>;
+}
+
+function ResultDetail({ item, relevant, criteria, decision, busy, onDecide, onTransfer }: { item: SourcingItem; relevant: boolean; criteria: SourcingCriteria; decision?: SourcingDecision; busy: boolean; onDecide: (status: SourcingDecision['status'], note: string) => void; onTransfer: (kind: 'product' | 'marketing') => void }) {
   const comparison = compareSourcingItem(item, criteria);
   const [note, setNote] = useState(decision?.note || '');
-  return <article className={styles.result}>
-    <div className={styles.sectionHead}><div><span className={styles.muted}>{item.source} · {new Date(item.collectedAt).toLocaleString('vi-VN')}</span><h3><a href={item.url} target="_blank" rel="noopener noreferrer">{item.title || 'Xem bài nguồn'} ↗</a></h3></div>{decision && <span className={styles.badge}>{({ shortlist: 'Danh sách ngắn', checked: 'Shop đã kiểm tra', rejected: 'Đã loại' })[decision.status]}</span>}</div>
-    <p className={styles.excerpt}>{item.text}</p>
-    {item.metrics && <p className={styles.muted}>{Object.entries(item.metrics).map(([key, value]) => `${({ views: 'Lượt xem', likes: 'Thích', comments: 'Bình luận', shares: 'Chia sẻ' } as Record<string, string>)[key]}: ${value === null ? 'chưa rõ' : number.format(value)}`).join(' · ')}</p>}
-    <p>Giá nhập: {item.price === null ? 'chưa rõ' : number.format(item.price)} · Tiền tệ / đơn vị: {item.currency || 'chưa rõ'} / {item.unit || 'chưa rõ'} · MOQ: {item.moq ?? 'chưa rõ'}</p>
-    {!!comparison.matched.length && <p>Khớp nội dung: {comparison.matched.join(' · ')}</p>}
+  const supplier = item.source !== 'tiktok';
+  return <div className={styles.detail}>
+    <div className={styles.sectionHead}><div><span className={styles.muted}>{supplier ? host(item.url) : 'TikTok'} · thu thập {new Date(item.collectedAt).toLocaleString('vi-VN')}</span><h3>{item.title || 'Bài không có nội dung'}</h3></div>
+      <span className={styles.resultTags}>{!relevant && <span className={styles.badgeMuted}>Ít liên quan</span>}{decision && <span className={styles.badge}>{DECISION_LABEL[decision.status]}</span>}</span></div>
+    {item.metrics && <dl className={styles.metrics}>{Object.entries(item.metrics).map(([key, value]) => <div key={key}><dt>{METRIC_LABEL[key]}</dt><dd>{value === null ? 'chưa rõ' : number.format(value)}</dd></div>)}</dl>}
+    <p className={styles.excerpt}>{item.text || 'Không có mô tả.'}</p>
+    <a href={item.url} target="_blank" rel="noopener noreferrer">{supplier ? 'Mở trang nguồn' : 'Mở video trên TikTok'} ↗</a>
+    {supplier && <p>Giá nhập: {item.price === null ? 'chưa rõ' : number.format(item.price)} · Tiền tệ / đơn vị: {item.currency || 'chưa rõ'} / {item.unit || 'chưa rõ'} · MOQ: {item.moq ?? 'chưa rõ'}</p>}
+    {!!comparison.matched.length && <p>Khớp: {comparison.matched.join(' · ')}</p>}
     {!!comparison.missing.length && <p className={styles.muted}>Cần kiểm tra: {comparison.missing.join(' · ')}</p>}
     {!!comparison.mismatched.length && <p className={styles.warning}>Không phù hợp: {comparison.mismatched.join(' · ')}</p>}
+    {!supplier && <p className={styles.muted}>Tương tác của bài không phải doanh số. Cần tự kiểm tra sản phẩm trong video và nguồn hàng.</p>}
     <label className={styles.field}>Ghi chú kiểm tra<input maxLength={1000} value={note} onChange={e => setNote(e.target.value)} placeholder="Giá báo lại, thông tin đã xác nhận…" /></label>
-    <div className={styles.actions}><button disabled={busy} className="btn btn-outline btn-sm" onClick={() => onDecide('shortlist', note)}>Lưu danh sách ngắn</button><button disabled={busy} className="btn btn-outline btn-sm" onClick={() => onDecide('checked', note)}>Đánh dấu đã kiểm tra</button><button disabled={busy} className="btn btn-text btn-sm" onClick={() => onDecide('rejected', note)}>Loại</button><button disabled={busy} className="btn btn-outline btn-sm" onClick={() => onTransfer('product')}>Xem trước nhập sản phẩm</button><button disabled={busy} className="btn btn-outline btn-sm" onClick={() => onTransfer('marketing')}>Tạo ý tưởng Marketing</button></div>
-  </article>;
+    <div className={styles.actions}><button disabled={busy} className="btn btn-primary btn-sm" onClick={() => onDecide('shortlist', note)}>Lưu danh sách ngắn</button><button disabled={busy} className="btn btn-outline btn-sm" onClick={() => onDecide('checked', note)}>Đánh dấu đã kiểm tra</button><button disabled={busy} className="btn btn-text btn-sm" onClick={() => onDecide('rejected', note)}>Loại</button></div>
+    <div className={styles.actions}><button disabled={busy} className="btn btn-outline btn-sm" onClick={() => onTransfer('product')}>Xem trước nhập sản phẩm</button><button disabled={busy} className="btn btn-outline btn-sm" onClick={() => onTransfer('marketing')}>Tạo ý tưởng Marketing</button></div>
+  </div>;
 }
 
 function Transfer({ item, runId, kind, industry, owner, busy, work, onClose, onDone }: { item: SourcingItem; runId: string; kind: 'product' | 'marketing'; industry: string; owner: string; busy: boolean; work: (fn: () => Promise<void>) => Promise<void>; onClose: () => void; onDone: (message: string) => void }) {
