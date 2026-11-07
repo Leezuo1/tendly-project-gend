@@ -128,7 +128,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
       <Link href="/cau-hinh-ai?tab=settings&ai=sourcing">Quy tắc AI Smart Sourcing</Link>
     </div>
     {error && <p role="alert" className={styles.error}>{error} <button className="btn btn-outline btn-sm" onClick={() => work(async () => { await load(); })}>Tải lại</button></p>}
-    <ol className={styles.steps} aria-label="Tiến trình">{['Nhập nhu cầu', 'Kiểm tra truy vấn & phí', 'Thu thập dữ liệu', 'AI phân tích'].map((label, i) => <li key={label} data-state={i < stage ? 'done' : i === stage ? 'current' : 'todo'} aria-current={i === stage ? 'step' : undefined}><span>{i + 1}</span>{label}</li>)}</ol>
+    <ol className={styles.steps} aria-label="Tiến trình">{['Nhập nhu cầu', 'Kiểm tra truy vấn & phí', 'Thu thập dữ liệu', 'AI phân tích'].map((label, i) => <li key={label} data-state={i < stage ? 'done' : i === stage ? 'current' : 'todo'} aria-current={i === stage ? 'step' : undefined}><span aria-hidden="true">{i < stage ? '✓' : i + 1}</span>{label}</li>)}</ol>
     <p aria-live="polite" className={styles.notice}>{busy ? 'Đang xử lý…' : notice}</p>
     <div className={styles.layout}>
       <section className={styles.panel} aria-labelledby="sourcing-form">
@@ -150,7 +150,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
             </div></details>
             <div className={styles.submitRow}>
               <label className={styles.inline}>Số kết quả<input type="number" min="1" max="20" required value={criteria.resultLimit} onChange={e => change('resultLimit', Number(e.target.value))} /></label>
-              <button className="btn btn-primary" type="submit">{selected?.runId ? 'Tìm lại với tiêu chí này' : 'Xem truy vấn'}</button>
+              <button className={`btn btn-primary ${styles.cta}`} type="submit">{selected?.runId ? 'Tìm lại với tiêu chí này' : 'Xem truy vấn'}</button>
             </div>
           </fieldset>
         </form>
@@ -162,9 +162,9 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
             <p>Nhập nhu cầu ở bên trái rồi bấm <strong>Xem truy vấn</strong>. Bạn sẽ thấy chính xác truy vấn được gửi đi và trần phí trước khi xác nhận thu thập.</p>
             <p className={styles.muted}>Thu thập xong, AI đọc toàn bộ dữ liệu thô, bỏ bài lạc đề và viết phân tích kèm nguồn cho từng nhận định.</p>
           </div> : <>
-            <div className={styles.panelHead}><h2 id="sourcing-run">{selected.criteria.product || selected.plan.queries[0] || 'Lượt tìm'}</h2>{run && <span className={styles.status} data-status={run.status}>{statusLabel[run.status] || run.status}</span>}</div>
-            <div className={styles.queryBlock}>
-              <span className={styles.label}>Truy vấn gửi tới {selected.criteria.kind === 'tiktok' ? 'TikTok' : 'Google'}</span>
+            <div className={styles.panelHead}><h2 id="sourcing-run" className={styles.runTitle}>{selected.criteria.product || selected.plan.queries[0] || 'Lượt tìm'}</h2>{run && <span className={styles.status} data-status={run.status}>{statusLabel[run.status] || run.status}</span>}</div>
+            <div className={styles.block}>
+              <span className={styles.label}>Thông tin truy vấn · gửi tới {selected.criteria.kind === 'tiktok' ? 'TikTok' : 'Google'}</span>
               <ul className={styles.chips}>{selected.plan.queries.map(q => <li key={q}>{q}</li>)}</ul>
               <p className={styles.muted}>{selected.criteria.kind === 'tiktok' ? 'Việt Nam · 7 ngày gần nhất' : 'Tiếng Việt'} · tối đa {selected.plan.resultLimit} kết quả · trần phí {selected.plan.maxChargeUsd} USD · dừng sau {selected.plan.timeoutSeconds} giây</p>
             </div>
@@ -175,13 +175,17 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
             </div>
             : !run || ['starting', 'running'].includes(run.status) ? <div role="status" className={styles.working}><span className={styles.pulse} aria-hidden="true" /><div><strong>{run?.status === 'running' ? 'Đang thu thập dữ liệu…' : 'Đang khởi chạy lượt tìm…'}</strong><p className={styles.muted}>Thường mất 1–3 phút. Bạn có thể rời trang; kết quả vẫn được lưu và AI sẽ phân tích khi bạn quay lại.</p></div></div>
             : ['failed', 'unknown'].includes(run.status) ? <div className={styles.error}><strong>{run.status === 'failed' ? 'Thu thập không thành công' : 'Chưa rõ kết quả lượt chạy'}</strong><p>{run.error || 'Không nhận được kết quả từ nhà cung cấp dữ liệu.'}</p><p>{run.status === 'unknown' ? 'Kiểm tra lượt chạy trong Apify Console trước khi tạo lượt mới để tránh tính phí trùng.' : 'Thử lại với một lượt tìm mới.'}</p></div>
-            : <div className={styles.outcome}>
-              <span className={styles.label}>Kết quả</span>
+            : <div className={`${styles.block} ${styles.outcome}`}>
+              <span className={styles.label}>Nội dung phân tích của AI</span>
               {run.analysis ? <>
+                <ul className={styles.stats}>
+                  <li><strong>{items.length}</strong> bài thu thập</li>
+                  <li data-tone="moss"><strong>{run.analysis.relevantCount}</strong> bài được AI dùng làm nguồn</li>
+                  {run.analysis.productIdeas.length > 0 && <li data-tone="coral"><strong>{run.analysis.productIdeas.length}</strong> sản phẩm đáng tìm hiểu</li>}
+                </ul>
                 <p className={styles.summary}>{run.analysis.summary}</p>
-                <p className={styles.muted}>{items.length} bài thu thập · {run.analysis.relevantCount} bài được AI dùng làm nguồn{run.analysis.productIdeas.length ? ` · ${run.analysis.productIdeas.length} sản phẩm đáng tìm hiểu` : ''}</p>
                 {run.analysis.productIdeas.length > 0 && <ul className={styles.chips}>{run.analysis.productIdeas.map(idea => <li key={idea.name}>{idea.name}</li>)}</ul>}
-                <button className="btn btn-primary" onClick={() => setAnalysisOpen(true)}>Xem phân tích đầy đủ</button>
+                <button className={`btn btn-primary ${styles.cta}`} onClick={() => setAnalysisOpen(true)}>Xem phân tích đầy đủ</button>
               </> : analysisError ? <><p className={styles.warning}>{analysisError}</p><button className="btn btn-primary" onClick={() => void analyze(run.id)}>Phân tích lại</button></>
               : <div role="status" className={styles.working}><span className={styles.pulse} aria-hidden="true" /><div><strong>AI đang phân tích {items.length} kết quả…</strong><p className={styles.muted}>Bài phân tích sẽ tự mở khi xong.</p></div></div>}
             </div>}
@@ -191,8 +195,9 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
         {view.requests.length > 0 && <section className={styles.panel} aria-labelledby="sourcing-history">
           <div className={styles.panelHead}><h2 id="sourcing-history">Lượt tìm gần đây</h2><span className={styles.muted}>{view.requests.length}</span></div>
           <ul className={styles.history}>{view.requests.slice(0, 8).map(request => <li key={request.id}><button type="button" aria-current={request.id === selectedId ? 'true' : undefined} disabled={busy} onClick={() => openRequest(request)}>
+            <svg className={styles.historyIcon} aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <span className={styles.historyTitle}>{request.criteria.product || request.plan.queries.join(' · ') || 'Lượt tìm'}</span>
-            <span className={styles.muted}>{request.criteria.kind === 'tiktok' ? 'TikTok' : 'Google'} · {new Date(request.updatedAt).toLocaleDateString('vi-VN')}</span>
+            <span className={styles.muted}>{request.criteria.kind === 'tiktok' ? 'TikTok' : 'Google'} · {new Date(request.updatedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
             <span className={styles.status} data-status={request.run?.status ?? 'draft'}>{request.run ? statusLabel[request.run.status] || request.run.status : 'Chưa chạy'}</span>
           </button></li>)}</ul>
         </section>}
