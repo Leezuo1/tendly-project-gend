@@ -85,6 +85,7 @@ export async function reviewPostDrafts(originals: GeneratedPostDraft[], evidence
       role: 'review', platform, includeShop: false,
       system: `Bạn là AI Review nội dung Marketing. Đọc từng bản nháp và đối chiếu CĂN CỨ REVIEW được server chọn, không mặc định dùng cùng nguồn với Content.
 - Chỉ sửa mức cần thiết: chính tả, diễn đạt, giọng, tên/giá/điều kiện có căn cứ. Giữ ý đồ brief và khác biệt hợp lệ giữa phương án.
+- Nếu căn cứ có campaign:samples (bài viết mẫu shop cung cấp): so sánh bản nháp với các bài mẫu về giọng, xưng hô, độ dài, cách mở/kết, nhịp câu, cách dùng emoji/hashtag; nêu chỗ lệch kèm sourceIds campaign:samples và chỉnh cho gần phong cách mẫu. Bài mẫu chỉ là chuẩn văn phong: không lấy giá, ưu đãi, công dụng hay dữ kiện từ bài mẫu, không chép nguyên văn.
 - Không bịa dữ kiện, ưu đãi, link, feedback, tồn kho hoặc công dụng. Nguồn thiếu/mâu thuẫn cốt lõi: needs_input; nội dung không thể dùng: blocked. finalDraft=null khi không dùng được.
 - Mỗi thay đổi gồm đúng toàn bộ giá trị trường before/after, reason và sourceIds có thật trong căn cứ. hashtags before/after là các hashtag nối bằng một dấu cách. Đủ draftId, không trùng.
 - Chỉ dùng FAQ làm chính sách của shop. Nguồn tham khảo sản phẩm không tự trở thành chính sách. approvedAt/phiên bản không chứng minh đã xác minh bên ngoài.
@@ -110,7 +111,7 @@ export function marketingGenerationContext(campaign: MarketingCampaign, account:
     shopAi: { goal: shop.goal, output: shop.output, instructions: shop.instructions || undefined },
     brief: { ...campaign, knowledge: undefined, configuration: undefined },
     knowledge: { ...campaign.knowledge, products: campaign.knowledge.products.filter(p => campaign.productIds.includes(p.id)), emailTriggers: [] },
-    contentRules: { ...baseRules, ...Object.fromEntries(Object.entries(campaign.profile).filter(([, value]) => value.trim())), tone: campaign.tone || campaign.profile.tone || baseRules.tone, format: campaign.format || campaign.profile.format || baseRules.format, cta: campaign.cta || campaign.profile.cta || baseRules.cta },
+    contentRules: { ...baseRules, ...Object.fromEntries(Object.entries(campaign.profile).filter(([key, value]) => key !== 'samples' && typeof value === 'string' && value.trim())), tone: campaign.tone || campaign.profile.tone || baseRules.tone, format: campaign.format || campaign.profile.format || baseRules.format, cta: campaign.cta || campaign.profile.cta || baseRules.cta },
   };
 }
 

@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { useToast } from '@/components/shared/ToastProvider';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
-import { emptyMarketingProfile } from '@/lib/services/marketingBrief';
+import { emptyMarketingProfile, MAX_SAMPLES } from '@/lib/services/marketingBrief';
 import type { MarketingProfile, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
 import styles from './ai-configuration.module.css';
 
-const LABELS: Record<keyof MarketingProfile, string> = { name: 'Tên tài khoản', purpose: 'Vai trò của kênh', audience: 'Đối tượng chính', pain: 'Nhu cầu / rào cản', address: 'Cách xưng hô', tone: 'Giọng văn', approach: 'Cách tiếp cận', format: 'Định dạng ưu tiên', cta: 'CTA mặc định', avoid: 'Từ / tuyên bố cần tránh', examples: 'Ví dụ đúng giọng đã được duyệt' };
+type TextKey = Exclude<keyof MarketingProfile, 'samples'>;
+const LABELS: Record<TextKey, string> = { name: 'Tên tài khoản', purpose: 'Vai trò của kênh', audience: 'Đối tượng chính', pain: 'Nhu cầu / rào cản', address: 'Cách xưng hô', tone: 'Giọng văn', approach: 'Cách tiếp cận', format: 'Định dạng ưu tiên', cta: 'CTA mặc định', avoid: 'Từ / tuyên bố cần tránh', examples: 'Ví dụ đúng giọng đã được duyệt' };
 
 /** Hồ sơ từng tài khoản đăng (Fanpage, kênh mẫu). Lưu trong workspace Marketing; sửa hồ sơ đưa brief liên quan về chờ duyệt. */
 export function ChannelProfiles() {
@@ -33,6 +34,7 @@ export function ChannelProfiles() {
 
   const saved = view && accountId ? view.workspace.profiles[accountId] ?? { ...emptyMarketingProfile(), name: view.accounts.find(item => item.id === accountId)?.name ?? '' } : null;
   const dirty = !!profile && JSON.stringify(profile) !== JSON.stringify(saved);
+  const samples = profile?.samples ?? [];
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
@@ -58,10 +60,19 @@ export function ChannelProfiles() {
         </select></div></div>
       <section className={styles.editor}><div className={styles.formBody}>
         <p className={styles.ruleHint}>Mỗi tài khoản có đối tượng và giọng riêng. Thứ tự áp dụng: thiết lập chung của Tendly → cấu hình AI của Page → hồ sơ kênh → brief. Sửa hồ sơ sẽ đưa brief liên quan về chờ duyệt.</p>
-        {(Object.keys(LABELS) as (keyof MarketingProfile)[]).map(key => <div className={styles.ruleField} key={key}>
+        {(Object.keys(LABELS) as TextKey[]).map(key => <div className={styles.ruleField} key={key}>
           <label htmlFor={`channel-${key}`}>{LABELS[key]}</label>
           <textarea id={`channel-${key}`} rows={2} maxLength={1500} required={key === 'name' || key === 'tone'} value={profile[key]} onChange={event => setProfile({ ...profile, [key]: event.target.value })} />
         </div>)}
+        <fieldset className={styles.ruleField}><legend>Bài viết mẫu ({samples.length}/{MAX_SAMPLES})</legend>
+          <p className={styles.ruleHint}>Dán các bài đã đăng mà shop thấy đúng giọng. AI Review so sánh bài mới với các bài này về giọng, độ dài, cách mở/kết; không lấy giá hay dữ kiện từ bài mẫu.</p>
+          {samples.map((sample, i) => <div key={i}>
+            <label htmlFor={`channel-sample-${i}`}>Bài mẫu {i + 1}</label>
+            <textarea id={`channel-sample-${i}`} rows={6} maxLength={5000} value={sample} onChange={event => setProfile({ ...profile, samples: samples.map((item, j) => j === i ? event.target.value : item) })} />
+            <button type="button" className="btn btn-text btn-sm" onClick={() => setProfile({ ...profile, samples: samples.filter((_, j) => j !== i) })}>Xóa bài mẫu {i + 1}</button>
+          </div>)}
+          {samples.length < MAX_SAMPLES && <button type="button" className="btn btn-outline btn-sm" onClick={() => setProfile({ ...profile, samples: [...samples, ''] })}>Thêm bài viết mẫu</button>}
+        </fieldset>
       </div></section>
       <footer className={styles.saveBar}><p aria-live="polite">{busy ? 'Đang lưu…' : dirty ? 'Có thay đổi chưa lưu' : 'Đã lưu'}</p>
         <button className="btn btn-outline" type="button" disabled={!dirty} onClick={() => setProfile(saved)}>Hủy thay đổi</button>

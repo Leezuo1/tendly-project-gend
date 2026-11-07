@@ -10,6 +10,8 @@ export interface MarketingAccount {
 export interface MarketingProfile {
   name: string; purpose: string; audience: string; pain: string; address: string; tone: string;
   approach: string; format: string; cta: string; avoid: string; examples: string;
+  /** Bài viết mẫu do shop cung cấp; AI Review so sánh giọng/cấu trúc bài mới với các bài này. Hồ sơ cũ có thể chưa có. */
+  samples?: string[];
 }
 export interface CampaignBrief {
   name: string; accountId: string; goal: string; productIds: string[]; audience: string; pain: string;

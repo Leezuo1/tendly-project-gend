@@ -20,6 +20,7 @@ export async function marketingReviewCatalog(pageId: string, campaign: Marketing
     ...knowledgeReviewSources(campaign.knowledge, scope, 'campaign', base.version, campaign.approvedAt),
     { ...base, id: 'campaign:brief', kind: 'brief', data: { goal: campaign.goal, audience: campaign.audience, pain: campaign.pain, message: campaign.message, benefits: campaign.benefits, barriers: campaign.barriers, cta: campaign.cta, link: campaign.link, notes: campaign.notes, format: campaign.format } },
     { ...base, id: 'campaign:voice', kind: 'voice', data: { address: campaign.profile.address, tone: campaign.tone || campaign.profile.tone, avoid: campaign.profile.avoid, rules: effectiveAiRules(campaign.configuration.profiles.review, platform) } },
+    ...(campaign.profile.samples?.length ? [{ ...base, id: 'campaign:samples', kind: 'voice' as const, data: { samples: campaign.profile.samples } }] : []),
     { ...base, id: 'campaign:offer', kind: 'offer', data: { ...campaign.offer }, validFrom: campaign.offer.startsAt ? Date.parse(campaign.offer.startsAt) : null, validUntil: campaign.offer.endsAt ? Date.parse(campaign.offer.endsAt) : null },
     { ...base, id: 'campaign:proof', kind: 'proof', data: { proof: campaign.proof, source: campaign.proofSource } },
   ];

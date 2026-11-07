@@ -17,8 +17,13 @@ export function marketingText(value: unknown, label: string, max = 1500, require
 export function parseMarketingProfile(value: unknown): MarketingProfile {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new MarketingWorkflowError('Hồ sơ kênh không hợp lệ.');
   const data = value as Record<string, unknown>;
-  return Object.fromEntries(Object.keys(emptyMarketingProfile()).map(key => [key, marketingText(data[key], key, 1500, key === 'name' || key === 'tone')])) as unknown as MarketingProfile;
+  const profile = Object.fromEntries(Object.keys(emptyMarketingProfile()).map(key => [key, marketingText(data[key], key, 1500, key === 'name' || key === 'tone')])) as unknown as MarketingProfile;
+  const samples = data.samples ?? [];
+  if (!Array.isArray(samples) || samples.length > MAX_SAMPLES) throw new MarketingWorkflowError(`Tối đa ${MAX_SAMPLES} bài viết mẫu.`);
+  profile.samples = samples.map((sample, i) => marketingText(sample, `Bài viết mẫu ${i + 1}`, 5000)).filter(Boolean);
+  return profile;
 }
+export const MAX_SAMPLES = 5;
 export function parseCampaignBrief(value: unknown, accounts: MarketingAccount[]): CampaignBrief {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new MarketingWorkflowError('Brief không hợp lệ.');
   const data = value as Record<string, unknown>;
