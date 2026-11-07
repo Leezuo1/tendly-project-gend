@@ -45,11 +45,11 @@ export const AI_ROLES = [
 ] as const;
 export type AiRoleId = typeof AI_ROLES[number]['id'];
 
-export const AI_PLATFORMS = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', zalo: 'Zalo' } as const;
+export const AI_PLATFORMS = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', zalo: 'Zalo', google: 'Google' } as const;
 export type AiPlatform = keyof typeof AI_PLATFORMS;
 export const ROLE_PLATFORMS: Record<AiRoleId, AiPlatform[]> = {
   chat: ['facebook', 'instagram', 'zalo'], content: ['facebook', 'instagram', 'tiktok'],
-  review: ['facebook', 'instagram', 'tiktok'], sourcing: [], livestream: ['facebook', 'tiktok'],
+  review: ['facebook', 'instagram', 'tiktok'], sourcing: ['tiktok', 'google'], livestream: ['facebook', 'tiktok'],
 };
 /** Thiết lập nền do admin đặt (lưu trên server); chi tiết vận hành nằm ở AiProfile của shop. */
 export const GLOBAL_AI_FIELDS = {

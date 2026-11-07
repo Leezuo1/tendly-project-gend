@@ -52,10 +52,12 @@ test('builds bounded Actor inputs and rejects invalid search products before spe
   assert.equal(tiktok.actorInput.proxyCountryCode, 'VN');
   assert.equal(tiktok.actorInput.resultsPerPage, 20);
   assert.equal(tiktok.actorInput.shouldDownloadVideos, false);
+  assert.equal(tiktok.actorInput.commentsPerPost, 10);
   const supplier = f.sourcingRequest('suppliers', { product: 'Áo polo cotton' });
   assert.equal(supplier.actorInput.countryCode, 'vn');
   assert.equal(supplier.actorInput.languageCode, 'vi');
   assert.equal(supplier.actorInput.maxPagesPerQuery, 1);
+  assert.equal(supplier.actorInput.websiteContentScraper.enable, true);
   assert.equal(supplier.context.queries.length, 2);
   for (const product of ['', 'a', 'x'.repeat(121), 'https://example.com', 'áo site:example.com', 'áo\nsite:test']) {
     assert.throws(() => f.sourcingRequest('suppliers', { product }));
@@ -69,7 +71,7 @@ test('request preview persists criteria without spending; approval binds one run
   const id = await f.prepareSourcingRequest('owner', criteria);
   let workspace = await f.sourcingWorkspace('owner');
   assert.equal(calls, 0); assert.deepEqual(workspace.requests[0].plan.queries, criteria.keywords);
-  assert.equal(workspace.requests[0].plan.maxChargeUsd, 0.5);
+  assert.equal(workspace.requests[0].plan.maxChargeUsd, 1);
   assert.deepEqual((await f.sourcingWorkspace('other')).requests, []);
   await assert.rejects(f.runSourcingRequest('other', id, 1, true), error => error.status === 404);
   await assert.rejects(f.runSourcingRequest('owner', id, 1, false), /Xác nhận/);
@@ -128,7 +130,7 @@ test('start uses fixed Actor, server header, budget and timeout; duplicate start
     calls++;
     assert.match(url, /actors\/clockworks~tiktok-scraper\/runs/);
     assert.equal(new URL(url).searchParams.get('timeout'), '300');
-    assert.equal(new URL(url).searchParams.get('maxTotalChargeUsd'), '0.5');
+    assert.equal(new URL(url).searchParams.get('maxTotalChargeUsd'), '1');
     assert.ok(!url.includes(process.env.APIFY_API_TOKEN));
     assert.equal(options.headers.Authorization, `Bearer ${process.env.APIFY_API_TOKEN}`);
     assert.equal(JSON.parse(options.body).resultsPerPage, 20);
@@ -182,6 +184,50 @@ test('TikTok maps metrics, deduplicates and excludes undated/old posts; complete
   assert.equal(reads, 2);
 });
 
+test('TikTok comments are read from Apify comment datasets only, grouped per video and ranked by likes', async () => {
+  const f = await fixture();
+  globalThis.fetch = async () => json(runResponse());
+  const run = await f.createSourcingRun('owner', 'tiktok', industry);
+  const fetched = [];
+  const second = '9876543210987654321';
+  globalThis.fetch = async url => {
+    fetched.push(url);
+    if (url.includes('actor-runs/')) return json(runResponse('SUCCEEDED'));
+    if (url.includes('datasets/Dataset123/')) return json([
+      rawPost({ commentsDatasetUrl: 'https://api.apify.com/v2/datasets/Comments1/items' }),
+      rawPost({ id: second, webVideoUrl: `https://www.tiktok.com/@shop/video/${second}`, commentsDatasetUrl: 'https://api.apify.com/v2/datasets/Comments1/items' }),
+      rawPost({ id: '555', webVideoUrl: 'https://www.tiktok.com/@shop/video/555', commentsDatasetUrl: 'https://evil.example/v2/datasets/Steal/items' }),
+    ]);
+    if (url.includes('datasets/Comments1/')) return json([
+      { text: 'ít thích', diggCount: 1, videoWebUrl: 'https://www.tiktok.com/@shop/video/1234567890123456789' },
+      { text: 'giá bao nhiêu shop?', diggCount: 30, videoWebUrl: 'https://www.tiktok.com/@shop/video/1234567890123456789' },
+      { text: 'size M còn không', diggCount: 2, videoWebUrl: `https://www.tiktok.com/@shop/video/${second}` },
+      { text: 'không rõ video', diggCount: 99 }, { diggCount: 5 },
+    ]);
+    throw new Error(`unexpected ${url}`);
+  };
+  const done = await f.readSourcingRun('owner', run.id);
+  assert.ok(!fetched.some(url => url.includes('evil.example')), 'token never sent to a non-Apify host');
+  assert.equal(fetched.filter(url => url.includes('Comments1')).length, 1);
+  const byId = Object.fromEntries(done.result.posts.map(post => [post.externalId, post.topComments]));
+  assert.deepEqual(byId['1234567890123456789'], [{ text: 'giá bao nhiêu shop?', likes: 30 }, { text: 'ít thích', likes: 1 }]);
+  assert.deepEqual(byId[second], [{ text: 'size M còn không', likes: 2 }]);
+  assert.deepEqual(byId['555'], []);
+  assert.equal(f.sourcingItems(done)[0].comments.length, 2);
+});
+
+test('a failing comment dataset keeps the collected posts', async () => {
+  const f = await fixture();
+  globalThis.fetch = async () => json(runResponse());
+  const run = await f.createSourcingRun('owner', 'tiktok', industry);
+  globalThis.fetch = async url => url.includes('actor-runs/') ? json(runResponse('SUCCEEDED'))
+    : url.includes('Comments1') ? new Response('down', { status: 503 })
+    : json([rawPost({ commentsDatasetUrl: 'https://api.apify.com/v2/datasets/Comments1/items' })]);
+  const done = await f.readSourcingRun('owner', run.id);
+  assert.equal(done.status, 'succeeded');
+  assert.deepEqual(done.result.posts[0].topComments, []);
+});
+
 test('Google extracts organic candidates only, canonicalizes URLs and preserves query evidence', async () => {
   const f = await fixture();
   globalThis.fetch = async (url, options) => {
@@ -192,7 +238,7 @@ test('Google extracts organic candidates only, canonicalizes URLs and preserves 
   const run = await f.createSourcingRun('owner', 'suppliers', { product: 'áo polo' });
   globalThis.fetch = async url => url.includes('actor-runs/') ? json(runResponse('SUCCEEDED')) : json([
     { searchQuery: { term: 'query1' }, paidResults: [{ title: 'Ad', url: 'https://ad.example' }], organicResults: [
-      { title: 'Xưởng A', url: 'https://example.com/p?id=1&utm_source=google#top', description: 'Nhận may áo', position: 1 },
+      { title: 'Xưởng A', url: 'https://example.com/p?id=1&utm_source=google#top', description: 'Nhận may áo', position: 1, websiteContent: { text: `Giới thiệu xưởng${'x'.repeat(5000)}Liên hệ 0901 234 567` } },
       { title: 'bad', url: 'javascript:alert(1)' },
     ] },
     { searchQuery: { term: 'query2' }, organicResults: [{ title: 'Xưởng A', url: 'https://example.com/p?id=1' }] },
@@ -206,6 +252,8 @@ test('Google extracts organic candidates only, canonicalizes URLs and preserves 
   assert.equal(done.result.duplicateCount, 1);
   assert.equal(done.result.rejectedCount, 1);
   assert.equal(done.result.candidates[0].price, null);
+  const page = done.result.candidates[0].page;
+  assert.ok(page.startsWith('Giới thiệu xưởng') && page.endsWith('Liên hệ 0901 234 567') && page.length < 4100, 'keeps page head and contact footer, bounded');
 });
 
 test('empty datasets differ from failed runs and malformed output', async () => {

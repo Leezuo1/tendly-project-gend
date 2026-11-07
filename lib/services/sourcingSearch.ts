@@ -51,7 +51,9 @@ export interface SourcingPostInput {
   likes?: number | null;
   comments?: number | null;
   shares?: number | null;
+  topComments?: SourcingComment[];
 }
+export type SourcingComment = { text: string; likes: number | null };
 
 function metric(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -72,6 +74,7 @@ function normalizePost(input: SourcingPostInput, collectedAt: string) {
     publishedAt: Number.isFinite(published) && published <= Date.parse(collectedAt) ? new Date(published).toISOString() : null,
     collectedAt,
     metrics: { views: metric(input.views), likes: metric(input.likes), comments: metric(input.comments), shares: metric(input.shares) },
+    topComments: input.topComments ?? [],
   };
 }
 

@@ -1,8 +1,11 @@
-import { normalizeSourcingPosts, prepareSourcingSearch, SourcingInputError } from '@/lib/services/sourcingSearch';
+import { normalizeSourcingPosts, prepareSourcingSearch, SourcingInputError, type SourcingComment } from '@/lib/services/sourcingSearch';
 import type { SupplierCandidate } from '@/lib/types/sourcing';
 
 export type SourcingKind = 'tiktok' | 'suppliers';
 export const sourcingActors = { tiktok: 'clockworks/tiktok-scraper', suppliers: 'apify/google-search-scraper' } as const;
+// TikTok thu thêm bình luận (tính phí theo sự kiện của Actor) nên trần phí cao hơn.
+export const sourcingBudgetUsd = { tiktok: 1, suppliers: 0.5 } as const;
+const COMMENTS_PER_POST = 10;
 
 export class SourcingProviderError extends Error {
   constructor(message: string, readonly status = 502, readonly code = 'APIFY_ERROR') { super(message); }
@@ -30,7 +33,7 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
         shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false,
         shouldDownloadSlideshowImages: false, shouldDownloadAvatars: false, shouldDownloadMusicCovers: false,
         scrapeRelatedVideos: false, scrapeRelatedSearchWords: false,
-        maxFollowersPerProfile: 0, maxFollowingPerProfile: 0, commentsPerPost: 0,
+        maxFollowersPerProfile: 0, maxFollowingPerProfile: 0, commentsPerPost: COMMENTS_PER_POST,
       },
     };
   }
@@ -49,7 +52,7 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
     actorInput: {
       queries: queries.join('\n'), countryCode: 'vn', languageCode: 'vi', maxPagesPerQuery: 1,
       focusOnPaidAds: false, aiOverview: { scrapeFullAiOverview: false },
-      aiModeSearch: { enableAiMode: false }, websiteContentScraper: { enable: false },
+      aiModeSearch: { enableAiMode: false }, websiteContentScraper: { enable: true },
     },
   };
 }
@@ -93,10 +96,39 @@ export function parseApifyRun(payload: unknown) {
 export async function startApifyRun(kind: SourcingKind, actorInput: unknown, token: string) {
   const actor = sourcingActors[kind].replace('/', '~');
   // No automatic POST retry: a lost response can still mean a billable run was created.
-  return parseApifyRun(await apifyRequest(`actors/${actor}/runs?timeout=300&maxTotalChargeUsd=0.5`, token, actorInput));
+  return parseApifyRun(await apifyRequest(`actors/${actor}/runs?timeout=300&maxTotalChargeUsd=${sourcingBudgetUsd[kind]}`, token, actorInput));
 }
 
-export function normalizeTikTok(items: unknown[], period: { from: string; to: string }, now = new Date()) {
+const metricValue = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+/** Chỉ nhận dataset trên api.apify.com để không gửi token tới host lạ. */
+function commentsDataset(item: unknown) {
+  const raw = record(item);
+  try {
+    const url = new URL(text(raw.commentsDatasetUrl ?? raw.commentsDatasetURL));
+    return url.protocol === 'https:' && url.hostname === 'api.apify.com' ? url.pathname.match(/^\/v2\/datasets\/([A-Za-z0-9]{1,64})\/items\/?$/)?.[1] ?? '' : '';
+  } catch { return ''; }
+}
+export const commentDatasets = (items: unknown[]) => [...new Set(items.map(commentsDataset).filter(Boolean))];
+
+/** Gom bình luận theo id video: theo videoWebUrl của bình luận; dataset chỉ của một video thì gán cho video đó. Giữ bình luận nhiều thích nhất. */
+export function groupTikTokComments(items: unknown[], datasets: Record<string, unknown[]>, perPost = COMMENTS_PER_POST) {
+  const owners = new Map<string, string[]>();
+  for (const item of items) {
+    const dataset = commentsDataset(item), video = text(record(item).id);
+    if (dataset && video && !owners.get(dataset)?.includes(video)) owners.set(dataset, [...owners.get(dataset) ?? [], video]);
+  }
+  const byVideo = new Map<string, SourcingComment[]>();
+  for (const [dataset, rows] of Object.entries(datasets)) for (const row of rows) {
+    const raw = record(row), body = text(raw.text);
+    const only = owners.get(dataset)?.length === 1 ? owners.get(dataset)![0] : '';
+    const video = text(raw.videoWebUrl).match(/\/video\/(\d+)/)?.[1] || only;
+    if (body && video) byVideo.set(video, [...byVideo.get(video) ?? [], { text: body.slice(0, 300), likes: metricValue(raw.diggCount) }]);
+  }
+  for (const [video, list] of byVideo) byVideo.set(video, list.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0)).slice(0, perPost));
+  return byVideo;
+}
+
+export function normalizeTikTok(items: unknown[], period: { from: string; to: string }, now = new Date(), comments = new Map<string, SourcingComment[]>()) {
   const normalized = normalizeSourcingPosts(items.map(item => {
     const raw = record(item);
     const author = record(raw.authorMeta);
@@ -108,6 +140,7 @@ export function normalizeTikTok(items: unknown[], period: { from: string; to: st
       authorId: text(author.id) || text(author.name) || text(raw['authorMeta.name']) || null,
       publishedAt, views: raw.playCount as number, likes: raw.diggCount as number,
       comments: raw.commentCount as number, shares: raw.shareCount as number,
+      ...(comments.has(text(raw.id)) ? { topComments: comments.get(text(raw.id)) } : {}),
     };
   }), now);
   const from = Date.parse(period.from), to = Date.parse(period.to);
@@ -130,6 +163,11 @@ function supplierUrl(value: unknown) {
   } catch { return null; }
 }
 
+// shortcut: giữ đầu trang (giới thiệu, chính sách sỉ) và cuối trang (footer liên hệ); tách theo mục nếu thông tin hay nằm giữa trang.
+const condensePage = (page: string) => page.length > 4000 ? `${page.slice(0, 3000)}
+…
+${page.slice(-1000)}` : page;
+
 export function normalizeSupplierResults(items: unknown[], now = new Date()) {
   const candidates = new Map<string, SupplierCandidate>();
   let rejectedCount = 0, duplicateCount = 0;
@@ -147,7 +185,7 @@ export function normalizeSupplierResults(items: unknown[], now = new Date()) {
         if (query && !existing.queries.includes(query)) existing.queries.push(query);
         continue;
       }
-      candidates.set(url, { title, url, description: text(raw.description),
+      candidates.set(url, { title, url, description: text(raw.description), page: condensePage(text(record(raw.websiteContent).text)),
         position: typeof raw.position === 'number' && Number.isSafeInteger(raw.position) && raw.position > 0 ? raw.position : null,
         queries: query ? [query] : [], verified: false, collectedAt: now.toISOString(), source: 'google',
         price: null, currency: null, unit: null, moq: null, region: null, leadTime: null });

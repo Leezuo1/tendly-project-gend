@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
-import { apifyRequest, apifyToken, normalizeSupplierResults, normalizeTikTok, parseApifyRun, record,
+import { apifyRequest, apifyToken, commentDatasets, groupTikTokComments, normalizeSupplierResults, normalizeTikTok, parseApifyRun, record,
   sourcingRequest, startApifyRun, SourcingProviderError, type SourcingKind } from '@/lib/services/sourcingApify';
 
 export class SourcingRunError extends Error {
@@ -85,7 +85,12 @@ export async function readSourcingRun(owner: string, id: string) {
     if (!Array.isArray(items)) throw new SourcingProviderError('Dataset Apify không hợp lệ.', 502, 'APIFY_BAD_DATASET');
     if (row.kind === 'tiktok') {
       const period = record(row.context_json.period) as { from: string; to: string };
-      const data = normalizeTikTok(items, period);
+      // Bình luận nằm ở dataset riêng; đọc lỗi thì vẫn giữ bài, báo cáo ghi thiếu dữ liệu bình luận.
+      const datasets = Object.fromEntries(await Promise.all(commentDatasets(items).map(async id => {
+        try { const rows = await apifyRequest(`datasets/${id}/items?format=json&clean=true&limit=1000`, token); return [id, Array.isArray(rows) ? rows : []] as const; }
+        catch { return [id, []] as const; }
+      })));
+      const data = normalizeTikTok(items, period, new Date(), groupTikTokComments(items, datasets));
       if (items.length && data.rejectedCount === items.length) throw new SourcingProviderError('Không đọc được bản ghi TikTok nào. Kiểm tra output Actor.', 502, 'APIFY_BAD_DATASET');
       result = { ...data, posts: data.posts.slice(0, Number(row.context_json.resultLimit ?? 60)) };
       status = data.posts.length ? 'succeeded' : 'empty';

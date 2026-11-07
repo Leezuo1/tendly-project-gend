@@ -35,9 +35,9 @@ export const decodeEscapes = (text: string) => text.replace(/\\u([0-9a-fA-F]{4})
 export function sourcingItems(run: SourcingRun): SourcingItem[] {
   if (!['succeeded', 'empty'].includes(run.status) || !run.result) return [];
   return run.kind === 'tiktok' ? (run.result.posts ?? []).map(post => { const text = decodeEscapes(post.text); return { key: JSON.stringify([post.source, post.externalId]), title: text.split('\n')[0].slice(0, 160), text,
-    url: post.url, source: post.source, collectedAt: post.collectedAt, metrics: post.metrics, price: null, currency: null, unit: null, moq: null, region: null }; })
+    url: post.url, source: post.source, collectedAt: post.collectedAt, metrics: post.metrics, comments: post.topComments ?? [], price: null, currency: null, unit: null, moq: null, region: null }; })
     : (run.result.candidates ?? []).map(item => ({ key: JSON.stringify(['google', item.url]), title: decodeEscapes(item.title), text: decodeEscapes(item.description), url: item.url,
-      source: 'google', collectedAt: item.collectedAt || new Date(run.updatedAt).toISOString(), price: item.price ?? null, currency: item.currency ?? null, unit: item.unit ?? null, moq: item.moq ?? null, region: item.region ?? null }));
+      source: 'google', collectedAt: item.collectedAt || new Date(run.updatedAt).toISOString(), page: item.page ?? '', price: item.price ?? null, currency: item.currency ?? null, unit: item.unit ?? null, moq: item.moq ?? null, region: item.region ?? null }));
 }
 export function compareSourcingItem(item: SourcingItem, criteria: SourcingCriteria) {
   const matched: string[] = [], missing: string[] = [], mismatched: string[] = [];

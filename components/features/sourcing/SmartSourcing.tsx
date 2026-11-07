@@ -11,7 +11,7 @@ import { productApi } from '@/lib/services/api';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
 import { defaultSourcingCriteria, sourcingItems } from '@/lib/services/sourcingCriteria';
 import { Modal } from '@/components/ui/Modal';
-import type { SourcingAnalysis, SourcingCriteria, SourcingDecision, SourcingItem, SourcingRequest, SourcingRun } from '@/lib/types/sourcing';
+import type { SourcingAnalysis, SourcingCriteria, SourcingDecision, SourcingItem, SourcingPoint, SourcingRequest, SourcingRun, SupplierTier, TikTokReport, TrendStatus } from '@/lib/types/sourcing';
 import styles from './sourcing.module.css';
 
 type Workspace = { requests: SourcingRequest[]; decisions: SourcingDecision[] };
@@ -63,10 +63,11 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
       if (!active) return;
       setView(next);
       const first = next.requests[0];
-      if (first) { setSelectedId(first.id); setCriteria(first.criteria); }
+      // Lượt cũ có thể lưu ngành khác (shop đã đổi ngành); truy vấn mới luôn theo ngành hiện tại.
+      if (first) { setSelectedId(first.id); setCriteria({ ...first.criteria, industry }); }
     }).catch(e => { if (active) setError((e as Error).message); });
     return () => { active = false; };
-  }, []);
+  }, [industry]);
   useEffect(() => {
     if (!run || !['running', 'starting'].includes(run.status)) return;
     const controller = new AbortController();
@@ -120,7 +121,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   const stage = !selected ? 0 : !selected.runId ? 1 : !run || ['starting', 'running', 'unknown'].includes(run.status) ? 2 : 3;
   const isSupplier = criteria.kind === 'suppliers';
   const newRequest = () => { setSelectedId(''); setConfirmed(false); setTransfer(null); setCriteria(old => ({ ...defaultSourcingCriteria(industry), minPrice: old.minPrice, maxPrice: old.maxPrice, maxMoq: old.maxMoq, region: old.region })); };
-  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria(request.criteria); setConfirmed(false); setTransfer(null); };
+  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria({ ...request.criteria, industry }); setConfirmed(false); setTransfer(null); };
   return <>
     <div className={styles.context}>
       <span><strong>{shopName}</strong> · {industry}</span>
@@ -180,6 +181,8 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
               {run.analysis ? <>
                 <p className={styles.summary}>{run.analysis.summary}</p>
                 <ul className={`${styles.chips} ${styles.stats}`}>
+                  {run.analysis.report && <><li>Trend: <strong>{TREND_LABEL[run.analysis.report.trend.status]}</strong></li><li>Sức mua: <strong>{intentText(run.analysis.report.buyingIntent.score)}</strong></li></>}
+                  {run.analysis.suppliers && <li><strong>{run.analysis.suppliers.suppliers.length}</strong> nhà cung cấp đáng chú ý</li>}
                   <li><strong>{items.length}</strong> bài thu thập</li>
                   <li><strong>{run.analysis.relevantCount}</strong> bài được AI dùng làm nguồn</li>
                   {run.analysis.productIdeas.length > 0 && <li><strong>{run.analysis.productIdeas.length}</strong> sản phẩm đáng tìm hiểu</li>}
@@ -201,7 +204,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
             <span className={styles.status} data-status={request.run?.status ?? 'draft'}>{request.run ? statusLabel[request.run.status] || request.run.status : 'Chưa chạy'}</span>
           </button></li>)}</ul>
         </section>}
-        {analysisOpen && run && <Modal open title="Phân tích kết quả tìm kiếm" width={920} onClose={() => setAnalysisOpen(false)}>
+        {analysisOpen && run && <Modal open title={run.kind === 'tiktok' ? 'Báo cáo khám phá sản phẩm' : 'Báo cáo tìm nhà cung cấp'} width={920} onClose={() => setAnalysisOpen(false)}>
           {run.analysis ? <AnalysisView analysis={run.analysis} items={items} kind={run.kind} onTransfer={(item, kind) => { setAnalysisOpen(false); setTransfer({ item, kind, runId: run.id }); }} />
             : analysisError ? <div className={styles.detail}><p className={styles.error}>{analysisError}</p><div className={styles.actions}><button className="btn btn-primary btn-sm" onClick={() => void analyze(run.id)}>Thử phân tích lại</button></div></div>
             : <p role="status" className={styles.empty}>AI đang đọc {items.length} kết quả thu thập được và viết phân tích…</p>}
@@ -215,21 +218,96 @@ const METRIC_LABEL: Record<string, string> = { views: 'Lượt xem', likes: 'Th�
 const metricsText = (metrics: SourcingItem['metrics']) => metrics ? Object.entries(metrics).filter(([, value]) => value !== null).map(([key, value]) => `${number.format(value!)} ${METRIC_LABEL[key].toLocaleLowerCase('vi')}`).join(' · ') : '';
 const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
 
+const TREND_LABEL: Record<TrendStatus, string> = { early: 'Mới chớm', peaking: 'Đang bùng nổ', saturated: 'Bão hòa', entertainment: 'Trend ảo (chỉ giải trí)', unclear: 'Chưa đủ dữ liệu' };
+const intentText = (score: number | null) => score === null ? 'chưa đủ dữ liệu bình luận' : `${score}/10`;
+const TIER_LABEL: Record<SupplierTier, string> = { factory: 'Xưởng sản xuất', wholesale: 'Tổng kho sỉ', distributor: 'Đại lý phân phối', unknown: 'Chưa rõ mô hình' };
+const HIDDEN = 'Không công khai trên web – cần liên hệ trực tiếp';
+const reportSources = (report: TikTokReport) => [report.trend.sources, report.buyingIntent.sources, ...[report.whyNow, report.specs, report.audience, report.price, report.drivers, report.hesitations, report.hooks, report.formats, report.keywords].flat().map(point => point.sources)].flat();
+
 /** Bài phân tích của AI; phần Nguồn bên dưới liệt kê đúng các kết quả được trích làm căn cứ. */
 function AnalysisView({ analysis, items, kind, onTransfer }: { analysis: SourcingAnalysis; items: SourcingItem[]; kind: SourcingRun['kind']; onTransfer: (item: SourcingItem, kind: 'product' | 'marketing') => void }) {
-  const cited = [...new Set([...analysis.findings, ...analysis.productIdeas].flatMap(entry => entry.sources))].map(key => items.find(item => item.key === key)).filter((item): item is SourcingItem => !!item);
+  const { report, suppliers } = analysis;
+  const [copied, setCopied] = useState(false);
+  const keys = report ? reportSources(report) : suppliers ? [...suppliers.suppliers.map(card => card.source), ...[...suppliers.tierMix, ...suppliers.regions].flatMap(point => point.sources)]
+    : [...analysis.findings, ...analysis.productIdeas].flatMap(entry => entry.sources);
+  const cited = [...new Set(keys)].map(key => items.find(item => item.key === key)).filter((item): item is SourcingItem => !!item);
   const ref = (keys: string[]) => keys.map(key => cited.findIndex(item => item.key === key) + 1).filter(n => n > 0);
-  const Refs = ({ keys }: { keys: string[] }) => <span className={styles.refs}>{ref(keys).map(n => <a key={n} href={`#source-${n}`}>[{n}]</a>)}</span>;
+  const refs = (keys: string[]) => <span className={styles.refs}>{ref(keys).map(n => <a key={n} href={`#source-${n}`}>[{n}]</a>)}</span>;
+  const points = (title: string, list: SourcingPoint[]) => <div className={styles.points}><h4>{title}</h4>
+    {list.length ? <ul className={styles.findings}>{list.map((point, i) => <li key={i}>{point.text} {refs(point.sources)}</li>)}</ul> : <p className={styles.muted}>Chưa đủ dữ liệu trong các bài thu thập.</p>}</div>;
   return <div className={styles.analysis}>
-    <p className={styles.muted}>{analysis.relevantCount}/{items.length} kết quả được dùng làm nguồn · phân tích bởi AI Smart Sourcing ({analysis.model}) lúc {new Date(analysis.createdAt).toLocaleString('vi-VN')}</p>
+    <p className={styles.muted}>{analysis.relevantCount}/{items.length} kết quả được dùng làm nguồn{report ? ` · ${report.commentCount} bình luận đã đọc` : ''} · phân tích bởi AI Smart Sourcing ({analysis.model}) lúc {new Date(analysis.createdAt).toLocaleString('vi-VN')}</p>
     <section><h3>Tóm tắt</h3><p>{analysis.summary}</p></section>
-    {analysis.findings.length > 0 && <section><h3>Nhận định từ dữ liệu</h3><ol className={styles.findings}>{analysis.findings.map((finding, i) => <li key={i}><strong>{finding.title}</strong> <Refs keys={finding.sources} /><p>{finding.detail}</p></li>)}</ol></section>}
-    {analysis.productIdeas.length > 0 && <section><h3>Sản phẩm đáng tìm hiểu</h3><ul className={styles.findings}>{analysis.productIdeas.map((idea, i) => <li key={i}><strong>{idea.name}</strong> <Refs keys={idea.sources} /><p>{idea.reason}</p></li>)}</ul></section>}
+    {report ? <>
+      <section><h3>1. Nhiệt độ trend & sức mua</h3>
+        <dl className={styles.signals}>
+          <div><dt>Trạng thái trend</dt><dd>{TREND_LABEL[report.trend.status]} {refs(report.trend.sources)}</dd>{report.trend.reason && <p>{report.trend.reason}</p>}</div>
+          <div><dt>Điểm sức mua</dt><dd>{intentText(report.buyingIntent.score)} {refs(report.buyingIntent.sources)}</dd>{report.buyingIntent.reason && <p>{report.buyingIntent.reason}</p>}</div>
+        </dl>
+        {points("Lý do tạo sóng (Why now?)", report.whyNow)}
+      </section>
+      <section><h3>2. Chân dung sản phẩm chiến thắng</h3>
+        {points("Đặc điểm ngoại hình / tính năng ăn tiền", report.specs)}
+        {points("Tệp khách hàng mục tiêu trên TikTok", report.audience)}
+        {points("Mức giá tâm lý", report.price)}
+      </section>
+      <section><h3>3. Insight khách hàng từ bình luận</h3>
+        {report.commentCount === 0 && <p className={styles.warning}>Lượt này chưa thu được bình luận nào, nên phần này và điểm sức mua chưa có căn cứ.</p>}
+        {points("Lý do khách chốt đơn", report.drivers)}
+        {points("Nỗi lo / rào cản mua hàng", report.hesitations)}
+      </section>
+      <section><h3>4. Công thức video & từ khóa</h3>
+        <p className={styles.muted}>Suy từ caption và bình luận; AI chưa xem hình ảnh hay lời thoại trong video.</p>
+        {points("Cấu trúc hook (3 giây đầu)", report.hooks)}
+        {points("Góc quay & bối cảnh", report.formats)}
+        {points("Từ khóa ngách", report.keywords)}
+        <div className={styles.points}><h4>Hashtag có trong dữ liệu</h4>{report.hashtags.length ? <ul className={styles.chips}>{report.hashtags.map(tag => <li key={tag}>{tag}</li>)}</ul> : <p className={styles.muted}>Chưa đủ dữ liệu trong các bài thu thập.</p>}</div>
+      </section>
+    </> : suppliers ? <>
+      <section><h3>1. Toàn cảnh nguồn cung trên Google</h3>
+        <dl className={styles.signals}>
+          <div><dt>Tỷ lệ lọc nguồn</dt><dd>{suppliers.suppliers.length}/{suppliers.collected} trang là nhà cung cấp</dd>{suppliers.filterNote && <p>{suppliers.filterNote}</p>}</div>
+          <div><dt>Trang đọc được nội dung</dt><dd>{suppliers.pagesRead}/{suppliers.collected}</dd><p>Trang không đọc được chỉ có tiêu đề và mô tả ngắn của Google.</p></div>
+        </dl>
+        {points('Phân bổ loại hình nguồn hàng', suppliers.tierMix)}
+        {points('Khu vực tập trung', suppliers.regions)}
+      </section>
+      <section><h3>2. Nhà cung cấp đáng chú ý</h3>
+        {!suppliers.suppliers.length ? <p className={styles.muted}>Không có trang nào đủ căn cứ là nhà cung cấp phù hợp. Thử tên sản phẩm cụ thể hơn.</p>
+          : <ul className={styles.suppliers}>{suppliers.suppliers.map(card => { const item = items.find(entry => entry.key === card.source); return <li key={card.source} className={styles.supplier}>
+            <div className={styles.supplierHead}><div><strong>{card.name}</strong> <span className={styles.status}>{TIER_LABEL[card.tier]}</span></div><span className={styles.muted}>Khớp nhu cầu <strong>{card.matchScore ?? '–'}/10</strong></span></div>
+            <dl className={styles.facts}>
+              <div><dt>Chính sách sỉ & MOQ</dt><dd>{card.moq || HIDDEN}</dd></div>
+              <div><dt>Giá sỉ</dt><dd>{card.price || HIDDEN}</dd></div>
+              <div><dt>Thế mạnh & mặt hàng chủ lực</dt><dd>{card.strengths || 'Trang chưa nêu rõ.'}</dd></div>
+              <div><dt>SĐT / Zalo</dt><dd>{card.phones.join(' · ') || HIDDEN}</dd></div>
+              <div><dt>Địa chỉ kho / xưởng</dt><dd>{card.address || HIDDEN}</dd></div>
+              <div><dt>Website nguồn</dt><dd>{item ? <a href={item.url} target="_blank" rel="noopener noreferrer">{host(item.url)} ↗</a> : 'Không rõ'} {refs([card.source])}</dd></div>
+            </dl>
+          </li>; })}</ul>}
+      </section>
+      {suppliers.suppliers.length > 0 && <section><h3>3. Độ tin cậy & cảnh báo rủi ro</h3>
+        {suppliers.suppliers.map(card => <div key={card.source} className={styles.points}><h4>{card.name}</h4>
+          {card.greenFlags.length + card.redFlags.length ? <ul className={styles.flags}>
+            {card.greenFlags.map((flag, i) => <li key={`g${i}`} data-tone="green"><span aria-hidden="true">✓</span> <span className={styles.srOnly}>Tín hiệu uy tín: </span>{flag}</li>)}
+            {card.redFlags.map((flag, i) => <li key={`r${i}`} data-tone="red"><span aria-hidden="true">!</span> <span className={styles.srOnly}>Cần xác minh: </span>{flag}</li>)}
+          </ul> : <p className={styles.muted}>Chưa đủ dữ liệu trên trang để đánh giá.</p>}</div>)}
+      </section>}
+      {suppliers.suppliers.length > 0 && <section><h3>4. Kịch bản liên hệ & đàm phán</h3>
+        {suppliers.suppliers.map(card => card.questions.length > 0 && <div key={card.source} className={styles.points}><h4>Hỏi {card.name}</h4><ol className={styles.findings}>{card.questions.map((question, i) => <li key={i}>{question}</li>)}</ol></div>)}
+        {suppliers.message && <div className={styles.points}><h4>Mẫu tin nhắn mở lời</h4><p className={styles.message}>{suppliers.message}</p>
+          <span className={styles.actions}><button type="button" className="btn btn-outline btn-sm" onClick={() => void navigator.clipboard.writeText(suppliers.message).then(() => setCopied(true), () => {})}>{copied ? 'Đã sao chép' : 'Sao chép tin nhắn'}</button></span></div>}
+      </section>}
+    </> : <>
+      {analysis.findings.length > 0 && <section><h3>Nhận định từ dữ liệu</h3><ol className={styles.findings}>{analysis.findings.map((finding, i) => <li key={i}><strong>{finding.title}</strong> {refs(finding.sources)}<p>{finding.detail}</p></li>)}</ol></section>}
+      {analysis.productIdeas.length > 0 && <section><h3>Sản phẩm đáng tìm hiểu</h3><ul className={styles.findings}>{analysis.productIdeas.map((idea, i) => <li key={i}><strong>{idea.name}</strong> {refs(idea.sources)}<p>{idea.reason}</p></li>)}</ul></section>}
+    </>}
     {analysis.caveats.length > 0 && <section><h3>Lưu ý</h3><ul className={styles.caveats}>{analysis.caveats.map((caveat, i) => <li key={i}>{caveat}</li>)}</ul></section>}
-    <section><h3>Nguồn — vì sao AI phân tích như vậy</h3>
+    <section><h3>{report || suppliers ? 'Dữ liệu nguồn đối chiếu' : 'Nguồn — vì sao AI phân tích như vậy'}</h3>
       {!cited.length ? <p className={styles.muted}>Không có kết quả nào đủ liên quan để làm căn cứ.</p> : <ol className={styles.sources}>{cited.map((item, i) => <li key={item.key} id={`source-${i + 1}`}>
         <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title || 'Bài nguồn'} ↗</a>
-        <span className={styles.muted}>{kind === 'tiktok' ? metricsText(item.metrics) || 'TikTok' : host(item.url)}</span>
+        <span className={styles.muted}>{kind === 'tiktok' ? metricsText(item.metrics) || 'TikTok' : host(item.url)}{item.comments?.length ? ` · ${item.comments.length} bình luận đã đọc` : ''}</span>
+        {report?.sourceNotes[item.key] && <p>{report.sourceNotes[item.key]}</p>}
         <p className={styles.sourceText}>{item.text.slice(0, 280)}{item.text.length > 280 ? '…' : ''}</p>
         <span className={styles.actions}><button type="button" className="btn btn-outline btn-sm" onClick={() => onTransfer(item, 'product')}>Nhập sản phẩm</button><button type="button" className="btn btn-outline btn-sm" onClick={() => onTransfer(item, 'marketing')}>Tạo ý tưởng Marketing</button></span>
       </li>)}</ol>}

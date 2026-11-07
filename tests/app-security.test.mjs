@@ -155,6 +155,18 @@ test('AI global configuration is admin-only, revision-checked, and applied by th
   await f.load('lib/services/gemini.ts').generateGeminiJson({ role: 'content', platform: 'facebook', system: 'PRIVATE-SHOP-INPUT', user: 'Hello', schema: {}, parse: JSON.parse });
   assert.ok(system.includes('GLOBAL-CONTENT-RULE') && system.includes('GLOBAL-FACEBOOK-BANNED') && system.includes('PRIVATE-SHOP-INPUT'));
   assert.ok(!(await global.globalAiSystemPrompt('chat', 'facebook')).includes('GLOBAL-CONTENT-RULE'));
+  // Smart Sourcing: lớp TikTok (khám phá sản phẩm) tách khỏi lớp chung dùng cho tìm nguồn hàng.
+  assert.ok((await global.globalAiSystemPrompt('sourcing', 'tiktok')).includes('Product Trend Analyst'));
+  assert.ok(!(await global.globalAiSystemPrompt('sourcing')).includes('Product Trend Analyst'));
+  const google = await global.globalAiSystemPrompt('sourcing', 'google');
+  assert.ok(google.includes('B2B Sourcing & Procurement Specialist') && !google.includes('Product Trend Analyst'));
+  const legacy = structuredClone(persisted.configuration); legacy.profiles.sourcing.platforms = {};
+  const filled = await global.readAiGlobalSettings({ query: async () => ({ rows: [{ document: legacy, revision: 1, updated_at: 0, updated_by: 'admin' }] }) });
+  assert.ok(filled.configuration.profiles.sourcing.platforms.tiktok.role.includes('Product Trend Analyst'), 'saved configs from before the TikTok layer get its default');
+  assert.ok(filled.configuration.profiles.sourcing.platforms.google.role.includes('B2B Sourcing'));
+  legacy.profiles.sourcing.platforms = { tiktok: {} };
+  const cleared = await global.readAiGlobalSettings({ query: async () => ({ rows: [{ document: legacy, revision: 1, updated_at: 0, updated_by: 'admin' }] }) });
+  assert.deepEqual(cleared.configuration.profiles.sourcing.platforms.tiktok, {}, 'an admin-saved TikTok layer is kept as saved');
   await assert.rejects(global.readAiGlobalSettings({ query: async () => { throw new Error('unavailable'); } }));
 });
 
