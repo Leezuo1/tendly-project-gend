@@ -41,7 +41,7 @@ export function MarketingDraft({ post, meta, view, busy, error, open, onOpen, on
     </div>
     <Modal open={open} title="Chi tiết nội dung" onClose={onClose} width={1140} footer={<>
       <button className="btn btn-outline btn-sm" onClick={onClose}>Đóng</button>
-      {edit ? <><button className="btn btn-outline btn-sm" disabled={busy} onClick={() => { setForm(initial); setEdit(false); }}>Hủy sửa</button><button className="btn btn-primary btn-sm" type="submit" form={`mw-edit-${post.id}`} disabled={busy}>Lưu và yêu cầu Review lại</button></> : draft && <>
+      {edit ? <><button className="btn btn-outline btn-sm" disabled={busy} onClick={() => { setForm(initial); setEdit(false); }}>Hủy sửa</button><button className="btn btn-primary btn-sm" type="submit" form={`mw-edit-${post.id}`} disabled={busy}>Lưu và Review lại</button></> : draft && <>
         <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => { setTab('post'); setEdit(true); }}>Chỉnh bài</button>
         <button className="btn btn-outline btn-sm" disabled={busy || !valid} onClick={() => act('generate', { campaignId: campaign.id, plan: meta.plan })}>Viết lại bằng AI</button>
         <button className="btn btn-outline btn-sm" disabled={busy || !campaign.approvedAt || !approvedPlan} onClick={() => act('review', { postId: post.id, plan: { id: approvedPlan!.id, version: approvedPlan!.version, itemId: itemId || outline?.id || approvedPlan!.items[0].id } })}>Review lại</button>
