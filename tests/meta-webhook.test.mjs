@@ -101,7 +101,7 @@ test('webhook verifies challenges, rejects untrusted payloads, writes only signe
     assert.equal(aiCalls.length, 0);
     assert.equal(callbacks.length, 2);
     for (const callback of callbacks) await callback();
-    assert.deepEqual(aiCalls, [['111', '222'], ['111', '222']]);
+    assert.deepEqual(aiCalls.map((a) => [a[0], a[1], a[4]]), [['111', '222', 15000], ['111', '222', 15000]]);
     assert.equal(stored.size, 1);
     assert.equal(stored.get('m1').text, event().message.text);
     failStorage = true;

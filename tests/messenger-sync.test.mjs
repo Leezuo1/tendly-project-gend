@@ -18,7 +18,7 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/015-marketing-workspace.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
-  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql']) {
+  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql']) {
     await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
   }
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
@@ -53,7 +53,7 @@ const m = (messageId, extra = {}) => ({ pageId: '111', psid: '222', messageId, d
 async function fixture() {
   await ready;
   await db.exec('TRUNCATE messenger_analysis_history, messenger_outbound_requests, messenger_messages, messenger_conversations, messenger_customers CASCADE');
-  await db.exec('TRUNCATE messenger_ai_settings');
+  await db.exec('TRUNCATE messenger_ai_settings, messenger_orders');
   await db.exec('TRUNCATE marketing_workspaces');
   await db.exec('TRUNCATE facebook_comments,live_sessions CASCADE');
   const load = loader();
@@ -124,6 +124,136 @@ test('Messenger AI defaults off, analyzes without sending, and sends one grounde
   await f.process();
   assert.equal(f.state.sends, 1);
   assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='on'")).rows[0].status, 'sent');
+});
+
+test('a burst of messages waits for the customer to stop typing and gets one reply covering all of them', async () => {
+  const f = await aiFixture(true);
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(JSON.stringify(options)); };
+  await f.incoming('b1', { text: 'alpha-one' });
+  const first = f.service.processMessengerAi('111', '222', undefined, pool, 150);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  await f.incoming('b2', { text: 'beta-two' });
+  const second = f.service.processMessengerAi('111', '222', undefined, pool, 150);
+  await Promise.all([first, second]);
+  assert.equal(f.state.sends, 1);
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], /alpha-one\\+nbeta-two/);
+});
+
+test('the quiet period is counted from the message timestamp, so an already-quiet customer is answered without waiting', async () => {
+  const f = await aiFixture(true);
+  await f.incoming('quiet', { timestamp: Date.now() - 5000 });
+  const started = Date.now();
+  await f.service.processMessengerAi('111', '222', undefined, pool, 5000);
+  assert.ok(Date.now() - started < 2000);
+  assert.equal(f.state.sends, 1);
+});
+
+test('a message arriving during the AI call is answered once, after its own quiet period, together with the earlier one', async () => {
+  const f = await aiFixture(true);
+  const seen = [];
+  let injected = false;
+  await f.incoming('d1', { text: 'alpha' });
+  f.state.beforeReply = async (options) => {
+    seen.push(JSON.stringify(options));
+    if (!injected) { injected = true; await f.incoming('d2', { text: 'beta' }); }
+  };
+  await f.service.processMessengerAi('111', '222', undefined, pool, 300);
+  assert.equal(f.state.sends, 0);
+  await f.service.processMessengerAi('111', '222', undefined, pool, 300);
+  assert.equal(f.state.sends, 1);
+  assert.match(seen.at(-1), /alpha\\+nbeta/);
+});
+
+test('a newer message whose quiet period already passed is picked up by the running job, not left unanswered', async () => {
+  const f = await aiFixture(true);
+  let injected = false;
+  await f.incoming('e1', { text: 'alpha', timestamp: Date.now() - 5000 });
+  f.state.beforeReply = async () => {
+    if (injected) return;
+    injected = true;
+    await f.incoming('e2', { text: 'beta', timestamp: Date.now() - 1000 });
+    // Its wait is already over, but the running e1 job is still processing and blocks the send.
+    await f.service.processMessengerAi('111', '222', undefined, pool, 300);
+  };
+  await f.service.processMessengerAi('111', '222', undefined, pool, 300);
+  assert.equal(f.state.sends, 1);
+});
+
+test('past orders reach the AI as a summary without personal data, only for that customer', async () => {
+  const f = await aiFixture(true);
+  await query(`INSERT INTO messenger_orders(id,page_id,psid,items_json,total,status,is_mock,created_at,updated_at) VALUES
+    ('o1','111','222','[{"name":"Áo thun trắng","qty":2}]',400000,'confirmed',true,1000,1000),
+    ('o2','111','222','[{"name":"Quần đã hủy","qty":1}]',300000,'cancelled',true,2000,2000),
+    ('o3','111','333','[{"name":"Giày của khách khác","qty":1}]',900000,'confirmed',true,3000,3000)`);
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options.user); };
+  await f.incoming('h1'); await f.process();
+  assert.match(seen[0], /o1/);
+  assert.match(seen[0], /Áo thun trắng x2/);
+  assert.match(seen[0], /"confirmedOrders":1/);
+  assert.doesNotMatch(seen[0], /Quần đã hủy|Giày của khách khác/);
+  assert.doesNotMatch(seen[0], /0\d{9}/);
+  await query('DELETE FROM messenger_orders');
+  await f.incoming('h2', { timestamp: Date.now() + 5 }); await f.process();
+  assert.doesNotMatch(seen.at(-1), /customerOrderHistory/);
+});
+
+test('phone numbers and emails are masked before text reaches the AI, and the debounce is shared and clamped', async () => {
+  const { maskPersonalData } = loader()('lib/services/piiMask.ts');
+  for (const phone of ['0901 234 567', '0901.234.567', '0901-234-567', '+84901234567', '84901234567', '0901234567']) {
+    assert.equal(maskPersonalData(`gọi ${phone} nhé`), 'gọi [SĐT] nhé', phone);
+  }
+  assert.equal(maskPersonalData('mail lan.nguyen+shop@gmail.com ok'), 'mail [email] ok');
+  assert.equal(maskPersonalData('áo 400000đ, size 38, 2 cái'), 'áo 400000đ, size 38, 2 cái');
+  const f = await aiFixture(true);
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options.user); };
+  await f.incoming('p1', { text: 'SĐT mình 0901 234 567, mail a.b@c.vn' }); await f.process();
+  assert.match(seen[0], /\[SĐT\]/);
+  assert.doesNotMatch(seen[0], /0901|234 567|a\.b@c\.vn/);
+  // Customer-written comments inside the conversation sources are masked too, the shop's own phone is not.
+  const system = f.load('lib/services/customerCare.ts').buildCustomerCarePrompt(
+    { ...f.knowledge, shop: { ...f.knowledge.shop, phone: '0281234567' } }, f.profile, null,
+    { sources: [{ id: 'c1', commentText: '0901234567 chốt nha' }] });
+  assert.doesNotMatch(system, /0901234567/);
+  assert.match(system, /\[SĐT\] chốt nha/);
+  assert.match(system, /0281234567/);
+  const { messengerDebounceMs } = loader()('lib/services/messengerDebounce.ts');
+  const old = process.env.MESSENGER_AI_DEBOUNCE_MS;
+  try {
+    delete process.env.MESSENGER_AI_DEBOUNCE_MS; assert.equal(messengerDebounceMs(), 15000);
+    process.env.MESSENGER_AI_DEBOUNCE_MS = '99999'; assert.equal(messengerDebounceMs(), 15000);
+    process.env.MESSENGER_AI_DEBOUNCE_MS = '0'; assert.equal(messengerDebounceMs(), 0);
+    process.env.MESSENGER_AI_DEBOUNCE_MS = 'abc'; assert.equal(messengerDebounceMs(), 0);
+  } finally { if (old === undefined) delete process.env.MESSENGER_AI_DEBOUNCE_MS; else process.env.MESSENGER_AI_DEBOUNCE_MS = old; }
+});
+
+test('a dead processing job stops blocking auto replies after two minutes, a live one still does', async () => {
+  const f = await aiFixture(true);
+  await f.incoming('stuck', { timestamp: Date.now() - 3000 });
+  const stuck = (updatedAt) => query(`INSERT INTO messenger_ai_jobs(page_id,message_id,conversation_id,sent_at,status,updated_at)
+    SELECT page_id,message_id,conversation_id,sent_at,'processing',$1 FROM messenger_messages WHERE message_id='stuck'
+    ON CONFLICT(page_id,message_id) DO UPDATE SET status='processing',updated_at=$1`, [updatedAt]);
+  await stuck(Date.now());
+  await f.incoming('fresh', { timestamp: Date.now() - 1000 }); await f.process();
+  assert.equal(f.state.sends, 0);
+  await stuck(Date.now() - 200000);
+  await f.process();
+  assert.equal(f.state.sends, 1);
+});
+
+test('analysing an older message never creates a blocking review job, only the latest message can', async () => {
+  const f = await aiFixture(true);
+  await f.incoming('old1', { timestamp: Date.now() - 3000 });
+  await f.incoming('new1', { timestamp: Date.now() - 1000 });
+  const memory = f.load('lib/services/conversationMemory.ts');
+  const result = { analysis: { canAutoReply: false }, reply: 'r', model: 'm', sourceSummary: 's' };
+  await memory.saveConversationMemory('111', '222', 'old1', result, pool);
+  assert.equal((await query("SELECT 1 FROM messenger_ai_jobs WHERE message_id='old1'")).rows.length, 0);
+  await memory.saveConversationMemory('111', '222', 'new1', result, pool);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='new1'")).rows[0].status, 'review');
 });
 
 test('insufficient evidence stays pending above unread/urgent threads, survives enabling AI, and blocks later auto replies until manual response', async () => {

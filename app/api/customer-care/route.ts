@@ -1,4 +1,5 @@
 import { AppSecurityError, assertOperationAllowed, requireAppAccess, sameOrigin, withAppAccess } from '@/lib/services/appSecurity';
+import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
 import { CustomerCareError, generateCareReply, parseCareProfile, readCarePageProfile, saveCustomerCareSettings } from '@/lib/services/customerCare';
 import { InvalidAiKnowledge, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { readMessengerAiSettings } from '@/lib/services/messengerAi';
@@ -50,7 +51,8 @@ async function handle(request: Request) {
       .map(m => ({ role: m.direction === 'in' ? 'user' as const : 'model' as const, text: m.text.slice(0, 2000) }));
     const sources = await readConversationSources(pageId, body.psid, latest.message_id, db);
     if (!sources) throw new CustomerCareError('Hội thoại không còn hiển thị.', 409);
-    const reply = await generateCareReply(settings.knowledge, settings.profile, settings.pageProfile, latest.text.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources);
+    const history = await readCustomerOrderHistory(pageId, body.psid, db);
+    const reply = await generateCareReply(settings.knowledge, settings.profile, settings.pageProfile, latest.text.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updatedAt}`;
     if (!latest.text.trim() || latest.attachments_json.length || reply.reply.length > 2000) reply.analysis.canAutoReply = false;
     await assertOperationAllowed();

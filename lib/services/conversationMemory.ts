@@ -21,8 +21,10 @@ export async function saveConversationMemory(pageId: string, psid: string, messa
   [pageId, JSON.stringify([pageId, psid]), messageId, JSON.stringify(result.analysis), result.reply, result.model, result.sourceSummary, Date.now(),
     result.sourceContext ? JSON.stringify(result.sourceContext) : null]);
   if (saved.rowCount && result.analysis.canAutoReply === false) {
+    // This path creates a blocking review job only for the conversation's latest message; older analysed ones are context.
     await db.query(`INSERT INTO messenger_ai_jobs(page_id,message_id,conversation_id,sent_at,status,updated_at)
-      SELECT page_id,message_id,conversation_id,sent_at,'review',$3 FROM messenger_messages WHERE page_id=$1 AND message_id=$2
+      SELECT m.page_id,m.message_id,m.conversation_id,m.sent_at,'review',$3 FROM messenger_messages m WHERE m.page_id=$1 AND m.message_id=$2
+      AND m.message_id=(SELECT message_id FROM messenger_messages WHERE conversation_id=m.conversation_id ORDER BY sent_at DESC,message_id DESC LIMIT 1)
       ON CONFLICT(page_id,message_id) DO UPDATE SET status='review',updated_at=$3
       WHERE messenger_ai_jobs.status IN ('processing','ready','review')`, [pageId, messageId, Date.now()]);
   }

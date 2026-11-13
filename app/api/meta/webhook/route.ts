@@ -3,6 +3,7 @@ import { InvalidWebhook, parseMetaComments, parseMetaMessages, verifyMetaSignatu
 import { requireMessengerDatabase, persistMessengerMessages } from '@/lib/services/messengerStorage';
 import { processPendingComments, saveFacebookComments } from '@/lib/services/facebookComments';
 import { processMessengerAi } from '@/lib/services/messengerAi';
+import { messengerDebounceMs } from '@/lib/services/messengerDebounce';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -65,7 +66,11 @@ export async function POST(request: Request) {
       const customers = [...new Set(messages.filter((m) => m.direction === 'in').map((m) => m.psid))];
       // shortcut: AI runs within the webhook lifetime; add a durable worker for sustained traffic.
       if (customers.length) after(async () => {
-        await Promise.allSettled(customers.map((psid) => processMessengerAi(pageId, psid)));
+        // Wait for the customer to finish typing. One run is up to 15s wait + 30s AI + 12s Graph send = 57s plus DB time,
+        // barely inside maxDuration=60, and a rerun for a message that arrived meanwhile can push past it. A run killed mid-way leaves its job in 'processing'/'sending', which blocks auto-reply
+        // for that conversation until the shop replies by hand, so keep the wait low or raise maxDuration.
+        const debounceMs = messengerDebounceMs();
+        await Promise.allSettled(customers.map((psid) => processMessengerAi(pageId, psid, undefined, undefined, debounceMs)));
       });
     }
     if (comments.length) {

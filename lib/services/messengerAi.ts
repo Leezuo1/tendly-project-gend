@@ -6,6 +6,7 @@ import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
 import { readConversationSources } from '@/lib/services/conversationSources';
+import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
 import { saveConversationMemory } from '@/lib/services/conversationMemory';
 import { AutomationStoppedError, sendMessengerMessage } from '@/lib/services/messengerSend';
 import { AppSecurityError, assertOperationAllowed, canRunAutomation, isInteractiveRequest, runAutomaticAccess } from '@/lib/services/appSecurity';
@@ -42,7 +43,7 @@ export async function saveConversationAutoReply(pageId: string, psid: string, en
 }
 
 export async function processMessengerAi(pageId: string, psid: string, knowledge?: AiKnowledge,
-  db: Pool = getMessengerPool()) {
+  db: Pool = getMessengerPool(), debounceMs = 0) {
   if (isInteractiveRequest()) await assertOperationAllowed(db);
   else if (!await canRunAutomation(db)) return {};
   const id = JSON.stringify([pageId, psid]);
@@ -50,10 +51,19 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
   const source = settings?.profile_json ? parseAiKnowledge(settings.knowledge_json) : undefined;
   if (!source) return {};
   const profile = parseCareProfile(settings.profile_json);
-  const latest = (await db.query(`SELECT m.*,c.ai_auto_reply,c.ai_updated_at,c.ai_enabled_at FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
+  const readLatest = async () => (await db.query(`SELECT m.*,c.ai_auto_reply,c.ai_updated_at,c.ai_enabled_at FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
     WHERE m.page_id=$1 AND m.conversation_id=$2 AND c.hidden_at IS NULL
     ORDER BY m.sent_at DESC,m.message_id DESC LIMIT 1`, [pageId, id])).rows[0];
+  const latest = await readLatest();
   if (!latest || latest.direction !== 'in') return {};
+  if (debounceMs > 0) {
+    // Wait until the customer has been quiet for debounceMs, counted from the latest message's own timestamp.
+    // shortcut: trusts Meta's clock vs ours (skew only shortens or caps the wait); upgrade if skew matters.
+    const wait = Math.min(debounceMs, debounceMs - (Date.now() - Number(latest.sent_at)));
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    // A newer message started its own delayed run; only the last run of a burst replies.
+    if ((await readLatest())?.message_id !== latest.message_id) return {};
+  }
   const now = Date.now();
   const claimed = await db.query(`INSERT INTO messenger_ai_jobs(page_id,message_id,conversation_id,sent_at,status,updated_at)
     VALUES($1,$2,$3,$4,'processing',$5) ON CONFLICT(page_id,message_id) DO UPDATE SET status='processing',updated_at=$5
@@ -61,16 +71,25 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
   [pageId, latest.message_id, id, latest.sent_at, now]);
   if (!claimed.rowCount) return {};
   try {
-    const context = (await db.query(`SELECT direction,text FROM messenger_messages WHERE page_id=$1 AND conversation_id=$2
-      AND (sent_at<$3 OR (sent_at=$3 AND message_id<$4)) ORDER BY sent_at DESC,message_id DESC LIMIT 10`,
-    [pageId, id, latest.sent_at, latest.message_id])).rows.reverse()
+    const recent = (await db.query(`SELECT direction,text,attachments_json,sent_at FROM messenger_messages WHERE page_id=$1 AND conversation_id=$2
+      AND (sent_at<$3 OR (sent_at=$3 AND message_id<=$4)) ORDER BY sent_at DESC,message_id DESC LIMIT 20`,
+    [pageId, id, latest.sent_at, latest.message_id])).rows.reverse();
+    // Inbound messages since our last outbound one, sent within 5 minutes of the latest, are answered together.
+    // shortcut: capped at 20 messages; older unanswered ones stay plain context.
+    let start = recent.length;
+    while (start > 0 && recent[start - 1].direction === 'in'
+      && Number(latest.sent_at) - Number(recent[start - 1].sent_at) <= 300000) start--;
+    const batch = recent.slice(start);
+    const customerText = batch.map((m) => m.text.trim()).filter(Boolean).join('\n');
+    const context = recent.slice(Math.max(0, start - 10), start)
       .filter((m) => m.text.trim()).map((m) => ({ role: m.direction === 'in' ? 'user' as const : 'model' as const, text: m.text.slice(0, 2000) }));
     const sources = await readConversationSources(pageId, psid, latest.message_id, db);
     if (!sources) throw new CustomerCareError('Hội thoại không còn hiển thị.', 409);
-    const reply = await generateCareReply(source, profile, settings.page_profile_json, latest.text.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources);
+    const history = await readCustomerOrderHistory(pageId, psid, db);
+    const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updated_at}`;
-    const blocked = !reply.analysis.canAutoReply || reply.analysis.needsHuman || !latest.text.trim()
-      || latest.attachments_json.length > 0 || Array.from(reply.reply).length > 2000;
+    const blocked = !reply.analysis.canAutoReply || reply.analysis.needsHuman || !customerText
+      || batch.some((m) => m.attachments_json.length > 0) || Array.from(reply.reply).length > 2000;
     if (blocked) reply.analysis.canAutoReply = false;
     const current = (await db.query('SELECT updated_at FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
     if (!current || Number(current.updated_at) !== Number(settings.updated_at)) {
@@ -95,7 +114,8 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
       AND COALESCE(c.last_out_at,0)<j.sent_at AND $3::bigint-j.sent_at<86400000
       AND j.message_id=(SELECT message_id FROM messenger_messages WHERE conversation_id=c.id ORDER BY sent_at DESC,message_id DESC LIMIT 1)
       AND NOT EXISTS(SELECT 1 FROM messenger_ai_jobs other WHERE other.conversation_id=c.id
-        AND other.status IN ('processing','review','sending','unknown') AND other.message_id<>j.message_id AND other.sent_at>COALESCE(c.last_out_at,0))
+        AND (other.status IN ('review','sending','unknown') OR (other.status='processing' AND other.updated_at>=$3::bigint-120000))
+        AND other.message_id<>j.message_id AND other.sent_at>COALESCE(c.last_out_at,0))
       RETURNING j.message_id`, [pageId, latest.message_id, Date.now(), settings.updated_at, latest.ai_updated_at]);
     if (!send.rowCount) return { reply, messageId: latest.message_id };
     try {
@@ -115,8 +135,12 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     throw new Error('AI chưa xác nhận đủ căn cứ. Hội thoại cần shop kiểm tra.', { cause });
   } finally {
     // A newer message may have finished first but waited for this analysis before it could send.
-    const newer = (await db.query(`SELECT message_id FROM messenger_messages WHERE page_id=$1 AND conversation_id=$2
+    const newer = (await db.query(`SELECT message_id,sent_at FROM messenger_messages WHERE page_id=$1 AND conversation_id=$2
       ORDER BY sent_at DESC,message_id DESC LIMIT 1`, [pageId, id])).rows[0];
-    if (newer && newer.message_id !== latest.message_id) await processMessengerAi(pageId, psid, knowledge, db);
+    // With a delay, the newer message's own run is still asleep unless its quiet period already passed (and this job blocked it).
+    // shortcut: assumes Meta's clock is close to ours; if ours runs behind, the newer message waits for the customer's next message.
+    if (newer && newer.message_id !== latest.message_id && (debounceMs === 0 || Date.now() - Number(newer.sent_at) >= debounceMs)) {
+      await processMessengerAi(pageId, psid, knowledge, db);
+    }
   }
 }
