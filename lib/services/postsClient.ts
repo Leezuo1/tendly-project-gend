@@ -43,9 +43,12 @@ export async function dashboardRequest(url: string, init: RequestInit = {}): Pro
         ...init.headers,
       },
     });
-  } catch {
+  } catch (e) {
+    if ((e as Error).name === 'TimeoutError') throw new PostsApiError('Máy chủ phản hồi quá lâu. Kiểm tra lại dữ liệu rồi thử lại nhé.', 'timeout');
     throw new PostsApiError('Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.');
   }
+  // Vercel trả 504 khi hàm vượt maxDuration, trước khi client kịp tự hủy: coi như timeout để nơi gọi tải lại dữ liệu.
+  if (res.status === 504) throw new PostsApiError('Máy chủ phản hồi quá lâu. Kiểm tra lại dữ liệu rồi thử lại nhé.', 'timeout', 504);
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new PostsApiError(data.error || 'Đã có lỗi xảy ra, thử lại nhé.', data.code, res.status);
