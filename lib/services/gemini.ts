@@ -40,6 +40,9 @@ export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Pr
 
   for (const model of models) {
     if (options.signal?.aborted) break;
+    const started = Date.now();
+    // One line per attempt: which role/model, how it ended, how long. Never the prompt or the answer, which may hold customer data.
+    const log = (outcome: string) => console.info(JSON.stringify({ ai: options.role, platform: options.platform, model, outcome, ms: Date.now() - started }));
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -59,15 +62,18 @@ export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Pr
           }),
         },
       );
-      if (!res.ok) continue;
+      if (!res.ok) { log(`http_${res.status}`); continue; }
       const data = await res.json() as GeminiResponse;
       const output = data.candidates?.[0]?.content?.parts
         ?.filter((part) => !part.thought && typeof part.text === 'string')
         .map((part) => part.text).join('\n').trim();
-      if (!output) continue;
-      return { result: options.parse(output), model };
-    } catch {
+      if (!output) { log('empty'); continue; }
+      const result = options.parse(output);
+      log('ok');
+      return { result, model };
+    } catch (error) {
       // Lỗi mạng, quá thời gian hoặc output sai định dạng: thử model tiếp theo.
+      log(`error_${error instanceof Error ? error.name : 'unknown'}`);
     }
   }
   throw new GeminiUnavailable('Không thể kết nối đến Gemini API. Vui lòng thử lại sau giây lát.');

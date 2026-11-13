@@ -4,10 +4,11 @@ import type { AiKnowledge } from '@/lib/types/ai';
 import type { CustomerCareSettings } from '@/lib/types/customerCare';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
-import { CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
+import { careRules, CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
 import { readConversationSources } from '@/lib/services/conversationSources';
 import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
-import { saveConversationMemory } from '@/lib/services/conversationMemory';
+import { readConversationMemories, saveConversationMemory } from '@/lib/services/conversationMemory';
+import { unsupportedReplyReason } from '@/lib/services/replyGuard';
 import { AutomationStoppedError, sendMessengerMessage } from '@/lib/services/messengerSend';
 import { AppSecurityError, assertOperationAllowed, canRunAutomation, isInteractiveRequest, runAutomaticAccess } from '@/lib/services/appSecurity';
 
@@ -69,7 +70,14 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     VALUES($1,$2,$3,$4,'processing',$5) ON CONFLICT(page_id,message_id) DO UPDATE SET status='processing',updated_at=$5
     WHERE messenger_ai_jobs.status='ready' OR (messenger_ai_jobs.status='processing' AND messenger_ai_jobs.updated_at<$5::bigint-120000) RETURNING message_id`,
   [pageId, latest.message_id, id, latest.sent_at, now]);
-  if (!claimed.rowCount) return {};
+  if (!claimed.rowCount) {
+    // Another run (usually the webhook) already analysed this message and held it for a human: hand back that analysis so the inbox shows it.
+    // Only for 'review'; for sending/unknown/sent a suggestion could invite a second reply.
+    const held = (await db.query("SELECT 1 FROM messenger_ai_jobs WHERE page_id=$1 AND message_id=$2 AND status='review'", [pageId, latest.message_id])).rows.length;
+    const saved = held ? (await readConversationMemories(pageId, [id], db)).get(id)?.find((entry) => entry.messageId === latest.message_id) : undefined;
+    return saved ? { messageId: latest.message_id as string, reply: { analysis: saved.analysis, reply: saved.reply, model: saved.model,
+      sourceSummary: saved.sourceSummary, ...(saved.sourceContext ? { sourceContext: saved.sourceContext } : {}) } } : {};
+  }
   try {
     const recent = (await db.query(`SELECT direction,text,attachments_json,sent_at FROM messenger_messages WHERE page_id=$1 AND conversation_id=$2
       AND (sent_at<$3 OR (sent_at=$3 AND message_id<=$4)) ORDER BY sent_at DESC,message_id DESC LIMIT 20`,
@@ -88,7 +96,10 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     const history = await readCustomerOrderHistory(pageId, psid, db);
     const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updated_at}`;
-    const blocked = !reply.analysis.canAutoReply || reply.analysis.needsHuman || !customerText
+    // Hard check on what the model wrote: masked data echoed back, links or amounts that the shop's own data (or the customer) never gave.
+    const unsupported = unsupportedReplyReason(reply.reply, JSON.stringify([source.products, source.faqs, source.shop, history, customerText, sources, careRules(profile, settings.page_profile_json), settings.page_profile_json]));
+    if (unsupported) reply.analysis.reason = `${unsupported} ${reply.analysis.reason}`.trim();
+    const blocked = !reply.analysis.canAutoReply || reply.analysis.needsHuman || !customerText || !!unsupported
       || batch.some((m) => m.attachments_json.length > 0) || Array.from(reply.reply).length > 2000;
     if (blocked) reply.analysis.canAutoReply = false;
     const current = (await db.query('SELECT updated_at FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];

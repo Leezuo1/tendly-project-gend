@@ -206,10 +206,19 @@ export function InboxShell() {
     try {
       let data: AiChatReply;
       if (conversation.messenger) {
-        const response = await fetch(automatic ? '/api/messenger/ai' : '/api/customer-care', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ psid: conversation.messenger.psid, ...(!automatic ? { action: 'suggest', messageId } : {}) }) });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Không phân tích được hội thoại.');
+        const request = async () => {
+          const response = await fetch(automatic ? '/api/messenger/ai' : '/api/customer-care', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ psid: conversation.messenger!.psid, ...(!automatic ? { action: 'suggest', messageId } : {}) }) });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error || 'Không phân tích được hội thoại.');
+          return body;
+        };
+        let result = await request();
+        // The webhook may still be analysing this message; ask a few times for its saved result before showing an error.
+        for (let retry = 0; automatic && !result.reply && retry < 3; retry++) {
+          await new Promise((resolve) => setTimeout(resolve, 8000));
+          result = await request();
+        }
         if (!result.reply) throw new Error('Chưa có gợi ý. Kiểm tra cấu hình AI Chat hoặc chờ lượt phân tích đang chạy.');
         if (result.messageId !== messageId) return;
         data = result.reply;

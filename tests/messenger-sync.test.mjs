@@ -70,7 +70,7 @@ after(() => { for (const [key, value] of Object.entries(original)) {
 
 async function aiFixture(enabled = true) {
   const { load, writer } = await fixture();
-  const state = { canAutoReply: true, priority: 'normal', sends: 0, beforeReply: async () => {}, beforeTransport: async () => {}, failSend: false, failAi: false };
+  const state = { canAutoReply: true, priority: 'normal', sends: 0, beforeReply: async () => {}, beforeTransport: async () => {}, failSend: false, failAi: false, replyText: 'Shop mở cửa lúc 8 giờ.' };
   const knowledge = { shop: { name: 'Shop', email: '', phone: '' },
     productSource: { name: 'Catalog', connected: true, lastSyncedAt: 1 }, products: [],
     faqs: [{ id: 'f1', question: 'Giờ mở cửa?', answer: '8 giờ', tag: '', keywords: [], active: true }], emailTriggers: [] };
@@ -79,7 +79,7 @@ async function aiFixture(enabled = true) {
     'lib/services/gemini.ts': { generateGeminiJson: async (options) => {
       await state.beforeReply(options);
       if (state.failAi) throw new Error('AI unavailable');
-      return { model: 'test', result: options.parse(JSON.stringify({ reply: 'Shop mở cửa lúc 8 giờ.', analysis: {
+      return { model: 'test', result: options.parse(JSON.stringify({ reply: state.replyText, analysis: {
         sentiment: 'neutral', emotion: 'neutral', priority: state.priority, needsHuman: false,
         reason: state.canAutoReply ? 'Dựa vào FAQ giờ mở cửa.' : 'Thiếu dữ liệu đơn hàng.',
         canAutoReply: state.canAutoReply,
@@ -124,6 +124,33 @@ test('Messenger AI defaults off, analyzes without sending, and sends one grounde
   await f.process();
   assert.equal(f.state.sends, 1);
   assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='on'")).rows[0].status, 'sent');
+});
+
+test('a reply with a price or link the shop never gave is held for review instead of being auto-sent', async () => {
+  const f = await aiFixture(true);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  f.state.replyText = 'Áo đang giảm còn 99.000đ, xem tại https://shop-la.example/sale nhé.';
+  await f.incoming('invented'); await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='invented'")).rows[0].status, 'review');
+  const saved = (await query("SELECT analysis,reply FROM messenger_analysis_history WHERE message_id='invented'")).rows[0];
+  assert.match(saved.analysis.reason, /số tiền|đường dẫn/);
+  // A run that loses the claim hands back the saved analysis, so the inbox shows it instead of "Cần phân tích lại".
+  const again = await f.process();
+  assert.equal(again.messageId, 'invented'); assert.equal(again.reply.reply, saved.reply);
+  assert.equal(f.state.sends, 0);
+});
+
+test('an invented amount alone (no link) also holds the reply, while a price from the shop data is sent', async () => {
+  const f = await aiFixture(true);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  f.state.replyText = 'Áo đang giảm còn 99.000đ nhé.';
+  await f.incoming('amount-only'); await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='amount-only'")).rows[0].status, 'review');
+  assert.match((await query("SELECT analysis FROM messenger_analysis_history WHERE message_id='amount-only'")).rows[0].analysis.reason, /số tiền/);
 });
 
 test('a burst of messages waits for the customer to stop typing and gets one reply covering all of them', async () => {
