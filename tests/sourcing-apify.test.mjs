@@ -50,7 +50,9 @@ test('builds bounded Actor inputs and rejects invalid search products before spe
   assert.equal(tiktok.actorInput.searchSection, '/video');
   assert.equal(tiktok.actorInput.videoSearchDateFilter, 'PAST_WEEK');
   assert.equal(tiktok.actorInput.proxyCountryCode, 'VN');
-  assert.equal(tiktok.actorInput.resultsPerPage, 20);
+  assert.equal(tiktok.actorInput.resultsPerPage, Math.ceil(20 / tiktok.actorInput.searchQueries.length));
+  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo', 'áo thun', 'áo sơ mi'], resultLimit: 10 }).actorInput.resultsPerPage, 4);
+  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo'], resultLimit: 10 }).actorInput.resultsPerPage, 10);
   assert.equal(tiktok.actorInput.shouldDownloadVideos, false);
   assert.equal(tiktok.actorInput.commentsPerPost, 10);
   const supplier = f.sourcingRequest('suppliers', { product: 'Áo polo cotton' });
@@ -133,7 +135,7 @@ test('start uses fixed Actor, server header, budget and timeout; duplicate start
     assert.equal(new URL(url).searchParams.get('maxTotalChargeUsd'), '1');
     assert.ok(!url.includes(process.env.APIFY_API_TOKEN));
     assert.equal(options.headers.Authorization, `Bearer ${process.env.APIFY_API_TOKEN}`);
-    assert.equal(JSON.parse(options.body).resultsPerPage, 20);
+    assert.ok(JSON.parse(options.body).resultsPerPage <= 20);
     return json(runResponse());
   };
   const run = await f.createSourcingRun('owner', 'tiktok', industry);

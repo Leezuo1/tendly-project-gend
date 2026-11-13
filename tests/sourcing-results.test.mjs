@@ -79,19 +79,31 @@ test('TikTok report keeps only sourced points; buying intent needs comments; has
     hashtags: ['#aodaitreem', 'tettrend', '#khongcotrongdulieu', '#có cách'],
     sources: [{ id: 'S1', summary: 'Video thử áo dài' }, { id: 'S2', summary: 'Bình luận hỏi giá' }, { id: 'S9', summary: 'Không tồn tại' }], caveats: ['Tương tác không phải doanh số'] };
   const corpus = 'Áo dài cho bé #AoDaiTreEm #tettrend\ngiá bao nhiêu';
-  const result = parseTikTokReport(JSON.stringify(output), ids, corpus, 12);
+  const intent = { hits: 3, sources: ['k2'] };
+  const result = parseTikTokReport(JSON.stringify(output), ids, corpus, 12, intent);
   assert.deepEqual(result.report.specs, [{ text: 'Áo dài gấm đỏ', sources: ['k1'] }]);
   assert.deepEqual(result.report.trend, { status: 'peaking', reason: 'Nhiều video mới', sources: ['k1'] });
-  assert.equal(result.report.buyingIntent.score, 8);
+  assert.deepEqual([result.report.buyingIntent.score, result.report.buyingIntent.sources], [3, ['k2']], '3 of 12 comments ask to buy: counted by code, not by the model');
+  assert.match(result.report.buyingIntent.reason, /3\/12/);
   assert.deepEqual(result.report.hashtags, ['#aodaitreem', '#tettrend']);
   assert.deepEqual(result.report.sourceNotes, { k1: 'Video thử áo dài', k2: 'Bình luận hỏi giá' });
   assert.equal(result.relevantCount, 2);
   assert.equal(result.report.commentCount, 12);
 
-  const noComments = parseTikTokReport(JSON.stringify(output), ids, corpus, 0);
+  const noComments = parseTikTokReport(JSON.stringify(output), ids, corpus, 0, { hits: 0, sources: [] });
   assert.equal(noComments.report.buyingIntent.score, null, 'no comments collected: no buying intent score');
-  const unsourced = parseTikTokReport(JSON.stringify({ ...output, trendSourceIds: ['S9'], buyingIntentSourceIds: [], trendStatus: 'viral' }), ids, corpus, 12);
+  const unsourced = parseTikTokReport(JSON.stringify({ ...output, trendSourceIds: ['S9'], trendStatus: 'viral' }), ids, corpus, 12, { hits: 0, sources: [] });
   assert.equal(unsourced.report.trend.status, 'unclear');
-  assert.equal(unsourced.report.buyingIntent.score, null);
-  assert.throws(() => parseTikTokReport(JSON.stringify({ ...output, summary: '' }), ids, corpus, 12));
+  assert.equal(unsourced.report.buyingIntent.score, 0);
+  assert.throws(() => parseTikTokReport(JSON.stringify({ ...output, summary: '' }), ids, corpus, 12, intent));
+});
+
+test('buying intent counts comments that ask price, link, size or how to buy', () => {
+  const { buyingIntentCount } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {} });
+  const c = text => ({ text, likes: null });
+  const items = [{ key: 'a', comments: [c('Áo này giá bao nhiêu vậy shop'), c('xinh quá'), c('cho mình xin link'), c('Ib size M nhé')] }, { key: 'b', comments: [c('đẹp, quá đẹp')] }, { key: 'c' }];
+  assert.deepEqual(buyingIntentCount(items), { hits: 3, sources: ['a'] });
+  assert.equal(buyingIntentCount([{ key: 'x', comments: [c('Tiktok trend'), c('mình thích bộ này'), c('cả gia đình mình thích'), c('tham gia minigame'), c('bn ơi xinh quá')] }]).hits, 0, 'common words are not buying signals');
+  assert.equal(buyingIntentCount([{ key: 'x', comments: [c('gia bao nhieu vay shop'), c('gia bn a')] }]).hits, 2, 'unaccented typing still counts');
+  assert.equal(buyingIntentCount([{ key: 'x', comments: [c('giá bao nhiêu'.normalize('NFD'))] }]).hits, 1, 'decomposed Vietnamese still counts');
 });
