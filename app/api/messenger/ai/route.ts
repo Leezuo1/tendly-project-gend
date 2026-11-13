@@ -1,6 +1,7 @@
 import { AppSecurityError, sameOrigin, withAppAccess } from '@/lib/services/appSecurity';
 import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { CustomerCareError } from '@/lib/services/customerCare';
+import { messengerDebounceMs } from '@/lib/services/messengerDebounce';
 import { processMessengerAi, readMessengerAiSettings, saveMessengerAiSettings, saveConversationAutoReply } from '@/lib/services/messengerAi';
 
 export const runtime = 'nodejs';
@@ -29,7 +30,8 @@ async function handle(request: Request) {
       return Response.json(await saveMessengerAiSettings(pageId, body.autoReply, undefined, undefined, body.updatedAt));
     }
     if (typeof body.psid !== 'string' || !/^\d{1,64}$/.test(body.psid)) return Response.json({ error: 'Khách không hợp lệ.' }, { status: 400 });
-    return Response.json(await processMessengerAi(pageId, body.psid), { headers: { 'Cache-Control': 'no-store' } });
+    // The inbox calls this automatically for unanswered messages; it must wait like the webhook does.
+    return Response.json(await processMessengerAi(pageId, body.psid, undefined, undefined, messengerDebounceMs()), { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     if (error instanceof CustomerCareError) return Response.json({ error: error.message }, { status: error.status });
     if (error instanceof AppSecurityError) throw error;

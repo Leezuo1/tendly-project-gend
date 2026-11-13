@@ -277,6 +277,12 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       }
       if (action === 'approveSchedule') { schedule.approvedAt = Date.now(); schedule.approvedBy = actor; schedule.status = 'approved'; }
       else { if (!schedule.approvedAt) throw new MarketingWorkflowError('Duyệt lịch trước khi kích hoạt.'); schedule.status = 'active'; }
+    } else if (action === 'resolveUnknown') {
+      // The owner checked the Page and the post is not there; allow publishing again. A wrong confirmation can duplicate the post.
+      const review = findReview(state, input.postId);
+      if (review.publication !== 'unknown') throw new MarketingWorkflowError('Bài không ở trạng thái chưa rõ kết quả.');
+      review.publication = 'draft';
+      for (const slot of state.schedules.flatMap(schedule => schedule.slots)) if (slot.postId === review.postId && slot.status === 'unknown') { slot.status = 'blocked'; slot.message = 'Đã xác nhận chưa đăng. Lập lịch mới nếu muốn đăng lại.'; }
     } else throw new MarketingWorkflowError('Hành động không hợp lệ.');
   });
 }
@@ -317,8 +323,10 @@ export async function publishMarketingPost(pageId: string, postId: string, slotI
     return await getPost(postId);
   } catch (error) {
     await changeWorkspace(pageId, undefined, async state => {
-      findReview(state, postId).publication = attempted ? 'unknown' : 'draft';
-      if (slotId) { const slot = state.schedules.flatMap(schedule => schedule.slots).find(item => item.id === slotId)!; slot.status = attempted ? 'unknown' : 'blocked'; slot.message = attempted ? 'Chưa xác nhận kết quả. Kiểm tra trên tài khoản trước khi xử lý tiếp.' : 'Chưa gửi: dữ liệu hoặc quyền đã thay đổi. Lập lịch và duyệt lại.'; }
+      // Provider errors that prove nothing was sent (missing token, security lock, 4xx) must not lock the post as unknown.
+      const unsent = !attempted || (error as { unsent?: boolean }).unsent === true;
+      findReview(state, postId).publication = unsent ? 'draft' : 'unknown';
+      if (slotId) { const slot = state.schedules.flatMap(schedule => schedule.slots).find(item => item.id === slotId)!; slot.status = unsent ? 'blocked' : 'unknown'; slot.message = !unsent ? 'Chưa xác nhận kết quả. Kiểm tra trên tài khoản trước khi xử lý tiếp.' : attempted ? `Chưa gửi: ${(error as Error).message}` : 'Chưa gửi: dữ liệu hoặc quyền đã thay đổi. Lập lịch và duyệt lại.'; }
     });
     throw error;
   }

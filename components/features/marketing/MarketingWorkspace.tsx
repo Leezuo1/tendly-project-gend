@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
 import { dashboardRequest, prepareUploadImage } from '@/lib/services/postsClient';
 import { MARKETING_GOALS } from '@/lib/services/marketingBrief';
 import type { MarketingCampaign, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
+import { BusyStatus } from './BusyStatus';
 import { CampaignBriefForm } from './CampaignBriefForm';
 import { MarketingScheduleTab } from './MarketingScheduleTab';
 import { CampaignPerformanceTab } from './CampaignPerformanceTab';
@@ -33,6 +34,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
   const [view, setView] = useState<MarketingWorkspaceView | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const inflight = useRef(false); // `busy` chỉ cập nhật sau render nên hai lần bấm sát nhau vẫn lọt qua.
   const [notice, setNotice] = useState('');
   const [campaignId, setCampaignId] = useState('');
   const [detailPlanId, setDetailPlanId] = useState('');
@@ -48,12 +50,15 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
     if (!next) return;
     setNotice('Đã lưu. AI đang Review…');
     try { setView(await marketingWorkspaceClient.act(saved.revision, next.action, next.input)); setNotice('Đã lưu và Review xong. Xem đề xuất của AI rồi duyệt.'); }
-    catch (e) { setError(`Đã lưu, nhưng Review tự động chưa xong: ${(e as Error).message} Bấm "Review lại" để thử lại.`); }
+    catch (e) {
+      if ((e as { code?: string }).code === 'timeout') await load(); // server có thể đã Review xong; revision cũ sẽ làm lần sau bị từ chối
+      setError(`Đã lưu, nhưng Review tự động chưa xong: ${(e as Error).message} Bấm "Review lại" để thử lại.`);
+    }
   };
   const act = async (action: string, input: object): Promise<boolean> => {
-    if (!view || busy) return false;
+    if (!view || busy || inflight.current) return false;
     if (['generatePlan', 'generate', 'review', 'applyReview'].includes(action) && document.querySelector('.mw-root [data-unsaved="true"]')) { setError('Lưu hoặc hủy phần đang sửa trước khi tiếp tục với AI.'); return false; }
-    setBusy(true); setError(''); setNotice('');
+    inflight.current = true; setBusy(true); setError(''); setNotice('');
     try {
       const next = await marketingWorkspaceClient.act(view.revision, action, input);
       setView(next); setNotice('Đã cập nhật');
@@ -65,13 +70,17 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
       }
       return true;
     }
-    catch (e) { setError((e as Error).message); return false; }
-    finally { setBusy(false); }
+    catch (e) {
+      // A failed publish still changes server state (draft/unknown), so reload it or the card and revision stay stale.
+      if (action === 'publish' || (e as { code?: string }).code === 'timeout') await load();
+      setError((e as Error).message); return false;
+    }
+    finally { inflight.current = false; setBusy(false); }
   };
   const confirm: Ask = (title, message, action) => setApproval({ title, message, action });
   const upload = async (postId: string, file: File | null) => {
-    if (!view || busy) return;
-    setBusy(true); setError('');
+    if (!view || busy || inflight.current) return;
+    inflight.current = true; setBusy(true); setError('');
     try {
       const image = file ? await prepareUploadImage(file) : undefined;
       const response = await dashboardRequest(`/api/marketing/workspace/image?postId=${encodeURIComponent(postId)}&revision=${view.revision}`, { method: file ? 'PUT' : 'DELETE', body: image });
@@ -79,7 +88,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
       setView(saved); setNotice('Đã cập nhật ảnh.');
       await reviewAfter('image', { postId }, saved);
     } catch (e) { setError((e as Error).message); }
-    finally { setBusy(false); }
+    finally { inflight.current = false; setBusy(false); }
   };
   if (!view) return <div className="mw-root">{error ? <div role="alert" className="mw-error">{error}<button className="btn btn-outline btn-sm" onClick={() => void load()}>Thử tải lại</button></div> : <p role="status">Đang tải Marketing…</p>}</div>;
   const campaigns = view.workspace.campaigns;
@@ -87,7 +96,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
   const filtered = view.workspace.reviews.filter(item => section === 'approvals' || item.campaignId === campaign?.id);
   return <div className="mw-root">
     {error && <div className="mw-error" role="alert">{error} <button className="btn btn-text btn-sm" onClick={() => void load()}>Tải dữ liệu mới</button></div>}
-    <p className="mw-status" aria-live="polite">{busy ? 'Đang xử lý yêu cầu…' : notice}</p>
+    <p className="mw-status" aria-live="polite">{busy ? <BusyStatus /> : notice}</p>
     <fieldset className="mw-body" disabled={busy}>
       {editing ? <CampaignBriefForm key={editing === 'new' ? 'new' : editing.id} view={view} initial={editing === 'new' ? undefined : editing} owner={session.userId || session.username} act={act} onClose={() => setEditing(null)} /> : <>
       {(section === 'composer' || section === 'approvals') && (view.workspace.reviewAttempts ?? []).filter(attempt => !attempt.appliedAt && !attempt.discardedAt && (attempt.targetPostId || attempt.status !== 'completed')).map(attempt => <section className="mw-item mw-review-attempt" key={attempt.id}>

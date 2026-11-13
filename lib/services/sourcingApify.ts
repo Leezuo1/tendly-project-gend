@@ -28,7 +28,8 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
     return {
       context: { industry: plan.industry, keywords, market: plan.market, period: plan.period, resultLimit: limit },
       actorInput: {
-        searchQueries: keywords, searchSection: '/video', resultsPerPage: limit,
+        // Apify's input schema defines resultsPerPage as "per hashtag, profile, or search query", so split it to keep the paid total near `limit`.
+        searchQueries: keywords, searchSection: '/video', resultsPerPage: Math.ceil(limit / Math.max(1, keywords.length)),
         proxyCountryCode: 'VN', videoSearchDateFilter: 'PAST_WEEK',
         shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false,
         shouldDownloadSlideshowImages: false, shouldDownloadAvatars: false, shouldDownloadMusicCovers: false,

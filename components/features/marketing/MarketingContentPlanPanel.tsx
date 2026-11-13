@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import type { MarketingCampaign, MarketingContentPlan, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
+import { BusyStatus } from './BusyStatus';
 import { ReviewDetails, ReviewSummary, REVIEW_STATUS } from './ReviewDetails';
 
 type Props = { view: MarketingWorkspaceView; campaign: MarketingCampaign; busy: boolean; error: string; openId: string; onOpen: (id: string) => void; onPostOpen: (id: string) => void; act: (action: string, input: object) => Promise<boolean> };
@@ -21,6 +22,7 @@ export function MarketingContentPlanPanel({ view, campaign, busy, error, openId,
   const run = async (action: string, input: object) => { if (await act(action, input)) setEditing(null); };
   return <section className="mw-plan-panel" data-unsaved={!!editing}>
     <div className="mw-section-head"><div><h3>Kế hoạch nội dung</h3><p>Trụ cột → heading và dàn ý → duyệt kế hoạch → viết bài.</p></div><button className="btn btn-primary btn-sm" disabled={busy || !campaign.approvedAt || !!editing} onClick={() => act('generatePlan', { campaignId: campaign.id })}>Lập kế hoạch bằng AI</button></div>
+    {editing && !plan && plans.some(p => p.id === editing.id) && <p className="mw-error" role="status">Bạn có bản sửa kế hoạch chưa lưu, nên các thao tác AI đang bị khóa. <button className="btn btn-text btn-sm" onClick={() => onOpen(editing.id)}>Tiếp tục sửa</button><button className="btn btn-text btn-sm" onClick={() => setEditing(null)}>Bỏ bản sửa</button></p>}
     {!plans.length && <p className="mw-empty">Chưa có kế hoạch. Duyệt brief rồi tạo trụ cột và dàn ý để bắt đầu.</p>}
     {plans.map(p => <div className="mw-plan-row" key={p.id}><div><b>{p.pillars.map(pillar => pillar.name).join(' · ')}</b><p className="mw-muted">{p.items.length} dàn ý · Phiên bản {p.version} · {p.campaignVersion !== campaign.version ? 'Brief đã thay đổi' : p.approvedAt ? 'Kế hoạch đã duyệt' : 'Chờ duyệt kế hoạch'}</p></div><button className="btn btn-outline btn-sm" disabled={!!editing && editing.id !== p.id} onClick={() => { setItemIndex(0); onOpen(p.id); }}>Xem dàn ý</button></div>)}
     <Modal open={!!plan} title="Dàn ý chi tiết" onClose={() => onOpen('')} width={1140} footer={<>
@@ -35,7 +37,7 @@ export function MarketingContentPlanPanel({ view, campaign, busy, error, openId,
       </>}
     </>}>
       {error && <p className="mw-error" role="alert">{error}</p>}
-      {busy && <p role="status">Đang xử lý…</p>}
+      {busy && <p role="status"><BusyStatus /></p>}
       {plan && item && <><div className="mw-detail-tabs" role="tablist" aria-label="Chi tiết nội dung"><button role="tab" aria-selected="true">Dàn ý</button><button role="tab" aria-selected="false" disabled={!post || busy || !!draft} onClick={() => { onOpen(''); onPostOpen(post!.postId); }}>Bài viết</button></div>
         <div className="mw-detail-layout"><div className="mw-detail-content" data-unsaved={!!draft}>
           <label>Bài trong kế hoạch<select disabled={busy} value={index} onChange={e => setItemIndex(Number(e.target.value))}>{plan.items.map((entry, i) => <option value={i} key={entry.id}>{i + 1}. {draft?.items[i].title ?? entry.title}</option>)}</select></label>

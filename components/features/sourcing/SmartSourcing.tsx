@@ -217,8 +217,9 @@ const METRIC_LABEL: Record<string, string> = { views: 'Lượt xem', likes: 'Th�
 const metricsText = (metrics: SourcingItem['metrics']) => metrics ? Object.entries(metrics).filter(([, value]) => value !== null).map(([key, value]) => `${number.format(value!)} ${METRIC_LABEL[key].toLocaleLowerCase('vi')}`).join(' · ') : '';
 const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
 
-const TREND_LABEL: Record<TrendStatus, string> = { early: 'Mới chớm', peaking: 'Đang bùng nổ', saturated: 'Bão hòa', entertainment: 'Trend ảo (chỉ giải trí)', unclear: 'Chưa đủ dữ liệu' };
-const intentText = (score: number | null) => score === null ? 'chưa đủ dữ liệu bình luận' : `${score}/10`;
+// Một lần chụp 7 ngày chưa chứng minh xu hướng tăng, nên nhãn nói "tín hiệu" thay vì kết luận.
+const TREND_LABEL: Record<TrendStatus, string> = { early: 'Tín hiệu mới chớm (1 lần chụp)', peaking: 'Tín hiệu mạnh (1 lần chụp)', saturated: 'Tín hiệu bão hòa (1 lần chụp)', entertainment: 'Chủ yếu giải trí, ít người hỏi mua', unclear: 'Chưa đủ dữ liệu' };
+const intentText = (score: number | null) => score === null ? 'chưa đủ dữ liệu bình luận' : `${score}/10 (tỉ lệ bình luận hỏi mua)`;
 const TIER_LABEL: Record<SupplierTier, string> = { factory: 'Xưởng sản xuất', wholesale: 'Tổng kho sỉ', distributor: 'Đại lý phân phối', unknown: 'Chưa rõ mô hình' };
 const HIDDEN = 'Không công khai trên web – cần liên hệ trực tiếp';
 const reportSources = (report: TikTokReport) => [report.trend.sources, report.buyingIntent.sources, ...[report.whyNow, report.specs, report.audience, report.price, report.drivers, report.hesitations, report.hooks, report.formats, report.keywords].flat().map(point => point.sources)].flat();
@@ -241,7 +242,7 @@ function AnalysisView({ analysis, items, kind, onTransfer }: { analysis: Sourcin
       <section><h3>1. Nhiệt độ trend & sức mua</h3>
         <dl className={styles.signals}>
           <div><dt>Trạng thái trend</dt><dd>{TREND_LABEL[report.trend.status]} {refs(report.trend.sources)}</dd>{report.trend.reason && <p>{report.trend.reason}</p>}</div>
-          <div><dt>Điểm sức mua</dt><dd>{intentText(report.buyingIntent.score)} {refs(report.buyingIntent.sources)}</dd>{report.buyingIntent.reason && <p>{report.buyingIntent.reason}</p>}</div>
+          <div><dt>Bình luận hỏi mua</dt><dd>{intentText(report.buyingIntent.score)} {refs(report.buyingIntent.sources)}</dd>{report.buyingIntent.reason && <p>{report.buyingIntent.reason}</p>}</div>
         </dl>
         {points("Lý do tạo sóng (Why now?)", report.whyNow)}
       </section>
@@ -320,13 +321,14 @@ function Transfer({ item, runId, kind, industry, owner, busy, work, onClose, onD
   const [sku, setSku] = useState('');
   const [name, setName] = useState(item.title.slice(0, 500));
   const [price, setPrice] = useState('');
+  const [description, setDescription] = useState(''); // do shop tự viết: văn bản cào về không đi thẳng vào danh mục mà AI Chat đọc
   return <section ref={panel} tabIndex={-1} className="card" aria-label="Xác nhận chuyển dữ liệu">
     <h2>{kind === 'product' ? 'Nhập sản phẩm mới' : 'Tạo brief ý tưởng nháp'}</h2><p>Nguồn: <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a></p>
     <form onSubmit={e => { e.preventDefault(); void work(async () => {
       const query = new URLSearchParams({ run: runId, item: item.key });
       const { item: source }: { item: SourcingItem } = await (await dashboardRequest(`/api/sourcing/requests?${query}`)).json();
       if (kind === 'product') {
-        await productApi.importSourced({ sku, name, price: Number(price), qty: 0, stockKnown: false, material: '', emoji: '📦', category: industry, sizes: [], colors: [], sourceName: source.source, sourceUrl: source.url, sourceUpdatedAt: source.collectedAt, description: source.text.slice(0, 2000) });
+        await productApi.importSourced({ sku, name, price: Number(price), qty: 0, stockKnown: false, material: '', emoji: '📦', category: industry, sizes: [], colors: [], sourceName: source.source, sourceUrl: source.url, sourceUpdatedAt: source.collectedAt, description: description.trim() });
         onDone('Đã thêm sản phẩm mới. Nhập tồn kho và kiểm tra thông tin trong FAQ & sản phẩm.');
       } else {
         const view = await marketingWorkspaceClient.read();
@@ -335,7 +337,7 @@ function Transfer({ item, runId, kind, industry, owner, busy, work, onClose, onD
       }
     }); }}>
       <fieldset className={styles.fields} disabled={busy}>
-        {kind === 'product' ? <><label className={styles.field}>SKU mới<input required maxLength={100} value={sku} onChange={e => setSku(e.target.value)} /></label><label className={styles.field}>Tên sản phẩm<input required maxLength={500} value={name} onChange={e => setName(e.target.value)} /></label><label className={styles.field}>Giá bán do shop xác nhận (VND)<input type="number" min="0" max="1000000000" required value={price} onChange={e => setPrice(e.target.value)} /></label><p>Tồn kho: chưa xác nhận · Lượng ban đầu: 0 · Giá nhập, size, màu: chưa có nguồn.</p></> : <p>Tên brief: Ý tưởng: {item.title}<br />Sản phẩm đang bán: chưa chọn · Ưu đãi: chưa có · Trạng thái: nháp, chờ shop hoàn thiện và duyệt.</p>}
+        {kind === 'product' ? <><label className={styles.field}>SKU mới<input required maxLength={100} value={sku} onChange={e => setSku(e.target.value)} /></label><label className={styles.field}>Tên sản phẩm<input required maxLength={500} value={name} onChange={e => setName(e.target.value)} /></label><label className={styles.field}>Giá bán do shop xác nhận (VND)<input type="number" min="0" max="1000000000" required value={price} onChange={e => setPrice(e.target.value)} /></label><label className={styles.field}>Mô tả sản phẩm (tự viết, có thể để trống; AI Chat sẽ đọc)<textarea rows={3} maxLength={2000} value={description} onChange={e => setDescription(e.target.value)} /></label><p>Tồn kho: chưa xác nhận · Lượng ban đầu: 0 · Giá nhập, size, màu: chưa có nguồn.</p></> : <p>Tên brief: Ý tưởng: {item.title}<br />Sản phẩm đang bán: chưa chọn · Ưu đãi: chưa có · Trạng thái: nháp, chờ shop hoàn thiện và duyệt.</p>}
         <div className={styles.actions}><button type="submit" className="btn btn-primary">{kind === 'product' ? 'Xác nhận nhập sản phẩm mới' : 'Xác nhận tạo brief nháp'}</button><button type="button" className="btn btn-outline" onClick={onClose}>Hủy</button><Link href={kind === 'product' ? '/cai-dat?tab=products' : '/marketing?tab=campaigns'}>Mở {kind === 'product' ? 'danh mục' : 'Marketing'} →</Link></div>
       </fieldset>
     </form>

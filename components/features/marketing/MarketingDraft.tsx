@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import type { MarketingWorkspaceView, ReviewedMarketingPost } from '@/lib/types/marketingWorkspace';
 import type { MarketingPost } from '@/lib/types/posts';
+import { BusyStatus } from './BusyStatus';
 import { ReviewDetails, ReviewSummary, REVIEW_STATUS } from './ReviewDetails';
 
 interface Props {
@@ -38,6 +39,7 @@ export function MarketingDraft({ post, meta, view, busy, error, open, onOpen, on
       {draft && meta.approvedAt && <button className="btn btn-primary btn-sm" disabled={busy || edit || !valid} onClick={() => confirm(account.mock ? 'Hoàn tất trên kênh mẫu?' : 'Đăng thật lên Facebook?', account.mock ? 'Mô phỏng bước đăng bằng nội dung đã duyệt; không gửi tới nền tảng.' : 'Nội dung đã duyệt sẽ được đăng lên Fanpage Facebook được kết nối.', () => act('publish', { postId: post.id }))}>{account.mock ? 'Chạy bước đăng mẫu' : 'Đăng Facebook'}</button>}
       {meta.publication === 'published' && (account.mock ? <span className="mw-chip">Đã hoàn tất mẫu</span> : <><a className="btn btn-outline btn-sm" href={meta.externalUrl} target="_blank" rel="noreferrer">Xem bài Facebook</a><button className="btn btn-outline btn-sm" onClick={() => onComments(meta.externalId!)}>Mở bình luận</button></>)}
       {(meta.publication === 'unknown' || meta.publication === 'publishing') && <p className="mw-error">{meta.publication === 'unknown' ? 'Chưa rõ kết quả gửi. Kiểm tra tài khoản trước khi xử lý lại.' : 'Đang gửi bài. Không bấm đăng lại.'}</p>}
+      {meta.publication === 'unknown' && <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => confirm('Bài chưa lên Facebook?', 'Chỉ xác nhận khi bạn đã mở Fanpage và chắc chắn bài này chưa được đăng. Nếu bài đã đăng mà xác nhận nhầm, bài có thể bị đăng trùng.', () => act('resolveUnknown', { postId: post.id }))}>Đã kiểm tra: bài chưa đăng</button>}
     </div>
     <Modal open={open} title="Chi tiết nội dung" onClose={onClose} width={1140} footer={<>
       <button className="btn btn-outline btn-sm" onClick={onClose}>Đóng</button>
@@ -49,7 +51,7 @@ export function MarketingDraft({ post, meta, view, busy, error, open, onOpen, on
       </>}
     </>}>
       {error && <p className="mw-error" role="alert">{error}</p>}
-      {busy && <p role="status">Đang xử lý…</p>}
+      {busy && <p role="status"><BusyStatus /></p>}
       <div className="mw-detail-tabs" role="tablist" aria-label="Chi tiết nội dung" onKeyDown={e => { if (!edit && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); setTab(tab === 'outline' ? 'post' : 'outline'); (e.currentTarget.querySelector(`[data-tab="${tab === 'outline' ? 'post' : 'outline'}"]`) as HTMLButtonElement)?.focus(); } }}><button role="tab" data-tab="outline" disabled={edit} tabIndex={tab === 'outline' ? 0 : -1} aria-selected={tab === 'outline'} aria-controls={`mw-detail-${post.id}`} onClick={() => setTab('outline')}>Dàn ý</button><button role="tab" data-tab="post" tabIndex={tab === 'post' ? 0 : -1} aria-selected={tab === 'post'} aria-controls={`mw-detail-${post.id}`} onClick={() => setTab('post')}>Bài viết</button></div>
       <div id={`mw-detail-${post.id}`} role="tabpanel" aria-label={tab === 'outline' ? 'Dàn ý' : 'Bài viết'} className="mw-detail-layout"><div className="mw-detail-content">
         {tab === 'outline' ? snapshot ? <><p className="mw-muted">{snapshot.pillar} · Phiên bản dàn ý đã dùng: {meta.plan?.version}</p>{!valid && <p className="mw-error">Đây là dàn ý đã dùng để viết bài. Cần đối chiếu với kế hoạch hiện hành trước khi duyệt lại.</p>}<h3>{snapshot.title}</h3><div className="mw-copy">{snapshot.outline}</div></> : <p>Bài cũ chưa có dàn ý. Chọn dàn ý đã duyệt rồi Review lại bài.</p> : <>

@@ -7,8 +7,11 @@ import { assertOperationAllowed } from '@/lib/services/appSecurity';
 
 const GRAPH_API_VERSION = 'v26.0';
 
-export class FacebookNotConfigured extends Error {}
-export class FacebookPublishFailed extends Error {}
+// `unsent` = the post provably never reached Facebook, so a caller may allow a retry instead of locking the post.
+export class FacebookNotConfigured extends Error { unsent = true; }
+export class FacebookPublishFailed extends Error {
+  constructor(message: string, public unsent = false) { super(message); }
+}
 
 export function facebookPublishConfigured(): boolean {
   return Boolean(process.env.PAGE_ACCESS_TOKEN?.trim() && /^\d{1,64}$/.test(process.env.PAGE_ID?.trim() ?? ''));
@@ -35,7 +38,7 @@ export async function publishToFacebookPage(
   }
 
   let res: Response;
-  await assertOperationAllowed();
+  try { await assertOperationAllowed(); } catch (error) { throw Object.assign(error as Error, { unsent: true }); }
   try {
     res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/${image ? 'photos' : 'feed'}`, {
       method: 'POST',
@@ -51,7 +54,8 @@ export async function publishToFacebookPage(
   const postId = typeof data.post_id === 'string' ? data.post_id : data.id;
   if (!res.ok || typeof postId !== 'string') {
     const reason = typeof data.error?.message === 'string' ? `: ${data.error.message.slice(0, 200)}` : '';
-    throw new FacebookPublishFailed(`Facebook từ chối đăng bài${reason}`);
+    // A 4xx is an explicit refusal; 5xx or a 200 without an id may still have created the post.
+    throw new FacebookPublishFailed(`Facebook từ chối đăng bài${reason}`, !res.ok && res.status < 500);
   }
   return { id: postId, url: `https://www.facebook.com/${postId}` };
 }

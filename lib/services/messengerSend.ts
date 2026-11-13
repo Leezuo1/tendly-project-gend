@@ -65,7 +65,8 @@ export async function sendMessengerMessage(input: SendMessengerInput,
         AND $6::bigint-j.sent_at<86400000
         AND j.message_id=(SELECT message_id FROM messenger_messages WHERE conversation_id=c.id ORDER BY sent_at DESC,message_id DESC LIMIT 1)
         AND NOT EXISTS(SELECT 1 FROM messenger_ai_jobs other WHERE other.conversation_id=c.id
-          AND other.message_id<>j.message_id AND other.status IN ('processing','review','sending','unknown') AND other.sent_at>COALESCE(c.last_out_at,0))`,
+          AND other.message_id<>j.message_id AND other.sent_at>COALESCE(c.last_out_at,0)
+          AND (other.status IN ('review','sending','unknown') OR (other.status='processing' AND other.updated_at>=$6::bigint-120000)))`,
       [pageId, JSON.stringify([pageId, input.psid]), messageId, settingsVersion, conversationVersion, Date.now()]);
       if (!allowed.rows.length) throw new AutomationStoppedError();
       const sources = await readConversationSources(pageId, input.psid, messageId, db);

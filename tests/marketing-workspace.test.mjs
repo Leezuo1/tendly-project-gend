@@ -22,7 +22,7 @@ async function fixture() {
   const pg = mem.adapters.createPg();
   const pool = new pg.Pool();
   let publishes = 0;
-  let failPublication = false, failReview = false;
+  let failPublication = false, failUnsent = false, failReview = false;
   let reviewHook;
   let reviewContent = 'Giá 221.000đ, nhắn tin để tư vấn.';
   let outlineReview;
@@ -31,7 +31,7 @@ async function fixture() {
   const load = file => {
     if (file === 'lib/services/appSecurity.ts') return { assertOperationAllowed: async () => {}, runAutomaticAccess: (_at, fn) => fn() };
     if (file === 'lib/services/messengerPostgres.ts') return { getMessengerPool: () => pool };
-    if (file === 'lib/services/facebookPage.ts') return { publishToFacebookPage: async () => { publishes++; if (failPublication) throw new Error('Connection lost after send'); return { id: '123_456', url: 'https://www.facebook.com/123_456' }; } };
+    if (file === 'lib/services/facebookPage.ts') return { publishToFacebookPage: async () => { publishes++; if (failPublication) throw Object.assign(new Error('Connection lost after send'), failUnsent ? { unsent: true } : {}); return { id: '123_456', url: 'https://www.facebook.com/123_456' }; } };
     if (file === 'lib/services/gemini.ts') return { generateGeminiJson: async options => {
       calls.push(options);
       if (options.schema.properties.pillars) return { result: options.parse(JSON.stringify({ pillars: [{ name: 'Product value', objective: 'Explain benefits' }], items: [{ pillarIndex: 0, title: 'Product guide', outline: 'Opening: customer need.\nDetails: product facts.\nCTA: inbox.' }] })), model: 'test-plan' };
@@ -69,7 +69,7 @@ async function fixture() {
     return { id: created.id, version: created.version, itemId: created.items[0].id };
   };
   return { load, service, briefApi, config, knowledge, brief, act, state, plan, pool, publishes: () => publishes, calls,
-    onReview: hook => { reviewHook = hook; }, failPublication: () => { failPublication = true; }, failReview: () => { failReview = true; }, restoreReview: () => { failReview = false; }, setReviewContent: content => { reviewContent = content; }, setOutlineReview: content => { outlineReview = content; } };
+    onReview: hook => { reviewHook = hook; }, failPublication: (unsent = false) => { failPublication = true; failUnsent = unsent; }, failReview: () => { failReview = true; }, restoreReview: () => { failReview = false; }, setReviewContent: content => { reviewContent = content; }, setOutlineReview: content => { outlineReview = content; } };
 }
 
 test('brief validation and finite weekly preview handle missing data, date limits and offer validity', async () => {
@@ -221,6 +221,28 @@ test('Review failure does not return/save an unreviewed draft, ambiguous Faceboo
   assert.equal((await g.state()).workspace.reviews[0].publication, 'unknown');
   await assert.rejects(() => g.service.publishMarketingPost('123', postId), /không gửi lại/);
   assert.equal(g.publishes(), 1);
+});
+
+test('a provably unsent failure keeps the post publishable; owner can clear an unknown outcome', async () => {
+  const approved = async unsent => {
+    const g = await fixture();
+    await g.act('campaign', { brief: { ...g.brief, accountId: '123' }, knowledge: g.knowledge, configuration: g.config });
+    const id = (await g.state()).workspace.campaigns[0].id;
+    await g.act('approveCampaign', { id }); await g.act('generate', { campaignId: id, plan: await g.plan(id) });
+    const postId = (await g.state()).workspace.reviews[0].postId;
+    await g.act('approvePost', { postId }); g.failPublication(unsent);
+    await assert.rejects(() => g.act('publish', { postId }), /Connection lost/);
+    // act() keeps a stale revision after a rejected publish, so resolve with the live one.
+    return { postId, publication: async () => (await g.state()).workspace.reviews[0].publication,
+      resolve: async () => g.service.marketingWorkspaceAction('123', 'owner', (await g.state()).revision, 'resolveUnknown', { postId }) };
+  };
+  const unsent = await approved(true);
+  assert.equal(await unsent.publication(), 'draft');
+  await assert.rejects(() => unsent.resolve(), /chưa rõ kết quả/);
+  const unknown = await approved(false);
+  assert.equal(await unknown.publication(), 'unknown');
+  await unknown.resolve();
+  assert.equal(await unknown.publication(), 'draft');
 });
 
 test('image changes require new Review and scheduling worker processes each due slot once', async () => {

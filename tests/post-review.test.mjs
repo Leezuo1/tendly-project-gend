@@ -51,6 +51,19 @@ test('Review rejects unstable IDs, invented refs, incorrect changes and unusable
   assert.equal(blocked.status, 'needs_input'); assert.equal(blocked.finalDraft, null); assert.equal(blocked.issues[0].severity, 'blocking');
 });
 
+test('Review ignores whitespace and hashtag-format drift in changes but still rejects real edits', () => {
+  const f = fixture(), original = { ...draft('Áo cotton'), hashtags: ['#ao', '#sale'] }, e = evidence(f, original);
+  const parse = changes => f.parseMarketingReview(JSON.stringify({ variants: [item(original, { status: 'corrected', changes })] }), [original], e, 'facebook')[0];
+  const result = parse([{ field: 'hashtags', before: 'ao sale', after: 'SALE ao', reason: 'x', sourceIds: [] }, { field: 'content', before: 'Áo  cotton ', after: 'Áo cotton', reason: 'x', sourceIds: [] }]);
+  assert.equal(result.status, 'unchanged'); assert.deepEqual(result.changes, []);
+  assert.throws(() => parse([{ field: 'content', before: 'Áo cotton', after: 'Áo cotton mới', reason: 'x', sourceIds: [] }]), /không khớp/);
+  // More tags than the draft keeps: the model's "after" lists 10, the parsed draft is capped at 8.
+  const many = Array.from({ length: 10 }, (_, i) => `#t${i}`);
+  const capped = f.parseMarketingReview(JSON.stringify({ variants: [item(original, { status: 'corrected', finalDraft: { ...original, hashtags: many },
+    changes: [{ field: 'hashtags', before: '#ao #sale', after: many.join(' '), reason: 'x', sourceIds: [] }] })] }), [original], e, 'facebook')[0];
+  assert.equal(capped.status, 'corrected'); assert.equal(capped.changes.length, 1);
+});
+
 test('code validates exact money and URLs without treating missing stock or source as confirmation', () => {
   const f = fixture(), original = draft(), e = evidence(f, original);
   assert.deepEqual(f.validateReviewedDraft(draft('Áo giá 221.000đ, phí ship 30.000đ.'), e, 'facebook'), []);
