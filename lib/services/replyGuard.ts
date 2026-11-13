@@ -21,7 +21,7 @@ export function unsupportedReplyReason(reply: string, known: string): string | n
   const allowedUrls = new Set(urls(known));
   if (urls(reply).some(url => !allowedUrls.has(url))) return 'Câu trả lời có đường dẫn không nằm trong dữ liệu của shop.';
   // Structured data (JSON prices, flashPrice, order totals) has no unit, so every number the shop supplied counts as an allowed amount.
-  const allowed = new Set([...vndAmounts(known), ...(known.match(/(?<![\p{L}\p{N}])\d[\d.,]*(?![\p{L}])/gu) ?? []).map(n => Number(n.replace(/[.,]/g, '')))]);
+  const allowed = new Set([...vndAmounts(known), ...(known.match(/(?<![\p{L}\p{N}])\d[\d.,]*(?![\p{L}\p{N}])/gu) ?? []).map(n => Number(n.replace(/[.,]/g, '')))]);
   if (vndAmounts(reply).some(amount => !allowed.has(amount))) return 'Câu trả lời nêu số tiền không có trong danh mục, FAQ hoặc đơn của khách.';
   return null;
 }

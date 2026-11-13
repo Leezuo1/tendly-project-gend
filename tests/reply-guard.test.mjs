@@ -19,6 +19,7 @@ test('a reply is held when it echoes masked data, or has a link or amount the sh
   assert.equal(unsupportedReplyReason('Áo 221.000đ ạ', JSON.stringify([{ price: 221000 }])), null, 'catalog price (a bare JSON number) is allowed');
   assert.equal(unsupportedReplyReason('Flash sale còn 199k', JSON.stringify({ sources: [{ flashPrice: 199000, flashActive: true }] })), null, 'an amount that only appears in sources is allowed');
   assert.match(unsupportedReplyReason('Giảm còn 99k', known), /số tiền/);
+  assert.match(unsupportedReplyReason('Giảm còn 99.000đ', JSON.stringify({ fingerprint: '990001ab' })), /số tiền/, 'digits inside ids do not allow an amount');
   assert.match(unsupportedReplyReason('Mua tại https://evil.example/x', known), /đường dẫn/);
   assert.match(unsupportedReplyReason('Em gọi [SĐT] nhé', known), /che/);
   assert.equal(unsupportedReplyReason('Dạ shop mở cửa lúc 8 giờ ạ', known), null);

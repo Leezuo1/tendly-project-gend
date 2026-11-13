@@ -142,7 +142,7 @@ test('a reply with a price or link the shop never gave is held for review instea
   assert.equal(f.state.sends, 0);
 });
 
-test('an invented amount alone (no link) also holds the reply, while a price from the shop data is sent', async () => {
+test('an invented amount alone (no link) also holds the reply', async () => {
   const f = await aiFixture(true);
   await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
   await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
