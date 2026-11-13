@@ -132,7 +132,7 @@ export function buildPostPrompt(request: PostGenerationRequest, knowledge: AiKno
   return { system, user };
 }
 
-function cleanHashtags(value: unknown): string[] {
+export function cleanHashtags(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const tags = value
     .filter((tag): tag is string => typeof tag === 'string')

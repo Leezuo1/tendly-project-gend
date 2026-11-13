@@ -65,7 +65,11 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
       }
       return true;
     }
-    catch (e) { setError((e as Error).message); return false; }
+    catch (e) {
+      // A failed publish still changes server state (draft/unknown), so reload it or the card and revision stay stale.
+      if (action === 'publish') await load();
+      setError((e as Error).message); return false;
+    }
     finally { setBusy(false); }
   };
   const confirm: Ask = (title, message, action) => setApproval({ title, message, action });

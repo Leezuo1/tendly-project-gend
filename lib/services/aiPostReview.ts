@@ -1,4 +1,4 @@
-import { buildPostPrompt, parsePostOutput, POST_RESPONSE_SCHEMA } from '@/lib/services/aiPost';
+import { buildPostPrompt, cleanHashtags, parsePostOutput, POST_RESPONSE_SCHEMA } from '@/lib/services/aiPost';
 import { generateGeminiJson } from '@/lib/services/gemini';
 import { effectiveAiRules } from '@/lib/services/aiConfiguration';
 import { MarketingWorkflowError, MARKETING_POST_GOALS } from '@/lib/services/marketingBrief';
@@ -19,6 +19,12 @@ export const MARKETING_REVIEW_SCHEMA = { type: 'object', properties: { variants:
 } } }, required: ['variants'], additionalProperties: false };
 
 const fieldValue = (draft: GeneratedPostDraft, key: ReviewField) => key === 'hashtags' ? draft.hashtags.join(' ') : draft[key];
+// Compare fields ignoring whitespace; hashtags go through the same cleaning as the parsed draft (adds "#", dedups, caps the count), then ignore case and order.
+const same = (field: ReviewField, a: string, b: string) => {
+  const clean = (value: string) => field === 'hashtags' ? cleanHashtags(value.split(/\s+/)).map(tag => tag.toLowerCase()).sort().join(' ')
+    : value.normalize('NFC').replace(/\s+/g, ' ').trim();
+  return clean(a) === clean(b);
+};
 export function parseMarketingReview(output: string, originals: GeneratedPostDraft[], evidence: ReviewEvidence, channel: string): ReviewedVariant[] {
   const data = JSON.parse(output);
   if (!Array.isArray(data?.variants) || data.variants.length !== originals.length) throw new Error('Review trả thiếu phương án.');
@@ -45,7 +51,8 @@ export function parseMarketingReview(output: string, originals: GeneratedPostDra
       if (!fields.includes(field) || changed.has(field) || !finalDraft) throw new Error('Trường sửa không hợp lệ.');
       changed.add(field);
       const before = text(change.before, 6000), after = text(change.after, 6000), reason = text(change.reason, 1000);
-      if (!reason.trim() || before !== fieldValue(original, field) || after !== fieldValue(finalDraft, field) || before === after) throw new Error('Phần sửa không khớp bản gốc/cuối.');
+      if (!reason.trim() || !same(field, before, fieldValue(original, field)) || !same(field, after, fieldValue(finalDraft, field))) throw new Error('Phần sửa không khớp bản gốc/cuối.');
+      if (same(field, before, after)) return null; // cosmetic only: not a change worth showing or blocking on
       const sourceIds = refs(change.sourceIds);
       if (JSON.stringify(reviewMoneyAmounts(before)) !== JSON.stringify(reviewMoneyAmounts(after))) {
         const cited = evidence.sources.filter(source => sourceIds.includes(source.id) && ['product', 'offer', 'faq'].includes(source.kind));
@@ -53,8 +60,8 @@ export function parseMarketingReview(output: string, originals: GeneratedPostDra
         if (!cited.length || reviewMoneyAmounts(after).some(amount => !amounts.has(amount))) throw new Error('Thay đổi số tiền thiếu tham chiếu căn cứ phù hợp.');
       }
       return { field, before, after, reason, sourceIds };
-    });
-    if (finalDraft && fields.some(field => fieldValue(original, field) !== fieldValue(finalDraft, field) && !changed.has(field))) throw new Error('Review thiếu giải thích thay đổi.');
+    }).filter((change: unknown): change is NonNullable<typeof change> => change !== null);
+    if (finalDraft && fields.some(field => !same(field, fieldValue(original, field), fieldValue(finalDraft, field)) && !changed.has(field))) throw new Error('Review thiếu giải thích thay đổi.');
     if (raw.status === 'unchanged' && changes.length) throw new Error('Trạng thái unchanged mâu thuẫn bản sửa.');
     const issues: ReviewIssue[] = raw.issues.map((issue: Record<string, unknown>) => {
       if (!issue || !['missing_source', 'conflict', 'unsupported_claim', 'scope', 'format'].includes(String(issue.type)) || !['blocking', 'warning'].includes(String(issue.severity)) || (issue.field !== '' && !fields.includes(issue.field as ReviewField))) throw new Error('Vấn đề Review không hợp lệ.');

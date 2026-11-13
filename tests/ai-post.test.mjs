@@ -184,7 +184,7 @@ test('Postgres posts: migration is re-runnable, drafts editable, published posts
 test('Facebook publish sends the token in the body, not the URL, and surfaces Graph errors', async () => {
   const fb = loadModules()('lib/services/facebookPage.ts');
   delete process.env.PAGE_ACCESS_TOKEN;
-  await assert.rejects(fb.publishToFacebookPage('hi'), fb.FacebookNotConfigured);
+  await assert.rejects(fb.publishToFacebookPage('hi'), e => e instanceof fb.FacebookNotConfigured && e.unsent === true);
 
   process.env.PAGE_ID = '12345';
   process.env.PAGE_ACCESS_TOKEN = 'page-token';
@@ -199,7 +199,13 @@ test('Facebook publish sends the token in the body, not the URL, and surfaces Gr
   assert.match(calls[0].body, /access_token=page-token/);
 
   globalThis.fetch = async () => Response.json({ error: { message: 'Missing pages_manage_posts' } }, { status: 403 });
-  await assert.rejects(fb.publishToFacebookPage('x'), /pages_manage_posts/);
+  await assert.rejects(fb.publishToFacebookPage('x'), e => /pages_manage_posts/.test(e.message) && e.unsent === true); // 4xx: refused, nothing posted
+
+  // 5xx or a 200 without an id may still have created the post, so it must stay "unknown".
+  globalThis.fetch = async () => Response.json({ error: { message: 'oops' } }, { status: 500 });
+  await assert.rejects(fb.publishToFacebookPage('x'), e => e.unsent === false);
+  globalThis.fetch = async () => Response.json({});
+  await assert.rejects(fb.publishToFacebookPage('x'), e => e.unsent === false);
 });
 
 // Ảnh nhỏ nhất đủ magic bytes để nhận diện định dạng.
