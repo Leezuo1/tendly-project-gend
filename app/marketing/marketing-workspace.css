@@ -1,5 +1,6 @@
 .marketing-root .mw-main-nav { display: flex; flex-wrap: wrap; gap: 4px 22px; border-bottom: 1px solid var(--line); }
 .marketing-root .mw-main-nav button, .marketing-root .mw-tool-nav button { background: none; border: 0; color: var(--ink-soft); font: inherit; font-size: 13px; cursor: pointer; padding: 12px 2px; min-height: 44px; }
+.marketing-root .mw-main-nav button { font-size: 15px; }
 .marketing-root .mw-main-nav button[aria-current] { color: var(--ink); border-bottom: 2px solid var(--coral); font-weight: 650; }
 .marketing-root .mw-tool-nav { margin: 18px 0; font-size: 12px; color: var(--ink-soft); }
 .marketing-root .mw-tool-nav summary { cursor: pointer; min-height: 32px; }
@@ -69,7 +70,7 @@
 .marketing-root .mw-schedules > form > button { margin-top: 20px; }
 @media (max-width: 880px) {
   .marketing-root .mw-main-nav { gap: 0 14px; }
-  .marketing-root .mw-main-nav button { flex: 1 0 25%; font-size: 12px; }
+  .marketing-root .mw-main-nav button { flex: 1 0 25%; font-size: 14px; }
   .marketing-root .mw-form-grid, .marketing-root .mw-product-picker, .marketing-root .mw-slot { grid-template-columns: minmax(0,1fr); }
   .marketing-root .mw-item, .marketing-root .mw-editor { padding: 18px 16px; }
   .marketing-root .mw-section-head h2 { font-size: 19px; }
