@@ -1,4 +1,4 @@
-import { normalizeSourcingPosts, prepareSourcingSearch, SourcingInputError, type SourcingComment } from '@/lib/services/sourcingSearch';
+import { hotScore, normalizeSourcingPosts, prepareSourcingSearch, SourcingInputError, type SourcingComment } from '@/lib/services/sourcingSearch';
 import type { SupplierCandidate } from '@/lib/types/sourcing';
 
 export type SourcingKind = 'tiktok' | 'suppliers';
@@ -129,7 +129,15 @@ export function groupTikTokComments(items: unknown[], datasets: Record<string, u
   return byVideo;
 }
 
-export function normalizeTikTok(items: unknown[], period: { from: string; to: string }, now = new Date(), comments = new Map<string, SourcingComment[]>()) {
+/** Tìm theo từ khóa tiếng Việt vẫn trả video nước ngoài. Giữ video tiếng Việt, hoặc caption chỉ có hashtag/ký hiệu ("un") đăng từ VN; thiếu field thì giữ (Actor đổi schema không làm mất hết dữ liệu).
+ * shortcut: tin nhãn ngôn ngữ của TikTok nên caption hashtag-only đăng từ VN vẫn lọt dù lạc ngành; ngành do AI loại. */
+export function isVietnamese(raw: Record<string, unknown>) {
+  const lang = text(raw.textLanguage), place = text(raw.locationCreated);
+  return lang === 'vi' || ((!lang || lang === 'un') && (!place || place === 'VN'));
+}
+
+export function normalizeTikTok(allItems: unknown[], period: { from: string; to: string }, now = new Date(), comments = new Map<string, SourcingComment[]>()) {
+  const items = allItems.filter(item => isVietnamese(record(item)));
   const normalized = normalizeSourcingPosts(items.map(item => {
     const raw = record(item);
     const author = record(raw.authorMeta);
@@ -145,10 +153,13 @@ export function normalizeTikTok(items: unknown[], period: { from: string; to: st
     };
   }), now);
   const from = Date.parse(period.from), to = Date.parse(period.to);
-  const posts = normalized.posts.filter(post => post.publishedAt && Date.parse(post.publishedAt) >= from && Date.parse(post.publishedAt) < to);
+  // Xếp theo điểm hot trước khi cắt theo giới hạn; thứ tự S1, S2… của báo cáo AI chính là thứ hạng này.
+  const posts = normalized.posts.filter(post => post.publishedAt && Date.parse(post.publishedAt) >= from && Date.parse(post.publishedAt) < to)
+    .sort((a, b) => hotScore(b, now.getTime()) - hotScore(a, now.getTime()));
   return {
     ...normalized, posts,
     excludedByDateCount: normalized.posts.length - posts.length,
+    excludedByLanguageCount: allItems.length - items.length,
     coverage: 'sample' as const,
     message: 'Mẫu bài TikTok theo truy vấn và proxy VN; không bảo đảm tác giả/người xem ở Việt Nam. Chưa phân tích AI hoặc xác nhận xu hướng.',
   };

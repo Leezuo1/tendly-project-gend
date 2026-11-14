@@ -2,24 +2,30 @@ import { industries } from '@/lib/data/workspace';
 
 // Seed queries guide collection; they are not measured trends or AI recommendations.
 const seedKeywords: Record<string, string[]> = {
-  'Thời trang & phụ kiện': ['thời trang', 'phối đồ', 'phụ kiện thời trang'],
-  'Mỹ phẩm & làm đẹp': ['mỹ phẩm', 'chăm sóc da', 'trang điểm'],
-  'Nhà cửa & đời sống': ['đồ gia dụng', 'trang trí nhà', 'đồ dùng tiện ích'],
-  'Thực phẩm & đồ uống': ['đồ ăn', 'đồ uống', 'ăn vặt'],
-  'Điện tử & công nghệ': ['đồ công nghệ', 'phụ kiện điện thoại', 'thiết bị thông minh'],
+  'Thời trang & phụ kiện': ['thời trang hot trend', 'review quần áo đáng mua', 'phụ kiện thời trang hot'],
+  'Mỹ phẩm & làm đẹp': ['mỹ phẩm hot trend', 'review skincare đáng mua', 'trang điểm hot'],
+  'Nhà cửa & đời sống': ['đồ gia dụng hot trend', 'review đồ tiện ích đáng mua', 'trang trí nhà hot'],
+  'Thực phẩm & đồ uống': ['đồ ăn vặt hot trend', 'review đồ uống đáng thử', 'đồ ăn hot'],
+  'Điện tử & công nghệ': ['đồ công nghệ hot trend', 'review phụ kiện điện thoại đáng mua', 'thiết bị thông minh hot'],
 };
 
 export class SourcingInputError extends Error {}
 
-/** Truy vấn TikTok bám ngành hàng của shop: từ khóa chưa nhắc tới sản phẩm/ngành thì ghép với sản phẩm quan tâm hoặc từ khóa chính của ngành. */
+/** Truy vấn TikTok: không tự ghép từ khóa của ngành vào từ khóa người dùng (ra truy vấn lạ như "mỹ phẩm áo polo"); chỉ ghép sản phẩm quan tâm khi từ khóa chưa nhắc tới nó. */
 export function scopedTiktokQueries(industry: string, keywords: string[], product = '') {
-  const seeds = seedKeywords[industry] ?? [];
   const terms = keywords.map(keyword => keyword.trim()).filter(Boolean);
-  if (!terms.length) return product.trim() ? [product.trim()] : [...seeds];
+  const anchor = product.trim();
+  if (!terms.length) return anchor ? [anchor] : [...(seedKeywords[industry] ?? [])];
   const lower = (text: string) => text.toLocaleLowerCase('vi');
-  const anchor = product.trim() || seeds[0] || '';
-  const scoped = (keyword: string) => !anchor || [anchor, ...seeds].some(term => lower(keyword).includes(lower(term)));
-  return [...new Set(terms.map(keyword => scoped(keyword) ? keyword : `${anchor} ${keyword}`.slice(0, 120)))];
+  return [...new Set(terms.map(keyword => !anchor || lower(keyword).includes(lower(anchor)) ? keyword : `${anchor} ${keyword}`.slice(0, 120)))];
+}
+
+/** Điểm "hot" đo bằng code: lượt xem mỗi giờ từ lúc đăng (tối thiểu 6 giờ để video vừa đăng không vọt lên) nhân với tỉ lệ tương tác. Thiếu số liệu = 0. */
+export function hotScore(post: { publishedAt: string | null; metrics: { views: number | null; likes: number | null; comments: number | null; shares: number | null } }, now = Date.now()) {
+  const { views, likes, comments, shares } = post.metrics;
+  if (!views || !post.publishedAt) return 0;
+  const hours = Math.max(6, (now - Date.parse(post.publishedAt)) / 3_600_000);
+  return (views / hours) * (1 + Math.min(1, ((likes ?? 0) + (comments ?? 0) + (shares ?? 0)) / views));
 }
 
 export function prepareSourcingSearch(input: Record<string, unknown>, now = new Date()) {

@@ -1,9 +1,21 @@
-import { SourcingInputError } from '@/lib/services/sourcingSearch';
+import { hotScore, SourcingInputError } from '@/lib/services/sourcingSearch';
 import type { SourcingCriteria, SourcingItem, SourcingRun } from '@/lib/types/sourcing';
 
 export function defaultSourcingCriteria(industry = ''): SourcingCriteria {
   return { industry, kind: 'tiktok', keywords: [], product: '', minPrice: null, maxPrice: null, currency: 'VND', unit: 'sản phẩm',
     quantity: null, maxMoq: null, region: 'Việt Nam', required: '', excluded: '', quality: '', leadTime: '', audience: '', resultLimit: 20 };
+}
+/** Từ khóa mặc định từ danh mục của shop: tối đa 3 loại sản phẩm nhiều nhất (bỏ nhãn ngành do nhập từ Smart Sourcing). Từ chung của ngành như "thời trang" chỉ ra video rác.
+ * samples: id → JSON của sản phẩm mẫu seed; sản phẩm mẫu chưa chỉnh sửa bị bỏ vì seed luôn là thời trang, bất kể ngành của shop. */
+export function catalogKeywords(products: { id: string; category: string }[], industries: string[] = [], samples = new Map<string, string>()) {
+  const counts = new Map<string, number>();
+  for (const product of products) {
+    if (samples.get(product.id) === JSON.stringify(product)) continue;
+    const { category } = product;
+    const name = category.replace(/[^\p{L}\p{N} .,()&+%\/-]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (name.length >= 2 && !industries.includes(name)) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name]) => name);
 }
 export function parseSourcingCriteria(value: unknown): SourcingCriteria {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new SourcingInputError('Tiêu chí tìm nguồn không hợp lệ.');
@@ -32,10 +44,34 @@ export function parseSourcingCriteria(value: unknown): SourcingCriteria {
 // Một số Actor trả emoji dạng chuỗi thoát (backslash-u + 4 số hex); giải mã để hiển thị đúng.
 export const decodeEscapes = (text: string) => text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
 
+// Bỏ dấu + gộp liền để "#aothun" khớp "áo thun"; bỏ từ đệm của từ khóa mặc định để "#hottrend" không tính là khớp.
+const FILLER = new Set(['hot', 'trend', 'review', 'dang', 'mua', 'thu']);
+const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/** Cụm khớp: cả từ khóa và từng cặp từ liền kề (đã bỏ từ đệm), cách nhau bằng dấu cách. */
+export function keywordTerms(keywords: unknown) {
+  const terms = new Set<string>();
+  for (const keyword of Array.isArray(keywords) ? keywords : []) {
+    const words = fold(String(keyword)).split(' ').filter(word => word && !FILLER.has(word));
+    if (words.length === 1 && words[0].length >= 3) terms.add(words[0]);
+    if (words.length > 1) terms.add(words.join(' '));
+    for (let i = 0; i + 1 < words.length; i++) terms.add(`${words[i]} ${words[i + 1]}`);
+  }
+  return [...terms];
+}
+/** Khớp theo từ nguyên vẹn trong caption; hashtag không có dấu cách nên so chuỗi liền ("#aothun" khớp "áo thun"). */
+export function matchesTerms(text: string, terms: string[]) {
+  const spaced = ` ${fold(text)} `, tags = (text.match(/#[^\s#]+/g) ?? []).map(tag => fold(tag).replace(/ /g, ''));
+  return terms.some(term => spaced.includes(` ${term} `) || tags.some(tag => tag.includes(term.replace(/ /g, ''))));
+}
+
 export function sourcingItems(run: SourcingRun): SourcingItem[] {
   if (!['succeeded', 'empty'].includes(run.status) || !run.result) return [];
-  return run.kind === 'tiktok' ? (run.result.posts ?? []).map(post => { const text = decodeEscapes(post.text); return { key: JSON.stringify([post.source, post.externalId]), title: text.split('\n')[0].slice(0, 160), text,
-    url: post.url, source: post.source, collectedAt: post.collectedAt, metrics: post.metrics, comments: post.topComments ?? [], price: null, currency: null, unit: null, moq: null, region: null }; })
+  // Sắp ở đây (không chỉ lúc thu thập) để lượt cũ cũng ra đúng thứ hạng S1, S2…: bài khớp từ khóa tìm kiếm trước, rồi theo điểm hot.
+  // shortcut: khớp theo chữ nên chỉ là sắp xếp mềm (không loại bài); lọc cứng khi dữ liệu cho thấy bài lạc ngành vẫn chiếm top.
+  const terms = run.kind === 'tiktok' ? keywordTerms(run.context.keywords) : [];
+  return run.kind === 'tiktok' ? [...(run.result.posts ?? [])].sort((a, b) => Number(matchesTerms(b.text, terms)) - Number(matchesTerms(a.text, terms))
+    || hotScore(b, Date.parse(b.collectedAt)) - hotScore(a, Date.parse(a.collectedAt))).map(post => { const text = decodeEscapes(post.text); return { key: JSON.stringify([post.source, post.externalId]), title: text.split('\n')[0].slice(0, 160), text,
+    url: post.url, source: post.source, collectedAt: post.collectedAt, author: post.authorId, metrics: post.metrics, comments: post.topComments ?? [], price: null, currency: null, unit: null, moq: null, region: null }; })
     : (run.result.candidates ?? []).map(item => ({ key: JSON.stringify(['google', item.url]), title: decodeEscapes(item.title), text: decodeEscapes(item.description), url: item.url,
       source: 'google', collectedAt: item.collectedAt || new Date(run.updatedAt).toISOString(), page: item.page ?? '', price: item.price ?? null, currency: item.currency ?? null, unit: item.unit ?? null, moq: item.moq ?? null, region: item.region ?? null }));
 }

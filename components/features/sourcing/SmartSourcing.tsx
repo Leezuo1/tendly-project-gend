@@ -9,7 +9,9 @@ import { readPageAiProfile } from '@/lib/services/aiSettingsClient';
 import { currentAiKnowledge } from '@/lib/services/aiChat';
 import { productApi } from '@/lib/services/api';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
-import { defaultSourcingCriteria, sourcingItems } from '@/lib/services/sourcingCriteria';
+import { catalogKeywords, defaultSourcingCriteria, sourcingItems } from '@/lib/services/sourcingCriteria';
+import { industries } from '@/lib/data/workspace';
+import { createSeed } from '@/lib/data/admin';
 import { Modal } from '@/components/ui/Modal';
 import type { SourcingAnalysis, SourcingCriteria, SourcingDecision, SourcingItem, SourcingPoint, SourcingRequest, SourcingRun, SupplierTier, TikTokReport, TrendStatus } from '@/lib/types/sourcing';
 import styles from './sourcing.module.css';
@@ -94,7 +96,14 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
     finally { inFlight.current = false; setBusy(false); }
   };
   const prepare = () => work(async () => {
-    const next = await api({ action: 'prepare', criteria, ...(selected && !selected.runId ? { id: selected.id, revision: selected.revision } : {}) });
+    let sent = criteria;
+    // Không nhập gì thì tìm theo loại sản phẩm trong danh mục của shop; chưa có danh mục (hoặc lỗi đọc) thì server dùng từ khóa gợi ý của ngành.
+    if (criteria.kind === 'tiktok' && !criteria.product.trim() && !criteria.keywords.length) {
+      const samples = new Map(createSeed().products.map(product => [product.id, JSON.stringify(product)]));
+      const fromCatalog = catalogKeywords(await productApi.list().catch(() => []), industries, samples);
+      if (fromCatalog.length) sent = { ...criteria, keywords: fromCatalog };
+    }
+    const next = await api({ action: 'prepare', criteria: sent, ...(selected && !selected.runId ? { id: selected.id, revision: selected.revision } : {}) });
     setView(next); setSelectedId(next.id!); setCriteria(next.requests.find(r => r.id === next.id)!.criteria);
   });
   const collect = () => work(async () => {
@@ -125,7 +134,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   return <>
     <div className={styles.context}>
       <span><strong>{shopName}</strong> · {industry}</span>
-      <span>Truy vấn được gắn ngành hàng này để kết quả đúng chủ đề.</span>
+      <span>Tìm theo sản phẩm, từ khóa bạn nhập hoặc loại sản phẩm trong danh mục của shop; bài khớp từ khóa được xếp lên trước.</span>
       <Link href="/cau-hinh-ai?tab=settings&ai=sourcing"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>Quy tắc AI Smart Sourcing</Link>
     </div>
     {error && <p role="alert" className={styles.error}>{error} <button className="btn btn-outline btn-sm" onClick={() => work(async () => { await load(); })}>Tải lại</button></p>}
@@ -140,7 +149,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
               {([['tiktok', 'Khám phá sản phẩm', 'Video TikTok 7 ngày gần nhất'], ['suppliers', 'Tìm nhà cung cấp', 'Kết quả tìm kiếm Google']] as const).map(([kind, label, hint]) => <button key={kind} type="button" role="radio" aria-checked={criteria.kind === kind} onClick={() => change('kind', kind)}><strong>{label}</strong><small>{hint}</small></button>)}
             </div>
             <label className={styles.field}>Sản phẩm quan tâm{isSupplier ? '' : ' (không bắt buộc)'}<input required={isSupplier} maxLength={120} value={criteria.product} onChange={e => change('product', e.target.value)} placeholder="Ví dụ: áo thun cotton" /></label>
-            {!isSupplier && <label className={styles.field}>Từ khóa khám phá<input maxLength={362} value={criteria.keywords.join(';')} onChange={e => change('keywords', e.target.value ? e.target.value.split(';') : [])} placeholder="Ví dụ: chất liệu thoáng mát; phối đồ đi biển" /><small>Tối đa 3, cách nhau bằng dấu ;. Để trống để dùng từ khóa gợi ý của ngành.</small></label>}
+            {!isSupplier && <label className={styles.field}>Từ khóa khám phá<input maxLength={362} value={criteria.keywords.join(';')} onChange={e => change('keywords', e.target.value ? e.target.value.split(';') : [])} placeholder="Ví dụ: chất liệu thoáng mát; phối đồ đi biển" /><small>Tối đa 3, cách nhau bằng dấu ;. Để trống để tìm theo các loại sản phẩm trong danh mục của shop (nếu có), hoặc từ khóa gợi ý của ngành.</small></label>}
             {isSupplier && <details className={styles.more} open><summary>Tiêu chí nhà cung cấp</summary><div className={styles.fields}>
               <div className={styles.pair}>{(['minPrice', 'maxPrice', 'quantity', 'maxMoq'] as const).map((key, i) => <label key={key} className={styles.field}>{['Giá nhập từ (VND)', 'Đến (VND)', 'Lượng dự kiến mua', 'MOQ tối đa'][i]}<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria[key] ?? ''} onChange={e => change(key, e.target.value === '' ? null : Number(e.target.value))} /></label>)}</div>
               <div className={styles.pair}><label className={styles.field}>Đơn vị hàng<input required maxLength={60} value={criteria.unit} onChange={e => change('unit', e.target.value)} /></label><label className={styles.field}>Khu vực<input required maxLength={100} value={criteria.region} onChange={e => change('region', e.target.value)} /></label></div>
@@ -228,7 +237,7 @@ const reportSources = (report: TikTokReport) => [report.trend.sources, report.bu
 function AnalysisView({ analysis, items, kind, onTransfer }: { analysis: SourcingAnalysis; items: SourcingItem[]; kind: SourcingRun['kind']; onTransfer: (item: SourcingItem, kind: 'product' | 'marketing') => void }) {
   const { report, suppliers } = analysis;
   const [copied, setCopied] = useState(false);
-  const keys = report ? reportSources(report) : suppliers ? [...suppliers.suppliers.map(card => card.source), ...[...suppliers.tierMix, ...suppliers.regions].flatMap(point => point.sources)]
+  const keys = report ? [...reportSources(report), ...analysis.productIdeas.flatMap(idea => idea.sources)] : suppliers ? [...suppliers.suppliers.map(card => card.source), ...[...suppliers.tierMix, ...suppliers.regions].flatMap(point => point.sources)]
     : [...analysis.findings, ...analysis.productIdeas].flatMap(entry => entry.sources);
   const cited = [...new Set(keys)].map(key => items.find(item => item.key === key)).filter((item): item is SourcingItem => !!item);
   const ref = (keys: string[]) => keys.map(key => cited.findIndex(item => item.key === key) + 1).filter(n => n > 0);
@@ -239,6 +248,7 @@ function AnalysisView({ analysis, items, kind, onTransfer }: { analysis: Sourcin
     <p className={styles.muted}>{analysis.relevantCount}/{items.length} kết quả được dùng làm nguồn{report ? ` · ${report.commentCount} bình luận đã đọc` : ''} · phân tích bởi AI Smart Sourcing ({analysis.model}) lúc {new Date(analysis.createdAt).toLocaleString('vi-VN')}</p>
     <section><h3>Tóm tắt</h3><p>{analysis.summary}</p></section>
     {report ? <>
+      {analysis.productIdeas.length > 0 && <section><h3>Sản phẩm đang hot</h3><ul className={styles.findings}>{analysis.productIdeas.map((idea, i) => <li key={i}><strong>{idea.name}</strong> {refs(idea.sources)}<p>{idea.reason}</p></li>)}</ul></section>}
       <section><h3>1. Nhiệt độ trend & sức mua</h3>
         <dl className={styles.signals}>
           <div><dt>Trạng thái trend</dt><dd>{TREND_LABEL[report.trend.status]} {refs(report.trend.sources)}</dd>{report.trend.reason && <p>{report.trend.reason}</p>}</div>
