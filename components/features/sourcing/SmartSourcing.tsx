@@ -11,6 +11,7 @@ import { productApi } from '@/lib/services/api';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
 import { catalogKeywords, defaultSourcingCriteria, sourcingItems } from '@/lib/services/sourcingCriteria';
 import { industries } from '@/lib/data/workspace';
+import { scopedTiktokQueries } from '@/lib/services/sourcingSearch';
 import { createSeed } from '@/lib/data/admin';
 import { Modal } from '@/components/ui/Modal';
 import type { SourcingAnalysis, SourcingCriteria, SourcingDecision, SourcingItem, SourcingPoint, SourcingRequest, SourcingRun, SupplierTier, TikTokReport, TrendStatus } from '@/lib/types/sourcing';
@@ -64,9 +65,9 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
     api().then(next => {
       if (!active) return;
       setView(next);
-      const first = next.requests[0];
-      // Lượt cũ có thể lưu ngành khác (shop đã đổi ngành); truy vấn mới luôn theo ngành hiện tại.
-      if (first) { setSelectedId(first.id); setCriteria({ ...first.criteria, industry }); }
+      // Chỉ nạp lại lượt gần nhất của ngành hiện tại; lượt của ngành cũ giữ trong lịch sử, không đem từ khóa/sản phẩm cũ sang form mới.
+      const first = next.requests.find(request => request.criteria.industry === industry);
+      if (first) { setSelectedId(first.id); setCriteria(first.criteria); }
     }).catch(e => { if (active) setError((e as Error).message); });
     return () => { active = false; };
   }, [industry]);
@@ -130,7 +131,8 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   const stage = !selected ? 0 : !selected.runId ? 1 : !run || ['starting', 'running', 'unknown'].includes(run.status) ? 2 : 3;
   const isSupplier = criteria.kind === 'suppliers';
   const newRequest = () => { setSelectedId(''); setTransfer(null); setCriteria(old => ({ ...defaultSourcingCriteria(industry), minPrice: old.minPrice, maxPrice: old.maxPrice, maxMoq: old.maxMoq, region: old.region })); };
-  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria({ ...request.criteria, industry }); setTransfer(null); };
+  // Lượt của ngành cũ vẫn mở xem được, nhưng không đem từ khóa/sản phẩm cũ vào ngành hiện tại.
+  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria(request.criteria.industry === industry ? request.criteria : { ...request.criteria, industry, keywords: [], product: '' }); setTransfer(null); };
   return <>
     <div className={styles.context}>
       <span><strong>{shopName}</strong> · {industry}</span>
@@ -146,10 +148,10 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
         <form onSubmit={e => { e.preventDefault(); void prepare(); }}>
           <fieldset disabled={busy} className={styles.fields}>
             <div className={styles.segmented} role="radiogroup" aria-label="Nguồn dữ liệu">
-              {([['tiktok', 'Khám phá sản phẩm', 'Video TikTok 7 ngày gần nhất'], ['suppliers', 'Tìm nhà cung cấp', 'Kết quả tìm kiếm Google']] as const).map(([kind, label, hint]) => <button key={kind} type="button" role="radio" aria-checked={criteria.kind === kind} onClick={() => change('kind', kind)}><strong>{label}</strong><small>{hint}</small></button>)}
+              {([['tiktok', 'Khám phá sản phẩm', 'Video TikTok 7 ngày gần nhất'], ['suppliers', 'Tìm nhà cung cấp', 'Kết quả tìm kiếm Google']] as const).map(([kind, label, hint]) => <button key={kind} type="button" role="radio" aria-checked={criteria.kind === kind} onClick={() => setCriteria(old => ({ ...old, kind, resultLimit: kind === 'tiktok' ? Math.min(old.resultLimit, 15) : old.resultLimit }))}><strong>{label}</strong><small>{hint}</small></button>)}
             </div>
             <label className={styles.field}>Sản phẩm quan tâm{isSupplier ? '' : ' (không bắt buộc)'}<input required={isSupplier} maxLength={120} value={criteria.product} onChange={e => change('product', e.target.value)} placeholder="Ví dụ: áo thun cotton" /></label>
-            {!isSupplier && <label className={styles.field}>Từ khóa khám phá<input maxLength={362} value={criteria.keywords.join(';')} onChange={e => change('keywords', e.target.value ? e.target.value.split(';') : [])} placeholder="Ví dụ: chất liệu thoáng mát; phối đồ đi biển" /><small>Tối đa 3, cách nhau bằng dấu ;. Để trống để tìm theo các loại sản phẩm trong danh mục của shop (nếu có), hoặc từ khóa gợi ý của ngành.</small></label>}
+            {!isSupplier && <label className={styles.field}>Từ khóa khám phá<input maxLength={362} value={criteria.keywords.join(';')} onChange={e => change('keywords', e.target.value ? e.target.value.split(';') : [])} placeholder={`Ví dụ: ${scopedTiktokQueries(industry, []).slice(0, 2).join('; ') || 'tên sản phẩm; kiểu dáng'}`} /><small>Tối đa 3, cách nhau bằng dấu ;. Để trống để tìm theo các loại sản phẩm trong danh mục của shop (nếu có), hoặc từ khóa gợi ý của ngành.</small></label>}
             {isSupplier && <details className={styles.more} open><summary>Tiêu chí nhà cung cấp</summary><div className={styles.fields}>
               <div className={styles.pair}>{(['minPrice', 'maxPrice', 'quantity', 'maxMoq'] as const).map((key, i) => <label key={key} className={styles.field}>{['Giá nhập từ (VND)', 'Đến (VND)', 'Lượng dự kiến mua', 'MOQ tối đa'][i]}<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria[key] ?? ''} onChange={e => change(key, e.target.value === '' ? null : Number(e.target.value))} /></label>)}</div>
               <div className={styles.pair}><label className={styles.field}>Đơn vị hàng<input required maxLength={60} value={criteria.unit} onChange={e => change('unit', e.target.value)} /></label><label className={styles.field}>Khu vực<input required maxLength={100} value={criteria.region} onChange={e => change('region', e.target.value)} /></label></div>
@@ -159,7 +161,7 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
               {(['audience', 'required', 'excluded'] as const).map((key, i) => <label key={key} className={styles.field}>{['Nhóm khách / phong cách', 'Điều cần có (cách nhau bằng dấu ,)', 'Điều cần loại bỏ'][i]}<input maxLength={500} value={criteria[key]} onChange={e => change(key, e.target.value)} placeholder={['Ví dụ: nữ văn phòng 25–35 tuổi', 'Ví dụ: cotton, form rộng', 'Ví dụ: hàng order nước ngoài'][i]} /></label>)}
             </div></details>
             <div className={styles.submitRow}>
-              <label className={styles.inline}>Số kết quả<input type="number" min="1" max="20" required value={criteria.resultLimit} onChange={e => change('resultLimit', Number(e.target.value))} /></label>
+              <label className={styles.inline}>Số kết quả<input type="number" min="1" max={isSupplier ? 20 : 15} required value={criteria.resultLimit} onChange={e => change('resultLimit', Number(e.target.value))} /></label>
               <button className="btn btn-primary" type="submit">{selected?.runId ? 'Tìm lại với tiêu chí này' : 'Xem truy vấn'}</button>
             </div>
           </fieldset>

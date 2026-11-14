@@ -3,7 +3,7 @@ import type { SourcingCriteria, SourcingItem, SourcingRun } from '@/lib/types/so
 
 export function defaultSourcingCriteria(industry = ''): SourcingCriteria {
   return { industry, kind: 'tiktok', keywords: [], product: '', minPrice: null, maxPrice: null, currency: 'VND', unit: 'sản phẩm',
-    quantity: null, maxMoq: null, region: 'Việt Nam', required: '', excluded: '', quality: '', leadTime: '', audience: '', resultLimit: 20 };
+    quantity: null, maxMoq: null, region: 'Việt Nam', required: '', excluded: '', quality: '', leadTime: '', audience: '', resultLimit: 15 };
 }
 /** Từ khóa mặc định từ danh mục của shop: tối đa 3 loại sản phẩm nhiều nhất (bỏ nhãn ngành do nhập từ Smart Sourcing). Từ chung của ngành như "thời trang" chỉ ra video rác.
  * samples: id → JSON của sản phẩm mẫu seed; sản phẩm mẫu chưa chỉnh sửa bị bỏ vì seed luôn là thời trang, bất kể ngành của shop. */
@@ -37,7 +37,7 @@ export function parseSourcingCriteria(value: unknown): SourcingCriteria {
     minPrice: number('minPrice'), maxPrice: number('maxPrice'), currency: 'VND', unit: text('unit', 60), quantity: number('quantity'), maxMoq: number('maxMoq'),
     region: text('region', 100), required: text('required'), excluded: text('excluded'), quality: text('quality'), leadTime: text('leadTime', 100), audience: text('audience'), resultLimit: Number(input.resultLimit) };
   if (criteria.minPrice !== null && criteria.maxPrice !== null && criteria.minPrice > criteria.maxPrice) throw new SourcingInputError('Giá tối đa phải lớn hơn hoặc bằng giá tối thiểu.');
-  if (!criteria.unit || !criteria.region || !Number.isInteger(input.resultLimit) || criteria.resultLimit < 1 || criteria.resultLimit > 20) throw new SourcingInputError('Nhập đơn vị, khu vực và giới hạn 1–20 kết quả mỗi truy vấn.');
+  if (!criteria.unit || !criteria.region || !Number.isInteger(input.resultLimit) || criteria.resultLimit < 1 || criteria.resultLimit > (criteria.kind === 'tiktok' ? 15 : 20)) throw new SourcingInputError('Nhập đơn vị, khu vực và giới hạn kết quả (1–15 với TikTok, 1–20 với Google).');
   return criteria;
 }
 

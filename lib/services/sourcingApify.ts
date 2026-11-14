@@ -3,9 +3,11 @@ import type { SupplierCandidate } from '@/lib/types/sourcing';
 
 export type SourcingKind = 'tiktok' | 'suppliers';
 export const sourcingActors = { tiktok: 'clockworks/tiktok-scraper', suppliers: 'apify/google-search-scraper' } as const;
-// TikTok thu thêm bình luận (tính phí theo sự kiện của Actor) nên trần phí cao hơn.
-export const sourcingBudgetUsd = { tiktok: 1, suppliers: 0.5 } as const;
-const COMMENTS_PER_POST = 10;
+// Trần phí Apify cho mỗi lượt chạy (maxTotalChargeUsd); khối lượng TikTok (TIKTOK_MAX_RESULTS) được cỡ để vừa trần này.
+export const sourcingBudgetUsd = { tiktok: 0.2, suppliers: 0.2 } as const;
+// Giá thật mỗi lượt: ~0,0064 USD/video + ~0,00125 USD/bình luận; 15 video × 5 bình luận ≈ 0,19 USD, vừa trần 0,2.
+export const TIKTOK_MAX_RESULTS = 15;
+const COMMENTS_PER_POST = 5;
 
 export class SourcingProviderError extends Error {
   constructor(message: string, readonly status = 502, readonly code = 'APIFY_ERROR') { super(message); }
@@ -23,13 +25,13 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
     if (input.keywords !== undefined && (!Array.isArray(input.keywords) || !input.keywords.length || input.keywords.length > 3
       || input.keywords.some(k => typeof k !== 'string' || k.trim().length < 2 || k.length > 120 || !/^[\p{L}\p{N}\s.,()&+%\/-]+$/u.test(k)))) throw new SourcingInputError('Truy vấn TikTok không hợp lệ.');
     const keywords = input.keywords === undefined ? plan.keywords : [...new Set((input.keywords as string[]).map(k => k.trim()))];
-    const limit = input.resultLimit ?? 20;
-    if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 20) throw new SourcingInputError('Giới hạn kết quả phải từ 1–20.');
+    const limit = input.resultLimit ?? TIKTOK_MAX_RESULTS;
+    if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > TIKTOK_MAX_RESULTS) throw new SourcingInputError(`Giới hạn kết quả TikTok phải từ 1–${TIKTOK_MAX_RESULTS}.`);
     return {
       context: { industry: plan.industry, keywords, market: plan.market, period: plan.period, resultLimit: limit },
       actorInput: {
         // Apify's input schema defines resultsPerPage as "per hashtag, profile, or search query", so split it to keep the paid total near `limit`.
-        searchQueries: keywords, searchSection: '/video', resultsPerPage: Math.ceil(limit / Math.max(1, keywords.length)),
+        searchQueries: keywords, searchSection: '/video', resultsPerPage: Math.max(1, Math.floor(limit / Math.max(1, keywords.length))),
         proxyCountryCode: 'VN', videoSearchDateFilter: 'PAST_WEEK',
         shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSubtitles: false,
         shouldDownloadSlideshowImages: false, shouldDownloadAvatars: false, shouldDownloadMusicCovers: false,

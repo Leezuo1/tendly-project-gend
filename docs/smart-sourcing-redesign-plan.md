@@ -66,7 +66,7 @@ Chưa mở bộ tùy chỉnh Page, tự đặt hàng, xác minh uy tín tự đ�
 
 ## 7. Phạm vi đã triển khai
 
-- UI thay dữ liệu mẫu bằng yêu cầu tìm nguồn có tiêu chí; giá/MOQ/khu vực mặc định lấy từ quy tắc Sourcing đã lưu của tài khoản. Có xem trước truy vấn chính xác, nguồn, cửa sổ 7 ngày cho TikTok, giới hạn kết quả giữ lại, timeout và trần phí provider 0,5 USD trước khi xác nhận chạy.
+- UI thay dữ liệu mẫu bằng yêu cầu tìm nguồn có tiêu chí; giá/MOQ/khu vực mặc định lấy từ quy tắc Sourcing đã lưu của tài khoản. Có xem trước truy vấn chính xác, nguồn, cửa sổ 7 ngày cho TikTok, giới hạn kết quả giữ lại, timeout và trần phí provider 0,2 USD trước khi xác nhận chạy.
 - Yêu cầu, phiên bản, chấp thuận và run lưu ở Postgres qua `019-sourcing-workflow.sql`. Tải lại trang đọc tiếp run; double click/retry cùng yêu cầu trả cùng ID, trạng thái `unknown` không tự khởi chạy lại. Chủ yêu cầu được kiểm tra trước khi đọc run/kết quả hoặc lưu lựa chọn. Token chỉ ở server.
 - Hiển thị URL/nguồn/ngày thu thập, tương tác TikTok có thật trong dataset, tiêu chí khớp/không khớp/chưa rõ, ghi chú và danh sách ngắn/đã kiểm tra/đã loại. Google hiện chỉ cung cấp đầu mối tìm kiếm: giá, tiền tệ, đơn vị và MOQ vẫn `null`; không trích số từ đoạn mô tả để giả thành báo giá.
 - Chuyển sang sản phẩm có xem trước SKU mới, tên và **giá bán do shop nhập riêng**; lượng khởi tạo 0, tồn chưa xác nhận, giữ URL nguồn, chặn SKU trùng và không ghi đè. Tái sử dụng danh mục hiện có (lưu trong trình duyệt).

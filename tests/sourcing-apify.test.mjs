@@ -50,11 +50,12 @@ test('builds bounded Actor inputs and rejects invalid search products before spe
   assert.equal(tiktok.actorInput.searchSection, '/video');
   assert.equal(tiktok.actorInput.videoSearchDateFilter, 'PAST_WEEK');
   assert.equal(tiktok.actorInput.proxyCountryCode, 'VN');
-  assert.equal(tiktok.actorInput.resultsPerPage, Math.ceil(20 / tiktok.actorInput.searchQueries.length));
-  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo', 'áo thun', 'áo sơ mi'], resultLimit: 10 }).actorInput.resultsPerPage, 4);
+  assert.equal(tiktok.actorInput.resultsPerPage, Math.floor(15 / tiktok.actorInput.searchQueries.length), 'default is 15 videos split across queries');
+  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo', 'áo thun', 'áo sơ mi'], resultLimit: 10 }).actorInput.resultsPerPage, 3, 'rounds down so paid videos never exceed the limit');
+  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo', 'áo thun'], resultLimit: 15 }).actorInput.resultsPerPage, 7);
   assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo'], resultLimit: 10 }).actorInput.resultsPerPage, 10);
   assert.equal(tiktok.actorInput.shouldDownloadVideos, false);
-  assert.equal(tiktok.actorInput.commentsPerPost, 10);
+  assert.equal(tiktok.actorInput.commentsPerPost, 5);
   const supplier = f.sourcingRequest('suppliers', { product: 'Áo polo cotton' });
   assert.equal(supplier.actorInput.countryCode, 'vn');
   assert.equal(supplier.actorInput.languageCode, 'vi');
@@ -73,7 +74,7 @@ test('request preview persists criteria without spending; approval binds one run
   const id = await f.prepareSourcingRequest('owner', criteria);
   let workspace = await f.sourcingWorkspace('owner');
   assert.equal(calls, 0); assert.deepEqual(workspace.requests[0].plan.queries, criteria.keywords);
-  assert.equal(workspace.requests[0].plan.maxChargeUsd, 1);
+  assert.equal(workspace.requests[0].plan.maxChargeUsd, 0.2);
   assert.deepEqual((await f.sourcingWorkspace('other')).requests, []);
   await assert.rejects(f.runSourcingRequest('other', id, 1, true), error => error.status === 404);
   await assert.rejects(f.runSourcingRequest('owner', id, 1, false), /Xác nhận/);
@@ -91,7 +92,10 @@ test('request preview persists criteria without spending; approval binds one run
 
 test('criteria validation and comparison preserve unknown money, units and MOQ', async () => {
   const f = await fixture(), criteria = { ...f.defaultSourcingCriteria(industry.industry), minPrice: 100, maxPrice: 200, maxMoq: 10 };
-  for (const input of [{ keywords: ['  '] }, { keywords: ['áo\nsite:test'] }, { minPrice: 300 }, { maxMoq: -1 }, { resultLimit: 21 }]) assert.throws(() => f.parseSourcingCriteria({ ...criteria, ...input }));
+  for (const input of [{ keywords: ['  '] }, { keywords: ['áo\nsite:test'] }, { minPrice: 300 }, { maxMoq: -1 }, { resultLimit: 21 }, { resultLimit: 16 }]) assert.throws(() => f.parseSourcingCriteria({ ...criteria, ...input }));
+  assert.equal(f.parseSourcingCriteria({ ...criteria, kind: 'suppliers', resultLimit: 20 }).resultLimit, 20, 'Google keeps its 20-result limit');
+  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo'], resultLimit: 15 }).actorInput.commentsPerPost, 5, 'comments capped so 15 videos fit the 0.2 USD cap');
+  assert.throws(() => f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo'], resultLimit: 16 }));
   const item = { title: 'Áo cotton', text: '', price: 0, currency: null, unit: null, moq: null, region: null };
   const comparison = f.compareSourcingItem(item, criteria);
   assert.deepEqual(comparison.mismatched, []); assert.equal(comparison.missing.length, 3);
@@ -132,7 +136,7 @@ test('start uses fixed Actor, server header, budget and timeout; duplicate start
     calls++;
     assert.match(url, /actors\/clockworks~tiktok-scraper\/runs/);
     assert.equal(new URL(url).searchParams.get('timeout'), '300');
-    assert.equal(new URL(url).searchParams.get('maxTotalChargeUsd'), '1');
+    assert.equal(new URL(url).searchParams.get('maxTotalChargeUsd'), '0.2');
     assert.ok(!url.includes(process.env.APIFY_API_TOKEN));
     assert.equal(options.headers.Authorization, `Bearer ${process.env.APIFY_API_TOKEN}`);
     assert.ok(JSON.parse(options.body).resultsPerPage <= 20);

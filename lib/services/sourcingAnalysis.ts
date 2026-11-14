@@ -153,7 +153,7 @@ function analyzeTikTok(items: SourcingItem[], ids: Map<string, string>, request:
     system: `ĐẦU VÀO
 - Ngành hàng gốc của shop: ${text(request.industry, 100) || 'chưa rõ'}. Sản phẩm quan tâm: ${text(request.product, 120) || 'chưa nêu'}. Từ khóa khám phá: ${JSON.stringify(run.context.keywords ?? [])}.
 - Hướng dẫn thêm từ người dùng: ${custom || 'không có'}.
-- Dữ liệu: mỗi bài gồm caption, chỉ số tương tác và tối đa 10 bình luận nhiều lượt thích nhất (${commentCount} bình luận tổng cộng). Không có transcript, hình ảnh video hay số liệu lượng tìm kiếm.
+- Dữ liệu: mỗi bài gồm caption, chỉ số tương tác và tối đa 5 bình luận nhiều lượt thích nhất (${commentCount} bình luận tổng cộng). Không có transcript, hình ảnh video hay số liệu lượng tìm kiếm.
 - Các bài đã được hệ thống xếp: bài khớp từ khóa tìm kiếm đứng trước, trong mỗi nhóm xếp theo điểm hot (lượt xem mỗi giờ kể từ lúc đăng × tỉ lệ tương tác). Bài hạng cao không đảm bảo đúng ngành; vẫn phải tự loại bài lạc ngành.
 
 ĐẦU RA: Báo cáo Khám phá Sản phẩm 4 phần, trả JSON đúng schema.
