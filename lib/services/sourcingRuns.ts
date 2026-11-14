@@ -91,7 +91,7 @@ export async function readSourcingRun(owner: string, id: string) {
         catch { return [id, []] as const; }
       })));
       const data = normalizeTikTok(items, period, new Date(), groupTikTokComments(items, datasets));
-      if (items.length && data.rejectedCount === items.length) throw new SourcingProviderError('Không đọc được bản ghi TikTok nào. Kiểm tra output Actor.', 502, 'APIFY_BAD_DATASET');
+      if (items.length > data.excludedByLanguageCount && data.rejectedCount === items.length - data.excludedByLanguageCount) throw new SourcingProviderError('Không đọc được bản ghi TikTok nào. Kiểm tra output Actor.', 502, 'APIFY_BAD_DATASET');
       result = { ...data, posts: data.posts.slice(0, Number(row.context_json.resultLimit ?? 60)) };
       status = data.posts.length ? 'succeeded' : 'empty';
     } else {

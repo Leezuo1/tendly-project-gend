@@ -68,5 +68,5 @@ export interface SourcingRequest {
 export interface SourcingDecision { runId: string; itemKey: string; status: 'shortlist' | 'checked' | 'rejected'; note: string; updatedAt: number; }
 export interface SourcingItem {
   key: string; title: string; url: string; text: string; source: string; collectedAt: string;
-  metrics?: SourcingPost['metrics']; comments?: SourcingComment[]; page?: string; price: number | null; currency: string | null; unit: string | null; moq: number | null; region: string | null;
+  author?: string | null; metrics?: SourcingPost['metrics']; comments?: SourcingComment[]; page?: string; price: number | null; currency: string | null; unit: string | null; moq: number | null; region: string | null;
 }
