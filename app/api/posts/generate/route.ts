@@ -44,7 +44,7 @@ export const POST = withAppAccess(async function POST(request: Request) {
       system: prompt.system,
       user: prompt.user,
       schema: POST_RESPONSE_SCHEMA,
-      temperature: 0.9,
+      temperature: 0.9, maxOutputTokens: 8000,
       signal: AbortSignal.any([deadline, AbortSignal.timeout(20_000)]),
       parse: (output) => parsePostOutput(output, expected),
     });

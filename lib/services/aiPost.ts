@@ -25,7 +25,7 @@ export const POST_TONES: Record<PostTone, string> = {
 };
 
 const CHANNEL_RULES: Record<PostChannel, string> = {
-  facebook: `Bài đăng Facebook Fanpage: 80–180 từ, câu mở đầu thu hút, xuống dòng ngắn dễ đọc, emoji vừa phải, kết thúc bằng lời kêu gọi inbox/bình luận để được tư vấn. title là dòng tiêu đề nội bộ ngắn (không đăng lên Page).`,
+  facebook: `Bài đăng Facebook Fanpage: 200–350 từ, có cấu trúc: câu mở đầu thu hút (hook); 1–2 đoạn nêu nhu cầu hoặc băn khoăn của khách; 3–4 lợi ích gắn với thông số thật trong dữ liệu sản phẩm (chất liệu, màu, size, giá); một đoạn chính sách đổi trả/giao hàng/COD nếu có trong FAQ; kết bằng lời kêu gọi inbox/bình luận để được tư vấn. Xuống dòng ngắn dễ đọc, emoji vừa phải. title là dòng tiêu đề nội bộ ngắn (không đăng lên Page).`,
   tiktok: `Caption TikTok: content tối đa 150 ký tự, câu hook đầu tiên thật mạnh, giọng tự nhiên như người thật. imageIdea mô tả kịch bản video 15–30 giây gồm 3–4 cảnh ngắn. title là tên ý tưởng video.`,
   email: `Email marketing: title là tiêu đề email tối đa 60 ký tự gây tò mò; content là thân email 80–160 từ, mở đầu "Chào bạn,", 2–3 đoạn ngắn, có một lời kêu gọi hành động rõ ràng, ký tên shop. imageIdea mô tả ảnh banner đầu email.`,
 };

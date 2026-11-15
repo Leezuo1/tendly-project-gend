@@ -64,7 +64,7 @@ export const AI_RULE_FIELDS: Record<AiRoleId, AiRuleField[]> = {
   content: [
     { key: 'goal', label: 'Mục tiêu', value: 'Giới thiệu sản phẩm và giúp khách hiểu lợi ích' },
     { key: 'tone', label: 'Giọng điệu', value: 'Gần gũi, rõ ràng, đúng giọng thương hiệu' },
-    { key: 'format', label: 'Định dạng bài', value: 'Mở đầu ngắn, lợi ích chính, thông tin sản phẩm, lời kêu gọi hành động' },
+    { key: 'format', label: 'Định dạng bài', value: 'Mở đầu thu hút, nhu cầu của khách, các lợi ích chính kèm thông số thật, chính sách nếu có, lời kêu gọi hành động' },
     { key: 'cta', label: 'Lời kêu gọi hành động', value: 'Nhắn tin để shop tư vấn sản phẩm phù hợp' },
   ],
   review: [
