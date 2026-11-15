@@ -140,7 +140,11 @@ test('editing or changing Page profile invalidates approval and stale writes are
   const postId = (await f.state()).workspace.reviews[0].postId;
   await f.act('approvePost', { postId });
   await f.act('editPost', { postId, patch: { content: 'Bản đã sửa' } });
-  await assert.rejects(() => f.act('approvePost', { postId }), /Review lại/);
+  // Bản chủ shop tự sửa duyệt thẳng được, không cần AI Review; sửa tiếp thì phải duyệt lại.
+  await f.act('approvePost', { postId });
+  assert.ok((await f.state()).workspace.reviews[0].approvedAt);
+  await f.act('editPost', { postId, patch: { content: 'Bản sửa lần hai' } });
+  assert.equal((await f.state()).workspace.reviews[0].approvedAt, null);
   await f.act('review', { postId });
   const proposal = (await f.state()).workspace.reviewAttempts.find(item => item.targetPostId === postId);
   await f.act('applyReview', { attemptId: proposal.id, draftId: 'draft-0' }); await f.act('approvePost', { postId });
@@ -165,6 +169,40 @@ test('schedule requires separate approval and activation and blocks changed cont
   await assert.rejects(() => f.act('activateSchedule', { id }), /chủ shop duyệt/);
   await f.act('pauseSchedule', { id });
   assert.equal((await f.state()).workspace.schedules[0].status, 'paused');
+});
+
+test('a hand-edited post can be approved and scheduled without AI Review, and a later AI Review replaces the manual state', async () => {
+  const f = await fixture();
+  await f.act('campaign', { brief: f.brief, knowledge: f.knowledge, configuration: f.config });
+  const campaign = (await f.state()).workspace.campaigns[0];
+  await f.act('approveCampaign', { id: campaign.id }); await f.act('generate', { campaignId: campaign.id, plan: await f.plan(campaign.id) });
+  const postId = (await f.state()).workspace.reviews[0].postId;
+  await f.act('editPost', { postId, patch: { content: 'Bản shop tự viết' } });
+  let review = (await f.state()).workspace.reviews[0];
+  assert.equal(review.reviewHash, ''); assert.ok(review.manualHash);
+  await f.act('approvePost', { postId });
+  await f.act('schedule', { name: 'Lịch tay', scenario: 'Một lần', slots: [{ postId, at: Date.now() + 3600000 }] });
+  await f.act('review', { postId });
+  const proposal = (await f.state()).workspace.reviewAttempts.find(item => item.targetPostId === postId);
+  await f.act('applyReview', { attemptId: proposal.id, draftId: 'draft-0' });
+  review = (await f.state()).workspace.reviews[0];
+  assert.ok(review.reviewHash); assert.equal(review.manualHash, undefined); assert.equal(review.approvedAt, null);
+});
+
+test('changing the image of a hand-edited post keeps it a hand-edited post: re-approve, no AI Review', async () => {
+  const f = await fixture();
+  await f.act('campaign', { brief: f.brief, knowledge: f.knowledge, configuration: f.config });
+  const campaign = (await f.state()).workspace.campaigns[0];
+  await f.act('approveCampaign', { id: campaign.id }); await f.act('generate', { campaignId: campaign.id, plan: await f.plan(campaign.id) });
+  const postId = (await f.state()).workspace.reviews[0].postId;
+  await f.act('editPost', { postId, patch: { content: 'Bản shop tự viết' } });
+  await f.act('approvePost', { postId });
+  await f.service.changeMarketingImage('123', (await f.state()).revision, postId, { mime: 'image/png', data: Buffer.from([137,80,78,71,13,10,26,10,0]), source: 'upload' });
+  const review = (await f.state()).workspace.reviews[0];
+  assert.equal(review.approvedAt, null, 'the old approval no longer holds');
+  assert.equal(review.reviewHash, ''); assert.ok(review.manualHash);
+  await f.service.marketingWorkspaceAction('123', 'owner', (await f.state()).revision, 'approvePost', { postId });
+  assert.ok((await f.state()).workspace.reviews[0].approvedAt);
 });
 
 test('review parser validates stable IDs, blocked status, and malformed output', async () => {

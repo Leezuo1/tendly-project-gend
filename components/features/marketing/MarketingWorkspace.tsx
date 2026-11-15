@@ -20,11 +20,15 @@ export type MarketingWorkflowSection = 'campaigns' | 'composer' | 'approvals' | 
 /** Sau khi shop sửa bài/dàn ý/ảnh, AI Review tự chạy lại; null khi chưa đủ điều kiện (brief hoặc kế hoạch chưa duyệt). */
 export function autoReview(action: string, input: Record<string, unknown>, next: MarketingWorkspaceView): { action: string; input: object } | null {
   if (action === 'editPlan') return { action: 'reviewPlan', input: { id: input.id } };
-  if (action !== 'editPost' && action !== 'image') return null;
-  const meta = next.workspace.reviews.find(item => item.postId === input.postId);
+  // Chủ shop tự sửa bài (editPost) không kéo theo AI; chỉ đổi ảnh mới tự Review lại.
+  return action === 'image' ? reviewPostInput(next, String(input.postId)) : null;
+}
+/** Yêu cầu Review một bài theo kế hoạch hiện hành; null khi chưa đủ điều kiện. Bài chủ shop tự sửa chỉ được Review khi force (shop chủ động nhờ AI). */
+export function reviewPostInput(next: MarketingWorkspaceView, postId: string, force = false): { action: string; input: object } | null {
+  const meta = next.workspace.reviews.find(item => item.postId === postId);
   const campaign = meta && next.workspace.campaigns.find(item => item.id === meta.campaignId);
   const plan = campaign?.approvedAt && next.workspace.contentPlans?.find(p => p.campaignId === campaign.id && p.campaignVersion === campaign.version && p.approvedAt);
-  if (!meta || meta.publication !== 'draft' || !plan || !plan.items.length) return null;
+  if (!meta || meta.publication !== 'draft' || !plan || !plan.items.length || (!force && !meta.reviewHash && meta.manualHash)) return null;
   const itemId = plan.items.some(item => item.id === meta.plan?.itemId) ? meta.plan!.itemId : plan.items[0].id;
   return { action: 'review', input: { postId: meta.postId, plan: { id: plan.id, version: plan.version, itemId } } };
 }
@@ -43,7 +47,7 @@ export function nextAutoReview(view: MarketingWorkspaceView, attempted: Set<stri
     const key = `post:${r.postId}:${r.reviewedAt}`;
     // Bài đang chờ chủ shop áp dụng bản đề xuất đã được Review rồi; Review lại sẽ chỉ chồng thêm lượt trùng.
     const waiting = reviewAttempts.some(a => a.targetPostId === r.postId && !a.appliedAt && !a.discardedAt);
-    const next = !r.reviewHash && !waiting && !attempted.has(key) ? autoReview('editPost', { postId: r.postId }, view) : null;
+    const next = !r.reviewHash && !waiting && !attempted.has(key) ? reviewPostInput(view, r.postId) : null;
     if (next) return { key, ...next };
   }
   return null;
@@ -151,11 +155,11 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
         try {
           const fresh = await marketingWorkspaceClient.read(); setView(fresh);
           const waiting = fresh.workspace.reviewAttempts?.some(a => a.targetPostId === (input as { postId?: string }).postId && !a.appliedAt && !a.discardedAt);
-          const next = waiting ? null : autoReview('editPost', input as Record<string, unknown>, fresh);
+          const next = waiting ? null : reviewPostInput(fresh, String((input as { postId?: string }).postId));
           if (next) {
             setNotice('Căn cứ đã thay đổi. AI đang Review lại bài…');
             setView(await marketingWorkspaceClient.act(fresh.revision, next.action, next.input));
-            setError(''); setNotice('Đã Review lại theo căn cứ mới. Xem bản đề xuất rồi duyệt lại.');
+            setError(''); setNotice('');
           }
         } catch (inner) { setError(`${message} Review tự động chưa xong: ${(inner as Error).message}`); }
       }
@@ -183,7 +187,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
       const image = file ? await prepareUploadImage(file) : undefined;
       const response = await dashboardRequest(`/api/marketing/workspace/image?postId=${encodeURIComponent(postId)}&revision=${view.revision}`, { method: file ? 'PUT' : 'DELETE', body: image });
       const saved: MarketingWorkspaceView = await response.json();
-      setView(saved); setNotice('Đã cập nhật ảnh.');
+      setView(saved);
       await reviewAfter('image', { postId }, saved);
     } catch (e) { setError((e as Error).message); }
     finally { inflight.current = false; setBusy(false); }
@@ -223,7 +227,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
           <dl className="mw-facts"><div><dt>Đối tượng</dt><dd>{campaign.audience || 'Chưa chọn'}</dd></div><div><dt>Định dạng</dt><dd>{campaign.format}</dd></div><div><dt>Kênh đăng</dt><dd>{campaign.profile.name || view.accounts.find(account => account.id === campaign.accountId)?.name}</dd></div><div><dt>Giọng điệu</dt><dd>{campaign.tone || campaign.profile.tone}</dd></div><div><dt>CTA</dt><dd>{campaign.cta}</dd></div><div><dt>Ưu đãi</dt><dd>{campaign.offer.kind === 'none' ? 'Không áp dụng' : `${campaign.offer.details} · ${campaign.offer.conditions}`}</dd></div></dl>
           {!campaign.approvedAt && <p className="mw-hint">Duyệt brief ở bước 1 trước khi tạo bài.</p>}</section> : <p className="mw-empty">Chưa có chiến dịch. Tạo brief để bắt đầu.</p>)}
         {section === 'composer' && campaign && <MarketingContentPlanPanel key={campaign.id} view={view} campaign={campaign} busy={busy} error={error} notice={notice} openId={detailPlanId} onOpen={setDetailPlanId} onPostOpen={id => { setDetailPostId(id); onNavigate('approvals', id); }} act={act} />}
-        {section === 'approvals' && <MarketingPostSplit view={view} selectedId={detailPostId} busy={busy} error={error} onSelect={selectPost} act={act} confirm={confirm} upload={upload} onComments={id => onNavigate('comments', id)} />}
+        {section === 'approvals' && <MarketingPostSplit view={view} selectedId={detailPostId} busy={busy} error={error} onSelect={selectPost} onAskAi={postId => { const next = reviewPostInput(view, postId, true); if (next) void act(next.action, next.input); }} act={act} confirm={confirm} upload={upload} onComments={id => onNavigate('comments', id)} />}
       </>}
       {section === 'schedule' && <MarketingScheduleTab view={view} act={act} confirm={confirm} />}
       {section === 'performance' && <><div className="mw-section-head"><h2>Hiệu quả</h2></div><CampaignPerformanceTab />
