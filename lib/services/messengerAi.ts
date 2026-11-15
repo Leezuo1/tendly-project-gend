@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import type { AiKnowledge } from '@/lib/types/ai';
 import type { CustomerCareSettings } from '@/lib/types/customerCare';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
-import { parseAiKnowledge } from '@/lib/services/aiKnowledge';
+import { liveKnowledge } from '@/lib/services/shopCatalog';
 import { careRules, CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
 import { readConversationSources } from '@/lib/services/conversationSources';
 import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
@@ -18,7 +18,7 @@ export async function readMessengerAiSettings(pageId: string, db: Pick<Pool, 'qu
     profile: row?.profile_json ? parseCareProfile(row.profile_json) : null, pageProfile: row?.page_profile_json ?? null,
     pageAssigned: row?.page_assigned === true, pageEnabled: row?.page_enabled === true,
     approvedBy: row?.approved_by || '', approvedAt: row?.approved_at == null ? null : Number(row.approved_at),
-    knowledge: row ? parseAiKnowledge(row.knowledge_json) : null };
+    knowledge: row ? await liveKnowledge(pageId, row.knowledge_json, db) : null };
 }
 
 export async function saveMessengerAiSettings(pageId: string, autoReply: boolean, knowledge?: AiKnowledge,
@@ -49,7 +49,8 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
   else if (!await canRunAutomation(db)) return {};
   const id = JSON.stringify([pageId, psid]);
   const settings = (await db.query('SELECT * FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
-  const source = settings?.profile_json ? parseAiKnowledge(settings.knowledge_json) : undefined;
+  // Sản phẩm và FAQ lấy từ danh mục hiện hành, không dùng bản chụp lúc xác nhận.
+  const source = settings?.profile_json ? await liveKnowledge(pageId, settings.knowledge_json, db) ?? undefined : undefined;
   if (!source) return {};
   const profile = parseCareProfile(settings.profile_json);
   const readLatest = async () => (await db.query(`SELECT m.*,c.ai_auto_reply,c.ai_updated_at,c.ai_enabled_at FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id

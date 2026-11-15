@@ -6,6 +6,7 @@ import type { CommentsData, FacebookComment, FacebookCommentEvent } from '@/lib/
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
 import { generateGeminiJson } from '@/lib/services/gemini';
 import { buildAiSystemPrompt, parseAiKnowledge } from '@/lib/services/aiKnowledge';
+import { liveKnowledge } from '@/lib/services/shopCatalog';
 import { InvalidMarketingRequest } from '@/lib/services/marketingApi';
 
 type Database = Pick<Pool, 'query' | 'connect'>;
@@ -53,7 +54,7 @@ export async function readFacebookComments(pageId: string, db: Database = getMes
     AND (status='pending' OR (status='processing' AND processing_at<$2))`, [pageId, Date.now() - 120_000]);
   return { now: Date.now(), comments: rows.rows.map(commentRow), pending: Number(count.rows[0].count), settings: {
     autoReply: settings?.auto_reply === true, updatedAt: settings ? Number(settings.updated_at) : null,
-    productCount: settings?.knowledge_json?.products?.length ?? 0,
+    productCount: (await liveKnowledge(pageId, settings?.knowledge_json, db))?.products.length ?? 0,
   } };
 }
 
@@ -228,7 +229,7 @@ async function analyzeComment(pageId: string, db: Database, signal: AbortSignal,
     const post = await graphRead(row.post_id, 'message', signal);
     const postText = typeof post.message === 'string' ? post.message.slice(0, 30_000) : '';
     const campaign = await marketingCommentContext(pageId, row.post_id, db);
-    const knowledge = parseAiKnowledge(campaign?.knowledge ?? settings.knowledge_json);
+    const knowledge = (await liveKnowledge(pageId, campaign?.knowledge ?? settings.knowledge_json, db)) ?? parseAiKnowledge(null);
     const { result: draft } = await generateGeminiJson({
       role: 'chat', platform: 'facebook', pageId,
       system: `${buildAiSystemPrompt(knowledge)}

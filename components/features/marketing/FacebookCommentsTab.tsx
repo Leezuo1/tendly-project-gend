@@ -93,7 +93,7 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
               : 'Chưa đồng bộ sản phẩm và FAQ'}
           </span>
         </div>
-        <p id="fc-knowledge-help" className="fc-note">Cập nhật lại sau khi đổi sản phẩm hoặc FAQ để AI dùng dữ liệu mới nhất.</p>
+        <p id="fc-knowledge-help" className="fc-note">Sản phẩm và FAQ được AI lấy từ danh mục mới nhất; bấm đồng bộ một lần đầu để lưu dữ liệu AI lên máy chủ.</p>
         <div className="fc-info" role="note" aria-label="Chính sách nhắn tin Facebook"><span className="fc-info-icon" aria-hidden="true">i</span>
           <p>Mỗi bình luận chỉ được một tin nhắn riêng trong 7 ngày. Khách cần nhắn lại để mở cửa sổ trò chuyện 24 giờ.</p>
         </div>

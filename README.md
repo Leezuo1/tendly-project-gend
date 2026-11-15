@@ -67,7 +67,7 @@ Mở **Smart Sourcing** (`/smart-sourcing`) → nhập nhu cầu → lưu/xem tr
 
 Google chỉ trả đầu mối tham khảo, giá/tiền tệ/đơn vị/MOQ chưa rõ để `null`; tương tác TikTok không phải doanh số hoặc bằng chứng tăng trưởng. Có ghi chú, shortlist, đánh dấu shop đã kiểm tra/loại, xem trước nhập sản phẩm mới (giá bán nhập riêng, tồn chưa xác nhận, chặn trùng SKU) hoặc tạo brief ý tưởng Marketing nháp. Không tự liên hệ, mua hàng, duyệt hoặc đăng bài.
 
-UI nối backend Apify `clockworks/tiktok-scraper` và `apify/google-search-scraper`. Cần `APIFY_API_TOKEN`, `DATABASE_URL` và migration 019 (`npm run db:migrate`). API khởi tạo trả ID để kiểm tra tiến trình và lưu kết quả; start chưa rõ không tự retry. Xem [kế hoạch/phạm vi đã triển khai](docs/smart-sourcing-redesign-plan.md#7-phạm-vi-đã-triển-khai). Chưa xác nhận kết nối provider thật; danh mục sản phẩm vẫn dùng nơi lưu hiện có trong trình duyệt.
+UI nối backend Apify `clockworks/tiktok-scraper` và `apify/google-search-scraper`. Cần `APIFY_API_TOKEN`, `DATABASE_URL` và migration 019 (`npm run db:migrate`). API khởi tạo trả ID để kiểm tra tiến trình và lưu kết quả; start chưa rõ không tự retry. Xem [kế hoạch/phạm vi đã triển khai](docs/smart-sourcing-redesign-plan.md#7-phạm-vi-đã-triển-khai). Chưa xác nhận kết nối provider thật; danh mục sản phẩm sửa trong trình duyệt và tự đồng bộ lên database (migration 024).
 
 Kiểm tra: `node --test tests/mock-onboarding.test.mjs tests/ai-chat.test.mjs tests/smart-sourcing.test.mjs`.
 
@@ -120,7 +120,7 @@ Trong Cài đặt (`/cai-dat`), nhập/đồng bộ sản phẩm, lưu FAQ và c
 
 Sản phẩm là nguồn cho giá, chất liệu, size, màu và tổng tồn kho. FAQ là nguồn cho chính sách shop. Mẫu email chỉ cung cấp thông tin về kịch bản, không chứng minh khách đủ điều kiện nhận ưu đãi hay email đã được gửi. Chỉ dẫn yêu cầu AI báo thiếu dữ liệu thay vì đoán thông tin hoặc tự xác nhận đã tạo đơn/gửi email. Việc gửi email thực tế không nằm trong tính năng này.
 
-Khung chat khách và ô thử AI vẫn gửi nguồn tri thức từ mock DB trình duyệt tới `/api/chat`; server kiểm tra cấu trúc, lọc trạng thái và tạo chỉ dẫn. Riêng Customer Care Messenger đã dùng cấu hình xác nhận trên backend theo Page được cấp quyền qua `/api/customer-care`; webhook và Inbox không thay bản tri thức này bằng dữ liệu tùy ý từ client. Lịch sử phân tích Messenger tiếp tục lưu trong PostgreSQL.
+Khung chat khách và ô thử AI vẫn gửi nguồn tri thức từ mock DB trình duyệt tới `/api/chat`; server kiểm tra cấu trúc, lọc trạng thái và tạo chỉ dẫn. Customer Care Messenger dùng quy tắc đã xác nhận trên backend theo Page được cấp quyền qua `/api/customer-care`, còn sản phẩm và FAQ lấy từ danh mục hiện hành trong database (`shop_catalog`, migration 024; trình duyệt tự đồng bộ qua `/api/shop-catalog`, lệch revision thì bản máy chủ thắng và bản cũ được cất ở localStorage `tendly.catalogBackup`). Sản phẩm mẫu chưa chỉnh sửa không được đưa tới khách thật; chưa có danh mục trong database thì dùng bản chụp đã xác nhận trước đó. Webhook và Inbox không nhận dữ liệu tùy ý từ client. Lịch sử phân tích Messenger tiếp tục lưu trong PostgreSQL.
 
 Đặt `GEMINI_API_KEY` trong `.env.local` (xem `.env.example`), có thể đặt thêm `GEMINI_MODEL` để chọn model được cấp quyền. Khóa chỉ được đọc ở server. API sử dụng [Gemini generateContent](https://ai.google.dev/api/generate-content).
 
