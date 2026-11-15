@@ -118,11 +118,6 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
         {processDisabledReason && <span className="fc-tooltip" id="fc-process-tooltip" role="tooltip">{processDisabledReason}</span>}
         </span>
       </div>
-      <div role="status" aria-live="polite" className="fc-count">{data && <>
-        {loading ? 'Đang cập nhật…' : 'Tự cập nhật mỗi 3 giây'}
-        {data.sync?.syncedAt && <> · Đồng bộ Facebook {relativeTime(data.sync.syncedAt).toLocaleLowerCase('vi')}</>}
-        {!!data.comments.length && <> · Hiển thị {comments.length} / {data.comments.length} bình luận · {groups.length} nhóm người dùng</>}
-      </>}</div>
       {data?.sync?.error && <p className="fc-warning" role="alert">{data.sync.error} Danh sách đang hiển thị dữ liệu đã lưu; hệ thống sẽ thử đồng bộ lại.</p>}
       {!data ? <p role="status" className="fc-note">Đang tải bình luận…</p> : !data.comments.length ? <div className="card pc-empty fc-empty">
         <div className="fc-empty-illustration" aria-hidden="true">

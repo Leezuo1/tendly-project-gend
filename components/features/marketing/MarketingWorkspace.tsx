@@ -80,7 +80,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
     const next = autoReview(action, input, saved);
     if (!next) return;
     setNotice('Đã lưu. AI đang Review…');
-    try { setView(await marketingWorkspaceClient.act(saved.revision, next.action, next.input)); setNotice('Đã lưu và Review xong. Xem đề xuất của AI rồi duyệt.'); }
+    try { setView(await marketingWorkspaceClient.act(saved.revision, next.action, next.input)); setNotice(''); }
     catch (e) {
       if ((e as { code?: string }).code === 'timeout') await load(); // server có thể đã Review xong; revision cũ sẽ làm lần sau bị từ chối
       setError(`Đã lưu, nhưng Review tự động chưa xong: ${(e as Error).message} Tải lại trang để hệ thống thử lại.`);
@@ -106,7 +106,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
       view = await run('editPlan', { id: planId, plan: fixed }, 'AI đang sửa dàn ý theo Review…');
       await run('reviewPlan', { id: planId }, 'AI đang Review lại dàn ý đã sửa…');
     }
-    setNotice('Đã Review dàn ý. Xem rồi duyệt kế hoạch.');
+    setNotice('');
   });
   // Chủ shop duyệt kế hoạch xong thì AI viết và Review từng bài theo dàn ý; bài vẫn cần chủ shop duyệt riêng.
   const writeAfterApproval = (saved: MarketingWorkspaceView, planId: string) => chain(saved, async run => {
@@ -121,7 +121,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
       // Bài viết theo bản dàn ý cũ: Review lại theo bản vừa duyệt (ra bản đề xuất, bài hiện tại giữ nguyên đến khi áp dụng).
       else if (existing.plan!.version !== plan.version && existing.publication === 'draft') view = await run('review', { postId: existing.postId, plan: binding }, message);
     }
-    setNotice('Đã viết và Review các bài theo dàn ý. Xem rồi duyệt từng bài.');
+    setNotice('');
   });
   const act = async (action: string, input: object): Promise<boolean> => {
     if (!view || busy || inflight.current) return false;
@@ -129,7 +129,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
     inflight.current = true; setBusy(true); setError(''); setNotice('');
     try {
       const next = await marketingWorkspaceClient.act(view.revision, action, input);
-      setView(next); setNotice('Đã cập nhật');
+      setView(next);
       await reviewAfter(action, input as Record<string, unknown>, next);
       if (action === 'generatePlan') { setDetailPostId(''); setDetailPlanId(next.workspace.contentPlans?.[0]?.id ?? ''); }
       if (action === 'generate' || action === 'retryReview') {
@@ -198,8 +198,10 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
   return <div className="mw-root">
     {error && <div className="mw-error" role="alert">{error} <button className="btn btn-text btn-sm" onClick={() => void load()}>Tải dữ liệu mới</button></div>}
     <p className="mw-status" aria-live="polite">{busy ? <><BusyStatus /> {notice}</> : notice}</p>
-    <fieldset className="mw-body" disabled={busy}>
+    {/* Ngoài fieldset: AI đang chạy (có thể vài phút) vẫn phải chuyển bước để xem bài đã viết xong. */}
       {studio && <nav className="mw-stepper" aria-label="Các bước của chiến dịch"><ol>{([['campaigns', '1. Brief chiến dịch', ''], ['composer', '2. Kế hoạch dàn ý', ''], ['approvals', '3. Bài viết & phê duyệt', waiting ? `${waiting} chờ duyệt` : '']] as const).map(([key, label, note]) => <li key={key}><button type="button" aria-current={section === key ? 'step' : undefined} onClick={() => key !== section && onNavigate(key)}>{label}{note && <small>{note}</small>}</button></li>)}</ol></nav>}
+    {/* Bước 3 không khóa cả khối: shop vẫn xem và chỉnh tay bài trong lúc AI chạy, từng nút tự khóa theo busy. */}
+    <fieldset className="mw-body" disabled={busy && section !== 'approvals'}>
       {editing && section === 'campaigns' ? <CampaignBriefForm key={editing === 'new' ? 'new' : editing.id} view={view} initial={editing === 'new' ? undefined : editing} owner={session.userId || session.username} act={act} onClose={() => setEditing(null)} /> : <>
       {(section === 'composer' || section === 'approvals') && (view.workspace.reviewAttempts ?? []).filter(attempt => !attempt.targetPostId && !attempt.appliedAt && !attempt.discardedAt && attempt.status !== 'completed').map(attempt => <section className="mw-item mw-review-attempt" key={attempt.id}>
         <div className="mw-section-head"><div><h3>Lượt soạn và Review cần xử lý</h3><p>{view.workspace.campaigns.find(c => c.id === attempt.campaignId)?.name}</p></div><span className="mw-badge waiting">{REVIEW_STATUS[attempt.status]}</span></div>

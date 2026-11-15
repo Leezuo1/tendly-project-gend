@@ -69,14 +69,15 @@ export function MarketingDraft({ post, meta, view, busy, error, act, confirm, up
     {!edit && snapshot && <details className="mw-fold"><summary>Dàn ý đã dùng để viết bài</summary><p className="mw-muted">{snapshot.pillar} · Dàn ý phiên bản {meta.plan?.version}</p><h4>{snapshot.title}</h4><div className="mw-copy">{snapshot.outline}</div></details>}
     {!edit && review && <ReviewDetails review={review} />}
     <div className="mw-actions mw-decision">
-      {edit ? <><button className="btn btn-outline" disabled={busy} onClick={() => { setForm(initial); setEdit(false); }}>Hủy sửa</button><button className="btn btn-primary" type="submit" form={`mw-edit-${post.id}`} disabled={busy}>Lưu và Review lại</button></> : <>
+      {edit ? <><button className="btn btn-outline" onClick={() => { setForm(initial); setEdit(false); }}>Hủy sửa</button><button className="btn btn-primary" type="submit" form={`mw-edit-${post.id}`} disabled={busy}>Lưu và Review lại</button></> : <>
         {draft && <button className="btn btn-text btn-sm" disabled={busy || !valid} onClick={() => act('generate', { campaignId: campaign.id, plan: meta.plan })}>Viết lại bằng AI</button>}
-        {draft && <button className="btn btn-outline" disabled={busy} onClick={() => setEdit(true)}>Chỉnh sửa thủ công</button>}
+        {draft && <button className="btn btn-outline" onClick={() => { setForm(initial); setEdit(true); }}>Chỉnh sửa thủ công</button>}
         {draft && !meta.approvedAt && <button className="btn btn-primary" disabled={busy || !reviewValid || !!candidate} onClick={() => act('approvePost', { postId: post.id })}>Duyệt bản này</button>}
         {draft && meta.approvedAt && <button className="btn btn-primary" disabled={busy || !valid} onClick={() => confirm(account.mock ? 'Hoàn tất trên kênh mẫu?' : 'Đăng thật lên Facebook?', account.mock ? 'Mô phỏng bước đăng bằng nội dung đã duyệt; không gửi tới nền tảng.' : 'Nội dung đã duyệt sẽ được đăng lên Fanpage Facebook được kết nối.', () => act('publish', { postId: post.id }))}>{account.mock ? 'Chạy bước đăng mẫu' : 'Đăng Facebook'}</button>}
         {meta.publication === 'published' && !account.mock && <><a className="btn btn-outline" href={meta.externalUrl} target="_blank" rel="noreferrer">Xem bài Facebook</a><button className="btn btn-outline" onClick={() => onComments(meta.externalId!)}>Mở bình luận</button></>}
       </>}
     </div>
+    {edit && busy && <p className="mw-hint mw-hint-end">AI đang xử lý. Bạn vẫn sửa được; nút lưu mở lại khi AI xong.</p>}
     {draft && !edit && !meta.approvedAt && <p className="mw-hint mw-hint-end">Bài sau khi duyệt sẽ đủ điều kiện xếp vào lịch đăng.</p>}
     {(meta.publication === 'unknown' || meta.publication === 'publishing') && <p className="mw-error">{meta.publication === 'unknown' ? 'Chưa rõ kết quả gửi. Kiểm tra tài khoản trước khi xử lý lại.' : 'Đang gửi bài. Không bấm đăng lại.'}</p>}
     {meta.publication === 'unknown' && <div className="mw-actions"><button className="btn btn-outline btn-sm" disabled={busy} onClick={() => confirm('Bài chưa lên Facebook?', 'Chỉ xác nhận khi bạn đã mở Fanpage và chắc chắn bài này chưa được đăng. Nếu bài đã đăng mà xác nhận nhầm, bài có thể bị đăng trùng.', () => act('resolveUnknown', { postId: post.id }))}>Đã kiểm tra: bài chưa đăng</button></div>}

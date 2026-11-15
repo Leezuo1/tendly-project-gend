@@ -124,7 +124,7 @@ export function FacebookPostsTab() {
 
   if (error) return <MarketingDataNotice error={error} onRetry={refresh} />;
   return <section className="tab-panel active fp-root" aria-label="Bài đăng Facebook">
-    <div className="fp-heading"><div><h2>Bài đăng trên Fanpage</h2><p className="fp-muted">Mở từng bài để xem nội dung và bình luận.</p></div>
+    <div className="fp-heading"><div><h2>Bài đăng trên Fanpage</h2></div>
       <button type="button" className="btn btn-outline btn-sm" disabled={loading || loadingMore} onClick={refresh}><PostIcon name="refresh" />Làm mới bài đăng</button></div>
     <div className="fp-toolbar">
       <label className="fp-search"><span className="fp-filter-label">Tìm bài đăng</span><span className="fp-search-input"><PostIcon name="search" /><input type="search" className="pc-input" placeholder="Tìm theo từ khóa, nội dung…" value={query} onChange={(e) => setQuery(e.target.value)} /></span></label>
@@ -138,7 +138,6 @@ export function FacebookPostsTab() {
       </div>}
     </div>
     {invalidRange && <p id="fp-range-error" role="alert" className="fp-error">Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.</p>}
-    <div className="fp-results-info"><span role="status">{shown.length} / {posts.length} bài đã tải</span><span>Tìm kiếm và sắp xếp áp dụng cho các bài đã tải · Giờ Việt Nam</span></div>
     {(loading || loadingMore) && <div role="status" className="fp-loading"><span className="pc-spinner" />{loadingMore ? 'Đang tải thêm bài viết…' : 'Đang tải bài đăng từ Facebook…'}</div>}
     {!loading && data && !posts.length && <div className="card pc-empty">Chưa có bài đăng Facebook để hiển thị.</div>}
     {!loading && posts.length > 0 && !shown.length && !invalidRange && <div className="card pc-empty">Không có bài phù hợp trong các bài đã tải. Hãy đổi bộ lọc{after ? ' hoặc tải thêm bài viết' : ''}.</div>}
