@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMockOnboarding } from '@/lib/hooks/useMockOnboarding';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { dashboardRequest } from '@/lib/services/postsClient';
-import { readPageAiProfile } from '@/lib/services/aiSettingsClient';
 import { currentAiKnowledge } from '@/lib/services/aiChat';
 import { productApi } from '@/lib/services/api';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
@@ -29,24 +28,14 @@ export function SmartSourcing() {
   return <div className={styles.root}>
     <header className="page-head"><div><h1>Smart Sourcing</h1><p>Tìm sản phẩm và nhà cung cấp từ dữ liệu thật, để AI phân tích và chỉ rõ nguồn.</p></div></header>
     {!ready ? <p role="status">Đang đọc thông tin shop…</p> : !workspace ? <section className="card"><h2>Bắt đầu từ ngành hàng của shop</h2><Link href="/cai-dat">Thiết lập thông tin shop →</Link></section>
-      : <SourcingFlow key={`${session.userId || session.username}:${workspace.industry}`} industry={workspace.industry} shopName={workspace.name} owner={session.userId || session.username} pageId={session.pageId} />}
+      : <SourcingFlow key={`${session.userId || session.username}:${workspace.industry}`} industry={workspace.industry} shopName={workspace.name} owner={session.userId || session.username} />}
   </div>;
 }
 
-function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string; shopName: string; owner: string; pageId: string | null }) {
+function SourcingFlow({ industry, shopName, owner }: { industry: string; shopName: string; owner: string }) {
   const [view, setView] = useState<Workspace>({ requests: [], decisions: [] });
   const [selectedId, setSelectedId] = useState('');
   const [criteria, setCriteria] = useState<SourcingCriteria>(() => defaultSourcingCriteria(industry));
-  useEffect(() => {
-    let active = true;
-    // Điền sẵn giá/MOQ/khu vực từ cấu hình AI Smart Sourcing của Page; lỗi thì giữ mặc định.
-    readPageAiProfile(pageId, owner).then(({ configuration }) => {
-      const rules = configuration.profiles.sourcing.rules;
-      const optional = (value: string) => value.trim() && Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : null;
-      if (active) setCriteria(current => ({ ...current, minPrice: optional(rules.minPrice || ''), maxPrice: optional(rules.maxPrice || ''), maxMoq: optional(rules.moq || ''), region: rules.region || current.region }));
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [pageId, owner]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -97,15 +86,17 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
     finally { inFlight.current = false; setBusy(false); }
   };
   const prepare = () => work(async () => {
-    let sent = criteria;
+    let sent = criteria, fromShop: string[] = [];
     // Không nhập gì thì tìm theo loại sản phẩm trong danh mục của shop; chưa có danh mục (hoặc lỗi đọc) thì server dùng từ khóa gợi ý của ngành.
     if (criteria.kind === 'tiktok' && !criteria.product.trim() && !criteria.keywords.length) {
       const samples = new Map(createSeed().products.map(product => [product.id, JSON.stringify(product)]));
       const fromCatalog = catalogKeywords(await productApi.list().catch(() => []), industries, samples);
-      if (fromCatalog.length) sent = { ...criteria, keywords: fromCatalog };
+      if (fromCatalog.length) { sent = { ...criteria, keywords: fromCatalog }; fromShop = fromCatalog; }
     }
     const next = await api({ action: 'prepare', criteria: sent, ...(selected && !selected.runId ? { id: selected.id, revision: selected.revision } : {}) });
     setView(next); setSelectedId(next.id!); setCriteria(next.requests.find(r => r.id === next.id)!.criteria);
+    // Sản phẩm trong danh mục không gắn ngành; nói rõ nguồn từ khóa để shop vừa đổi ngành kịp nhập từ khóa mới trước khi thu thập (tốn phí).
+    if (fromShop.length) setNotice(`Từ khóa lấy từ danh mục sản phẩm của shop: ${fromShop.join('; ')}. Nếu không đúng ngành hiện tại, hãy nhập từ khóa khác rồi chuẩn bị lại trước khi thu thập.`);
   });
   const collect = () => work(async () => {
     if (!selected || dirty) return;
@@ -131,13 +122,12 @@ function SourcingFlow({ industry, shopName, owner, pageId }: { industry: string;
   const stage = !selected ? 0 : !selected.runId ? 1 : !run || ['starting', 'running', 'unknown'].includes(run.status) ? 2 : 3;
   const isSupplier = criteria.kind === 'suppliers';
   const newRequest = () => { setSelectedId(''); setTransfer(null); setCriteria(old => ({ ...defaultSourcingCriteria(industry), minPrice: old.minPrice, maxPrice: old.maxPrice, maxMoq: old.maxMoq, region: old.region })); };
-  // Lượt của ngành cũ vẫn mở xem được, nhưng không đem từ khóa/sản phẩm cũ vào ngành hiện tại.
-  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria(request.criteria.industry === industry ? request.criteria : { ...request.criteria, industry, keywords: [], product: '' }); setTransfer(null); };
+  // Lượt của ngành cũ vẫn mở xem được, nhưng không đem từ khóa, sản phẩm, đối tượng khách hay yêu cầu cũ vào ngành hiện tại.
+  const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria(request.criteria.industry === industry ? request.criteria : { ...defaultSourcingCriteria(industry), kind: request.criteria.kind }); setTransfer(null); };
   return <>
     <div className={styles.context}>
       <span><strong>{shopName}</strong> · {industry}</span>
       <span>Tìm theo sản phẩm, từ khóa bạn nhập hoặc loại sản phẩm trong danh mục của shop; bài khớp từ khóa được xếp lên trước.</span>
-      <Link href="/cau-hinh-ai?tab=settings&ai=sourcing"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>Quy tắc AI Smart Sourcing</Link>
     </div>
     {error && <p role="alert" className={styles.error}>{error} <button className="btn btn-outline btn-sm" onClick={() => work(async () => { await load(); })}>Tải lại</button></p>}
     <ol className={styles.steps} aria-label="Tiến trình">{['Nhập nhu cầu', 'Kiểm tra truy vấn & phí', 'Thu thập dữ liệu', 'AI phân tích'].map((label, i) => <li key={label} data-state={i < stage ? 'done' : i === stage ? 'current' : 'todo'} aria-current={i === stage ? 'step' : undefined}><span aria-hidden="true">{i < stage ? '✓' : i + 1}</span>{label}</li>)}</ol>

@@ -19,8 +19,9 @@ function render(settings, mode = 'manage') {
     '@/components/shared/ToastProvider': { useToast: () => () => {} },
     '@/lib/services/postsClient': {},
     '@/lib/services/aiChat': {},
-    '@/lib/services/aiConfiguration': { defaultAiConfiguration: () => ({ profiles: { chat: profile } }), AI_RULE_FIELDS: { chat: [] } },
+    '@/lib/services/aiConfiguration': { defaultAiConfiguration: () => ({ profiles: { chat: profile } }) },
     './ai-configuration.module.css': { default: {} },
+    './RuleFields': { RuleFields: () => null },
   };
   const source = ts.transpileModule(readFileSync('components/features/ai-config/CustomerCareSettings.tsx', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },

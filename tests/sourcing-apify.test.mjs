@@ -74,7 +74,7 @@ test('request preview persists criteria without spending; approval binds one run
   const id = await f.prepareSourcingRequest('owner', criteria);
   let workspace = await f.sourcingWorkspace('owner');
   assert.equal(calls, 0); assert.deepEqual(workspace.requests[0].plan.queries, criteria.keywords);
-  assert.equal(workspace.requests[0].plan.maxChargeUsd, 0.2);
+  assert.equal(workspace.requests[0].plan.maxChargeUsd, 0.5);
   assert.deepEqual((await f.sourcingWorkspace('other')).requests, []);
   await assert.rejects(f.runSourcingRequest('other', id, 1, true), error => error.status === 404);
   await assert.rejects(f.runSourcingRequest('owner', id, 1, false), /Xác nhận/);
@@ -94,7 +94,7 @@ test('criteria validation and comparison preserve unknown money, units and MOQ',
   const f = await fixture(), criteria = { ...f.defaultSourcingCriteria(industry.industry), minPrice: 100, maxPrice: 200, maxMoq: 10 };
   for (const input of [{ keywords: ['  '] }, { keywords: ['áo\nsite:test'] }, { minPrice: 300 }, { maxMoq: -1 }, { resultLimit: 21 }, { resultLimit: 16 }]) assert.throws(() => f.parseSourcingCriteria({ ...criteria, ...input }));
   assert.equal(f.parseSourcingCriteria({ ...criteria, kind: 'suppliers', resultLimit: 20 }).resultLimit, 20, 'Google keeps its 20-result limit');
-  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo'], resultLimit: 15 }).actorInput.commentsPerPost, 5, 'comments capped so 15 videos fit the 0.2 USD cap');
+  assert.equal(f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo'], resultLimit: 15 }).actorInput.commentsPerPost, 5, 'comments capped so 15 videos stay well under the 0.5 USD cap');
   assert.throws(() => f.sourcingRequest('tiktok', { ...industry, keywords: ['áo polo'], resultLimit: 16 }));
   const item = { title: 'Áo cotton', text: '', price: 0, currency: null, unit: null, moq: null, region: null };
   const comparison = f.compareSourcingItem(item, criteria);
@@ -136,7 +136,7 @@ test('start uses fixed Actor, server header, budget and timeout; duplicate start
     calls++;
     assert.match(url, /actors\/clockworks~tiktok-scraper\/runs/);
     assert.equal(new URL(url).searchParams.get('timeout'), '300');
-    assert.equal(new URL(url).searchParams.get('maxTotalChargeUsd'), '0.2');
+    assert.equal(new URL(url).searchParams.get('maxTotalChargeUsd'), '0.5');
     assert.ok(!url.includes(process.env.APIFY_API_TOKEN));
     assert.equal(options.headers.Authorization, `Bearer ${process.env.APIFY_API_TOKEN}`);
     assert.ok(JSON.parse(options.body).resultsPerPage <= 20);

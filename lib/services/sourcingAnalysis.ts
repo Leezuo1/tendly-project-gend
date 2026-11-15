@@ -2,6 +2,7 @@ import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { generateGeminiJson, GeminiNotConfigured } from '@/lib/services/gemini';
 import { publicSourcingRun, SourcingRunError } from '@/lib/services/sourcingRuns';
 import { sourcingItems } from '@/lib/services/sourcingCriteria';
+import { sourcingPrompt } from '@/lib/services/sourcingPrompts';
 import type { SourcingAnalysis, SourcingItem, SourcingRun, SupplierTier, TrendStatus } from '@/lib/types/sourcing';
 
 const IDS = { type: 'array', items: { type: 'string' } };
@@ -143,14 +144,16 @@ export async function analyzeSourcingRun(owner: string, runId: unknown): Promise
   return analysis;
 }
 
-/** Lượt TikTok: vai trò và nguyên tắc nằm ở lớp TikTok của cấu hình admin; phần này chỉ mô tả dữ liệu và cấu trúc báo cáo. */
+/** Lượt TikTok: vai trò và nguyên tắc nằm ở sourcingPrompt; phần còn lại mô tả dữ liệu và cấu trúc báo cáo. */
 function analyzeTikTok(items: SourcingItem[], ids: Map<string, string>, request: Record<string, unknown>, run: SourcingRun) {
   const commentCount = items.reduce((sum, item) => sum + (item.comments?.length ?? 0), 0);
   const corpus = items.map(item => [item.text, ...(item.comments ?? []).map(comment => comment.text)].join('\n')).join('\n');
   const custom = labelled(request, [['audience', 'Nhóm khách / phong cách'], ['required', 'Điều cần có'], ['excluded', 'Điều cần loại bỏ']]);
   return generateGeminiJson({
     role: 'sourcing', platform: 'tiktok', temperature: 0.2, maxOutputTokens: 8000, signal: AbortSignal.timeout(50_000), schema: TIKTOK_SCHEMA,
-    system: `ĐẦU VÀO
+    system: `${sourcingPrompt('tiktok')}
+
+ĐẦU VÀO
 - Ngành hàng gốc của shop: ${text(request.industry, 100) || 'chưa rõ'}. Sản phẩm quan tâm: ${text(request.product, 120) || 'chưa nêu'}. Từ khóa khám phá: ${JSON.stringify(run.context.keywords ?? [])}.
 - Hướng dẫn thêm từ người dùng: ${custom || 'không có'}.
 - Dữ liệu: mỗi bài gồm caption, chỉ số tương tác và tối đa 5 bình luận nhiều lượt thích nhất (${commentCount} bình luận tổng cộng). Không có transcript, hình ảnh video hay số liệu lượng tìm kiếm.
@@ -178,7 +181,7 @@ const labelled = (request: Record<string, unknown>, fields: [string, string][]) 
   .map(([key, label]) => { const value = request[key]; return typeof value === 'number' ? `${label}: ${value}` : text(value, 500) && `${label}: ${text(value, 500)}`; })
   .filter(Boolean).join('; ');
 
-/** Lượt Google: vai trò và nguyên tắc nằm ở lớp Google của cấu hình admin; phần này chỉ mô tả dữ liệu và cấu trúc báo cáo. */
+/** Lượt Google: vai trò và nguyên tắc nằm ở sourcingPrompt; phần còn lại mô tả dữ liệu và cấu trúc báo cáo. */
 function analyzeSuppliers(items: SourcingItem[], ids: Map<string, string>, request: Record<string, unknown>, run: SourcingRun) {
   const pagesRead = items.filter(item => item.page).length;
   const pages = new Map(items.map(item => [item.key, `${item.title}\n${item.text}\n${item.page ?? ''}`]));
@@ -187,7 +190,9 @@ function analyzeSuppliers(items: SourcingItem[], ids: Map<string, string>, reque
     ['audience', 'Nhóm khách / phong cách'], ['required', 'Điều cần có'], ['excluded', 'Điều cần loại bỏ']]);
   return generateGeminiJson({
     role: 'sourcing', platform: 'google', temperature: 0.2, maxOutputTokens: 8000, signal: AbortSignal.timeout(50_000), schema: SUPPLIER_SCHEMA,
-    system: `ĐẦU VÀO
+    system: `${sourcingPrompt('google')}
+
+ĐẦU VÀO
 - Ngành hàng gốc của shop: ${text(request.industry, 100) || 'chưa rõ'}. Sản phẩm cần tìm nguồn: ${text(request.product, 120) || 'chưa nêu'}. Từ khóa tìm kiếm: ${JSON.stringify(run.context.queries ?? [])}.
 - Nhu cầu và hướng dẫn thêm từ người dùng: ${needs || 'không có'}.
 - Dữ liệu: ${items.length} kết quả Google; mỗi kết quả gồm tiêu đề, đoạn mô tả của Google và nội dung trang (phần đầu và phần cuối trang) nếu đọc được — đọc được ${pagesRead}/${items.length} trang.

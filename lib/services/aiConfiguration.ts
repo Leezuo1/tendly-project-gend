@@ -28,13 +28,6 @@ export const AI_ROLES = [
     output: 'Đạt / cần sửa / chặn; vị trí vấn đề, căn cứ đối chiếu và đề xuất chỉnh sửa.',
     guard: 'AI kiểm tra vẫn có thể sai; không thay quyền duyệt của shop hoặc kiểm tra quyền bằng backend.',
     sources: ['shop', 'products', 'faqs', 'campaign'] },
-  { id: 'sourcing', label: 'AI Smart Sourcing', description: 'Giải thích tín hiệu sản phẩm và nguồn hàng từ dữ liệu có bằng chứng.',
-    goal: 'Nhận diện sản phẩm liên quan và giải thích tín hiệu đáng xem xét từ dữ liệu đã thu thập.',
-    tone: 'Có căn cứ, phân biệt điều đã biết với thông tin còn thiếu.',
-    input: 'Ngành hàng, từ khóa, dữ liệu thu thập, URL nguồn và thời điểm thu thập.',
-    output: 'Sản phẩm đáng chú ý, nguồn tham khảo, bằng chứng và dữ kiện cần shop xác minh.',
-    guard: 'Một lần thu thập không chứng minh xu hướng tăng. Không tự xác minh nhà cung cấp hay đặt hàng.',
-    sources: ['shop', 'products', 'market'] },
   { id: 'livestream', label: 'AI Livestream', description: 'Gom câu hỏi, hỗ trợ phản hồi và chuẩn bị đơn nháp trong phiên live.',
     goal: 'Hỗ trợ xử lý bình luận theo nhóm, tư vấn sản phẩm đang lên sóng và đề xuất đơn nháp.',
     tone: 'Nhanh, dễ đọc, rõ sản phẩm và những thông tin cần xác nhận.',
@@ -45,11 +38,11 @@ export const AI_ROLES = [
 ] as const;
 export type AiRoleId = typeof AI_ROLES[number]['id'];
 
-export const AI_PLATFORMS = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', zalo: 'Zalo', google: 'Google' } as const;
+export const AI_PLATFORMS = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', zalo: 'Zalo' } as const;
 export type AiPlatform = keyof typeof AI_PLATFORMS;
 export const ROLE_PLATFORMS: Record<AiRoleId, AiPlatform[]> = {
   chat: ['facebook', 'instagram', 'zalo'], content: ['facebook', 'instagram', 'tiktok'],
-  review: ['facebook', 'instagram', 'tiktok'], sourcing: ['tiktok', 'google'], livestream: ['facebook', 'tiktok'],
+  review: ['facebook', 'instagram', 'tiktok'], livestream: ['facebook', 'tiktok'],
 };
 /** Thiết lập nền do admin đặt (lưu trên server); chi tiết vận hành nằm ở AiProfile của shop. */
 export const GLOBAL_AI_FIELDS = {
@@ -80,14 +73,6 @@ export const AI_RULE_FIELDS: Record<AiRoleId, AiRuleField[]> = {
     { key: 'brandVoice', label: 'Kiểm tra giọng thương hiệu', value: 'yes', type: 'check' },
     { key: 'avoid', label: 'Từ ngữ cần tránh', value: 'Cam kết tuyệt đối, tốt nhất, đảm bảo 100%' },
     { key: 'result', label: 'Cách trình bày kết quả', value: 'Liệt kê lỗi, vị trí và gợi ý sửa để chủ shop duyệt' },
-  ],
-  sourcing: [
-    { key: 'category', label: 'Ngành hàng', value: 'Thời trang & Phụ kiện' },
-    { key: 'minPrice', label: 'Giá từ (VND)', value: '', type: 'number' },
-    { key: 'maxPrice', label: 'Giá đến (VND)', value: '', type: 'number' },
-    { key: 'moq', label: 'MOQ tối đa chấp nhận', value: '', type: 'number' },
-    { key: 'region', label: 'Khu vực nhà cung cấp', value: 'Việt Nam' },
-    { key: 'criteria', label: 'Tiêu chí bổ sung', value: 'Có thông tin giá, số lượng đặt tối thiểu và nguồn tham khảo rõ ràng' },
   ],
   livestream: [
     { key: 'tone', label: 'Giọng điệu', value: 'Năng động, ngắn gọn, dễ nghe' },
@@ -174,7 +159,6 @@ export function parseAiConfiguration(value: unknown): AiConfiguration {
         platformRules[platform as AiPlatform] = { enabled: boolean(override.enabled), values: parseRules(override.values, true) };
       }
     }
-    if (role.id === 'sourcing' && rules.minPrice && rules.maxPrice && Number(rules.minPrice) > Number(rules.maxPrice)) throw new Error('Giá đến phải lớn hơn hoặc bằng giá từ.');
     return [role.id, {
       name: text(p.name, 100, `${role.label} — tên`), enabled: boolean(p.enabled),
       goal: text(p.goal, 1500, `${role.label} — mục tiêu`), tone: text(p.tone, 500, `${role.label} — văn phong`),

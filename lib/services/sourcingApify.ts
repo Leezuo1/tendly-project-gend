@@ -3,9 +3,10 @@ import type { SupplierCandidate } from '@/lib/types/sourcing';
 
 export type SourcingKind = 'tiktok' | 'suppliers';
 export const sourcingActors = { tiktok: 'clockworks/tiktok-scraper', suppliers: 'apify/google-search-scraper' } as const;
-// Trần phí Apify cho mỗi lượt chạy (maxTotalChargeUsd); khối lượng TikTok (TIKTOK_MAX_RESULTS) được cỡ để vừa trần này.
-export const sourcingBudgetUsd = { tiktok: 0.2, suppliers: 0.2 } as const;
-// Giá thật mỗi lượt: ~0,0064 USD/video + ~0,00125 USD/bình luận; 15 video × 5 bình luận ≈ 0,19 USD, vừa trần 0,2.
+// Trần phí Apify cho mỗi lượt chạy (maxTotalChargeUsd). Apify từ chối trần dưới 0,5 USD (max-total-charge-usd-below-minimum), nên đây là mức thấp nhất dùng được.
+// Chi phí thật bị chặn bởi khối lượng (TIKTOK_MAX_RESULTS × COMMENTS_PER_POST), không phải bởi trần.
+export const sourcingBudgetUsd = { tiktok: 0.5, suppliers: 0.5 } as const;
+// Giá thật mỗi lượt: ~0,0064 USD/video + ~0,00125 USD/bình luận; 15 video × 5 bình luận ≈ 0,19 USD.
 export const TIKTOK_MAX_RESULTS = 15;
 const COMMENTS_PER_POST = 5;
 
