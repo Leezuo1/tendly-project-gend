@@ -33,6 +33,9 @@
 .root textarea { resize: vertical; }
 .root input:disabled, .root textarea:disabled { opacity: 1; background: var(--sand); color: var(--ink-soft); }
 .root .checkLabel input { width: 16px; height: 16px; accent-color: var(--coral-deep); }
+.root .pencil { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 5px; background: var(--canvas); color: var(--ink); cursor: pointer; }
+.root .pencil:hover:not(:disabled) { background: var(--sand); border-color: var(--ink-soft); }
+.root .pencil[data-active='true'] { background: var(--sand); color: var(--moss); border-color: var(--moss); }
 .root .detail { margin-bottom: 18px; }
 .root .detail h3 { font-size: 14px; margin-bottom: 8px; }
 .root .detail p { font-size: 13px; color: var(--ink-soft); max-width: 75ch; line-height: 1.7; margin-top: 6px; }

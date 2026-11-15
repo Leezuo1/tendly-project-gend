@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useMockOnboarding } from '@/lib/hooks/useMockOnboarding';
 import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { dashboardRequest } from '@/lib/services/postsClient';
@@ -149,25 +149,25 @@ function SourcingFlow({ industry, shopName }: { industry: string; shopName: stri
     <div className={styles.tabs} role="tablist" aria-label="Chế độ làm việc">{MODES.map(mode => <button key={mode.kind} type="button" role="tab" id={`tab-${mode.kind}`} aria-selected={kind === mode.kind} aria-controls="sourcing-panel" disabled={busy} onClick={() => switchKind(mode.kind)}><strong>{mode.label}</strong><small>{mode.hint}</small></button>)}</div>
     <div id="sourcing-panel" role="tabpanel" aria-labelledby={`tab-${kind}`}>
       <form className={styles.bar} onSubmit={e => { e.preventDefault(); void search(); }}>
-        <fieldset disabled={busy} className={styles.barFields}>
+        <fieldset disabled={busy} className={styles.hero}>
+          <label className={styles.heroField}>{isSupplier ? 'Sản phẩm cần tìm' : 'Ngách hoặc sản phẩm bạn quan tâm (không bắt buộc)'}<input required={isSupplier} maxLength={120} value={criteria.product} onChange={e => change('product', e.target.value)} placeholder={isSupplier ? 'Ví dụ: áo thun cotton' : `Ví dụ: ${scopedTiktokQueries(industry, [])[0] || 'áo thun cotton'}`} /></label>
+          <button className="btn btn-primary" type="submit">{busy ? 'Đang xử lý…' : isSupplier ? 'Phân tích ngay' : 'Khám phá ngay'}</button>
+        </fieldset>
+        <fieldset disabled={busy} className={styles.barFields} onKeyDown={noEnterSubmit}>
           {isSupplier ? <>
-            <label className={`${styles.field} ${styles.grow}`}>Sản phẩm cần tìm<input required maxLength={120} value={criteria.product} onChange={e => change('product', e.target.value)} placeholder="Ví dụ: áo thun cotton" /></label>
             <label className={styles.field}>Khu vực ưu tiên<select value={criteria.region} onChange={e => change('region', e.target.value)}>{regionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <div className={styles.range}>{(['minPrice', 'maxPrice'] as const).map((key, i) => <label key={key} className={styles.field}>{['Giá nhập từ (đ)', 'Đến (đ)'][i]}<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria[key] ?? ''} onChange={e => change(key, e.target.value === '' ? null : Number(e.target.value))} /></label>)}</div>
-          </> : <>
-            <div className={styles.static}><span>Ngành hàng</span><strong>{industry}</strong></div>
-            <label className={`${styles.field} ${styles.grow}`}>Ngách hoặc sản phẩm (không bắt buộc)<input maxLength={120} value={criteria.product} onChange={e => change('product', e.target.value)} placeholder="Ví dụ: áo thun cotton" /></label>
-          </>}
-          <button className="btn btn-primary" type="submit">{busy ? 'Đang xử lý…' : isSupplier ? 'Phân tích ngay' : 'Quét xu hướng mới nhất'}</button>
+          </> : <p className={styles.industry}>Ngành hàng của shop: <strong>{industry}</strong></p>}
         </fieldset>
-        <details className={styles.more}><summary>Tùy chỉnh thêm</summary><fieldset disabled={busy} className={styles.moreFields}>
-          {!isSupplier && <label className={styles.field}>Từ khóa riêng<input maxLength={362} value={criteria.keywords.join(';')} onChange={e => change('keywords', e.target.value ? e.target.value.split(';') : [])} placeholder={`Ví dụ: ${scopedTiktokQueries(industry, []).slice(0, 2).join('; ') || 'tên sản phẩm; kiểu dáng'}`} /><small>Tối đa 3, cách nhau bằng dấu ;. Để trống để tìm theo loại sản phẩm trong danh mục của shop.</small></label>}
+        <details className={styles.more}><summary>Tùy chỉnh thêm</summary><fieldset disabled={busy} className={styles.moreFields} onKeyDown={noEnterSubmit}>
+          {!isSupplier && <TagInput label="Từ khóa riêng" hint="Tối đa 3. Để trống để tìm theo loại sản phẩm trong danh mục của shop." max={3} value={criteria.keywords} onChange={keywords => change('keywords', keywords)} placeholder={scopedTiktokQueries(industry, [])[1] || 'tên sản phẩm, kiểu dáng'} clean={text => text.replace(/[^\p{L}\p{N} .(),&+%\/-]/gu, '').slice(0, 120)} />}
           {isSupplier && <><label className={styles.field}>Lượng dự kiến nhập<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria.quantity ?? ''} onChange={e => change('quantity', e.target.value === '' ? null : Number(e.target.value))} /></label>
             <label className={styles.field}>MOQ tối đa<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria.maxMoq ?? ''} onChange={e => change('maxMoq', e.target.value === '' ? null : Number(e.target.value))} /></label>
-            <label className={styles.field}>Đơn vị hàng<input required maxLength={60} value={criteria.unit} onChange={e => change('unit', e.target.value)} /></label>
+            <label className={styles.field}>Đơn vị hàng<input maxLength={60} value={criteria.unit} onChange={e => change('unit', e.target.value)} /></label>
             {(['quality', 'leadTime'] as const).map((key, i) => <label key={key} className={styles.field}>{['Chứng từ cần có', 'Thời gian cung ứng mong muốn'][i]}<input maxLength={key === 'leadTime' ? 100 : 500} value={criteria[key]} onChange={e => change(key, e.target.value)} /></label>)}</>}
-          {(['audience', 'required', 'excluded'] as const).map((key, i) => <label key={key} className={styles.field}>{['Nhóm khách / phong cách', 'Điều cần có (cách nhau bằng dấu phẩy)', 'Điều cần loại bỏ'][i]}<input maxLength={500} value={criteria[key]} onChange={e => change(key, e.target.value)} placeholder={['Ví dụ: nữ văn phòng 25–35 tuổi', 'Ví dụ: cotton, form rộng', 'Ví dụ: hàng order nước ngoài'][i]} /></label>)}
-          <label className={styles.field}>Số kết quả<input type="number" min="1" max={isSupplier ? 20 : 15} required value={criteria.resultLimit} onChange={e => change('resultLimit', Number(e.target.value))} /></label>
+          <label className={styles.field}>Nhóm khách / phong cách<input maxLength={500} value={criteria.audience} onChange={e => change('audience', e.target.value)} placeholder="Ví dụ: nữ văn phòng 25–35 tuổi" /></label>
+          <TagInput label="Điều cần có" value={splitList(criteria.required)} onChange={list => change('required', list.join(', '))} placeholder="Ví dụ: cotton" clean={text => text.replace(/,/g, '').slice(0, 100)} />
+          <TagInput label="Điều cần loại bỏ" value={splitList(criteria.excluded)} onChange={list => change('excluded', list.join(', '))} placeholder="Ví dụ: hàng order nước ngoài" clean={text => text.replace(/,/g, '').slice(0, 100)} />
         </fieldset></details>
         <p className={styles.lastRun}>{latest ? <>Lần quét gần nhất: {when(latest.updatedAt)}{resultCount(latest.run) > 0 && ` (${resultCount(latest.run)} ${isSupplier ? 'trang web' : 'video TikTok'})`}</> : 'Chưa có lần quét nào.'}
           {mine.length > 1 && <> · <button type="button" className={styles.link} aria-expanded={historyOpen} aria-controls="sourcing-history" onClick={() => setHistoryOpen(open => !open)}>{historyOpen ? 'Ẩn các lần trước' : 'Xem các lần trước'}</button></>}</p>
@@ -179,7 +179,8 @@ function SourcingFlow({ industry, shopName }: { industry: string; shopName: stri
       <p aria-live="polite" className={styles.notice}>{notice && <>{notice.message}{notice.href && <> <Link href={notice.href}>{notice.label}</Link></>}</>}</p>
       <section className={styles.results} aria-label="Kết quả">
         {!selected ? <div className={styles.idle}><h2>{isSupplier ? 'Tìm xưởng và nhà phân phối cho món bạn muốn bán' : 'Xem ngành của bạn đang có món gì nổi'}</h2>
-          <p>{isSupplier ? 'Nhập sản phẩm muốn nhập hàng rồi bấm Phân tích ngay. AI so sánh xưởng, tổng kho sỉ, MOQ, giá sỉ và gợi ý cách liên hệ.' : 'Bấm Quét xu hướng mới nhất. AI cho biết món nào đang nổi, khách thích và lo điều gì, và nên quay video thế nào.'}</p></div> : <>
+          <p>{isSupplier ? 'Nhập sản phẩm muốn nhập hàng rồi bấm Phân tích ngay. AI so sánh xưởng, tổng kho sỉ, MOQ, giá sỉ và gợi ý cách liên hệ.' : 'Bấm Khám phá ngay. AI cho biết món nào đang nổi, khách thích và lo điều gì, và nên quay video thế nào.'}</p>
+          {!isSupplier && scopedTiktokQueries(industry, []).length > 0 && <div className={styles.suggest}><span className={styles.muted}>Gợi ý ngách cho ngành {industry}:</span><ul>{scopedTiktokQueries(industry, []).map(query => <li key={query}><button type="button" disabled={busy} onClick={() => change('product', query)}>{query}</button></li>)}</ul></div>}</div> : <>
           <header className={styles.resultHead}><div><h2>{title}</h2><p className={styles.muted}>{selected.criteria.kind === 'tiktok' ? 'TikTok Việt Nam · 7 ngày gần nhất' : `Google · ${selected.criteria.region}`}{resultCount(run) > 0 && ` · ${resultCount(run)} ${selected.criteria.kind === 'tiktok' ? 'video' : 'trang web'}`} · {when(selected.updatedAt)}</p></div>
             {run && <span className={styles.badge} data-tone={(RUN_BADGE[run.status] ?? RUN_BADGE.draft).tone}>{(RUN_BADGE[run.status] ?? RUN_BADGE.draft).label}</span>}</header>
           {!selected.runId ? <p className={styles.warning}>Lượt này chưa được quét. Bấm {isSupplier ? 'Phân tích ngay' : 'Quét xu hướng mới nhất'} để bắt đầu.</p>
@@ -192,6 +193,30 @@ function SourcingFlow({ industry, shopName }: { industry: string; shopName: stri
     </div>
     {transfer && <Transfer key={`${transfer.runId}:${transfer.item.key}:${transfer.kind}`} {...transfer} industry={industry} busy={busy} error={error} work={work} onClose={() => setTransfer(null)} onDone={setNotice} />}
   </>;
+}
+
+// Chỉ ô tìm chính được gửi form bằng Enter; Enter ở ô khác không được kích hoạt lượt quét (có tính phí).
+const noEnterSubmit = (event: React.KeyboardEvent) => { if (event.key === 'Enter' && (event.target as HTMLElement).tagName === 'INPUT') event.preventDefault(); };
+const splitList = (text: string) => text.split(',').map(item => item.trim()).filter(Boolean);
+
+/** Gõ rồi Enter (hoặc dấu phẩy) để thành thẻ, có nút × để xóa. Không tách theo dấu cách vì từ khóa tiếng Việt thường gồm nhiều chữ ("áo thun"). */
+function TagInput({ label, hint, value, onChange, placeholder, max = 10, clean }: { label: string; hint?: string; value: string[]; onChange: (value: string[]) => void; placeholder?: string; max?: number; clean: (text: string) => string }) {
+  const id = useId();
+  const [draft, setDraft] = useState('');
+  const full = value.length >= max;
+  const add = (raw: string) => { const fresh = [...new Set(raw.split(/[,;]/).map(part => clean(part).trim()).filter(text => text.length >= 2 && !value.includes(text)))].slice(0, max - value.length); if (fresh.length) onChange([...value, ...fresh]); setDraft(''); };
+  return <div role="group" aria-labelledby={id} className={styles.field}>
+    <span id={id}>{label}</span>
+    <div className={styles.tagBox}>
+      {value.map(tag => <span key={tag} className={styles.tag}>{tag}<button type="button" aria-label={`Xóa ${tag}`} onClick={() => onChange(value.filter(item => item !== tag))}>×</button></span>)}
+      <input aria-labelledby={id} value={draft} disabled={full} placeholder={full ? `Đã đủ ${max} thẻ` : value.length ? '' : placeholder} onChange={e => /[,;]/.test(e.target.value) && e.target.value.length > 1 ? add(e.target.value) : setDraft(e.target.value)} onBlur={() => draft.trim() && add(draft)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ',' || e.key === ';') { e.preventDefault(); if (draft.trim()) add(draft); }
+          else if (e.key === 'Backspace' && !draft && value.length) onChange(value.slice(0, -1));
+        }} />
+    </div>
+    <small>{hint ? `${hint} ` : ''}Nhấn Enter để thêm.</small>
+  </div>;
 }
 
 const METRIC_LABEL: Record<string, string> = { views: 'Lượt xem', likes: 'Thích', comments: 'Bình luận', shares: 'Chia sẻ' };
@@ -267,15 +292,16 @@ function Report({ analysis, items, kind, product, onTransfer }: { analysis: Sour
       {ideas}
     </>}
     {analysis.caveats.length > 0 && <section className={styles.block}><h3>Lưu ý khi dùng báo cáo</h3><ul className={styles.caveats}>{analysis.caveats.map((caveat, i) => <li key={i}>{caveat}</li>)}</ul></section>}
-    <details className={styles.fold}><summary>{kind === 'tiktok' ? `Video gốc đã quét (${cited.length})` : `Trang web nguồn (${cited.length})`}</summary>
-      {!cited.length ? <p className={styles.muted}>Không có kết quả nào đủ liên quan để làm căn cứ.</p> : <ul className={styles.sources}>{cited.map(item => <li key={item.key}>
-        <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title || 'Bài nguồn'}</a>
-        <span className={styles.muted}>{kind === 'tiktok' ? metricsText(item.metrics) || 'TikTok' : host(item.url)}{item.comments?.length ? ` · ${item.comments.length} bình luận đã đọc` : ''}</span>
-        {report?.sourceNotes[item.key] && <p>{report.sourceNotes[item.key]}</p>}
-        <p className={styles.sourceText}>{item.text.slice(0, 280)}{item.text.length > 280 ? '…' : ''}</p>
-        <span className={styles.actions}><button type="button" className="btn btn-outline btn-sm" onClick={() => onTransfer(item, 'product')}>Nhập sản phẩm</button><button type="button" className="btn btn-outline btn-sm" onClick={() => onTransfer(item, 'marketing')}>Tạo brief Marketing</button></span>
-      </li>)}</ul>}
-    </details>
+    {kind === 'tiktok' && <section className={styles.block}><h3>Nguồn đối chiếu</h3>
+      {!cited.length ? <p className={styles.muted}>Không có kết quả nào đủ liên quan để làm căn cứ.</p> : <div className={styles.tableWrap}><table className={styles.table}>
+        <thead><tr><th scope="col">Kênh và bài gốc</th><th scope="col">Tương tác chính</th><th scope="col">Điểm đắt giá nhất của bài</th><th scope="col">Thao tác</th></tr></thead>
+        <tbody>{cited.map(item => <tr key={item.key}>
+          <th scope="row" data-label="Kênh và bài gốc"><span className={styles.muted}>{kind === 'tiktok' ? 'TikTok' : host(item.url)}</span><a href={item.url} target="_blank" rel="noopener noreferrer">{item.title || 'Bài nguồn'}</a></th>
+          <td data-label="Tương tác chính">{kind === 'tiktok' ? metricsText(item.metrics) || '—' : 'Kết quả tìm trên Google'}{!!item.comments?.length && <span className={styles.muted}> · AI đã đọc {item.comments.length} bình luận</span>}</td>
+          <td data-label="Điểm đắt giá nhất của bài">{report?.sourceNotes[item.key] || `${item.text.slice(0, 200)}${item.text.length > 200 ? '…' : ''}`}</td>
+          <td data-label="Thao tác"><div className={styles.rowActions}><button type="button" className="btn btn-outline btn-sm" onClick={() => onTransfer(item, 'product')}>Nhập sản phẩm</button><button type="button" className={styles.link} onClick={() => onTransfer(item, 'marketing')}>Tạo brief Marketing</button></div></td>
+        </tr>)}</tbody></table></div>}
+    </section>    }
     <p className={styles.footnote}>Phân tích bởi AI Smart Sourcing lúc {when(analysis.createdAt)}. AI có thể sai; hãy kiểm tra lại trước khi nhập hàng hoặc đăng bài.</p>
   </div>;
 }

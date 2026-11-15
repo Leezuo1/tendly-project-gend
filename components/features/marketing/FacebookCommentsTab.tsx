@@ -93,7 +93,7 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
               : 'Chưa đồng bộ sản phẩm và FAQ'}
           </span>
         </div>
-        <p id="fc-knowledge-help" className="fc-note">Cập nhật lại sau khi đổi sản phẩm hoặc FAQ để AI dùng dữ liệu mới nhất.</p>
+        <p id="fc-knowledge-help" className="fc-note">Sản phẩm và FAQ được AI lấy từ danh mục mới nhất; bấm đồng bộ một lần đầu để lưu dữ liệu AI lên máy chủ.</p>
         <div className="fc-info" role="note" aria-label="Chính sách nhắn tin Facebook"><span className="fc-info-icon" aria-hidden="true">i</span>
           <p>Mỗi bình luận chỉ được một tin nhắn riêng trong 7 ngày. Khách cần nhắn lại để mở cửa sổ trò chuyện 24 giờ.</p>
         </div>
@@ -118,11 +118,6 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
         {processDisabledReason && <span className="fc-tooltip" id="fc-process-tooltip" role="tooltip">{processDisabledReason}</span>}
         </span>
       </div>
-      <div role="status" aria-live="polite" className="fc-count">{data && <>
-        {loading ? 'Đang cập nhật…' : 'Tự cập nhật mỗi 3 giây'}
-        {data.sync?.syncedAt && <> · Đồng bộ Facebook {relativeTime(data.sync.syncedAt).toLocaleLowerCase('vi')}</>}
-        {!!data.comments.length && <> · Hiển thị {comments.length} / {data.comments.length} bình luận · {groups.length} nhóm người dùng</>}
-      </>}</div>
       {data?.sync?.error && <p className="fc-warning" role="alert">{data.sync.error} Danh sách đang hiển thị dữ liệu đã lưu; hệ thống sẽ thử đồng bộ lại.</p>}
       {!data ? <p role="status" className="fc-note">Đang tải bình luận…</p> : !data.comments.length ? <div className="card pc-empty fc-empty">
         <div className="fc-empty-illustration" aria-hidden="true">

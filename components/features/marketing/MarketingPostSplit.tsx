@@ -19,13 +19,13 @@ export function MarketingPostSplit({ view, selectedId, busy, error, onSelect, ac
   const current = rows.find(row => row.post.id === selectedId) ?? rows[0];
   return <div className="mw-split">
     <ul className="mw-split-list mw-post-list" aria-label="Bài viết">{rows.map(({ meta, post }) => { const status = draftStatus(view, meta); return <li key={post.id}>
-      <button type="button" disabled={busy} aria-current={post.id === current.post.id ? 'true' : undefined} onClick={() => onSelect(post.id)}>
+      <button type="button" aria-current={post.id === current.post.id ? 'true' : undefined} onClick={() => onSelect(post.id)}>
         <span className="mw-row-top"><b>{post.title}</b><span className={`mw-badge ${status.tone}`}>{status.label}</span></span>
         <span className="mw-post-excerpt">{post.content}</span>
         <span className="mw-row-meta">{view.workspace.campaigns.find(c => c.id === meta.campaignId)?.name} · {created(post.createdAt)}</span>
       </button></li>; })}</ul>
     <div className="mw-split-detail">
-      <MarketingDraft key={`${current.post.id}:${current.post.updatedAt}:${current.meta.reviewedAt}:${current.post.image?.updatedAt}`} post={current.post} meta={current.meta} view={view} busy={busy} error={error} act={act} confirm={confirm} upload={upload} onComments={onComments} />
+      <MarketingDraft key={current.post.id} post={current.post} meta={current.meta} view={view} busy={busy} error={error} act={act} confirm={confirm} upload={upload} onComments={onComments} />
     </div>
   </div>;
 }

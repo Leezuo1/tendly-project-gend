@@ -1,4 +1,5 @@
 import type { AiKnowledge } from '@/lib/types/ai';
+import type { MockDb } from '@/lib/types/admin';
 import { parseProductDetails } from '@/lib/services/productDetails';
 
 export class InvalidAiKnowledge extends Error {}
@@ -37,6 +38,21 @@ function list(value: unknown, max: number): unknown[] {
 }
 
 const strings = (value: unknown) => list(value, 100).map((v) => text(v, 200));
+
+/** Dữ liệu FAQ & sản phẩm của shop (phần của mock DB mà AI được đọc). */
+export type CatalogDb = Pick<MockDb, 'shop' | 'productSource' | 'products' | 'faqs' | 'triggers'>;
+
+/** Dựng nguồn tri thức từ danh mục; dùng chung cho trình duyệt và máy chủ để hai bên luôn cho cùng kết quả. */
+export function buildKnowledge(db: CatalogDb): AiKnowledge {
+  return structuredClone({
+    shop: { name: db.shop.name, email: db.shop.email, phone: db.shop.phone },
+    productSource: { name: db.productSource.name, connected: db.productSource.connected, lastSyncedAt: db.productSource.lastSyncedAt },
+    products: db.products.map(p => ({ id: p.id, sku: p.sku, name: p.name, material: p.material, category: p.category,
+      colors: p.colors, sizes: p.sizes, qty: p.qty, price: p.price, ...parseProductDetails({ ...p }) })),
+    faqs: db.faqs.filter(f => f.active),
+    emailTriggers: db.triggers.filter(t => t.enabled),
+  });
+}
 
 /** Kiểm tra và chỉ giữ các trường nguồn tri thức được phép gửi tới model. */
 export function parseAiKnowledge(value: unknown): AiKnowledge {

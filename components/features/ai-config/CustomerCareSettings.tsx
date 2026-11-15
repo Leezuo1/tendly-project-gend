@@ -18,6 +18,7 @@ export function CustomerCareSettings({ mode, initialProfile, platform }: { mode:
   const [page, setPage] = useState<CarePageProfile | null>(null);
   const [assigned, setAssigned] = useState(false);
   const [pageEnabled, setPageEnabled] = useState(false);
+  const [catalogAt, setCatalogAt] = useState<number | null>(null);
   const [knowledge, setKnowledge] = useState<AiKnowledge | null>(null);
   const [message, setMessage] = useState('Khách muốn đổi size thì cần đáp ứng điều kiện nào?');
   const [preview, setPreview] = useState<AiChatReply | null>(null);
@@ -27,9 +28,9 @@ export function CustomerCareSettings({ mode, initialProfile, platform }: { mode:
   const load = useCallback(async () => {
     setBusy(true);
     try {
-      const value = await (await dashboardRequest('/api/customer-care')).json() as Settings & { currentPageProfile: CarePageProfile };
+      const value = await (await dashboardRequest('/api/customer-care')).json() as Settings & { currentPageProfile: CarePageProfile; catalogUpdatedAt: number | null };
       setSettings(value); setProfile(value.profile ?? initialProfile); setPage(value.currentPageProfile);
-      setAssigned(value.pageAssigned); setPageEnabled(value.pageEnabled);
+      setCatalogAt(value.catalogUpdatedAt); setAssigned(value.pageAssigned); setPageEnabled(value.pageEnabled);
       setKnowledge(value.knowledge ?? currentAiKnowledge()); setPreview(null); setError('');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa tải được AI Chat.'); }
     finally { setBusy(false); }
@@ -87,8 +88,8 @@ export function CustomerCareSettings({ mode, initialProfile, platform }: { mode:
         <label className={styles.checkLabel}><input type="checkbox" checked={pageEnabled} disabled={busy || !settings || !assigned} onChange={event => { setPageEnabled(event.target.checked); reset(); }} />Cho phép AI Chat trên Fanpage này</label>
       </div>
       <div className={styles.careScope}><h3>Tri thức & chính sách</h3><p>{knowledge?.products.length ?? 0} sản phẩm · {knowledge?.faqs.length ?? 0} FAQ đang bật</p>
-        <p>Chính sách dùng từ FAQ đã xác nhận. Khi sửa sản phẩm hoặc FAQ, cập nhật tri thức rồi xác nhận lại tại đây.</p>
-        <div className={styles.rowActions}><button type="button" className="btn btn-outline btn-sm" disabled={busy || !settings} onClick={() => { setKnowledge(currentAiKnowledge()); reset(); }}>Cập nhật tri thức từ Sản phẩm & FAQ</button><Link href="/cai-dat?tab=faq" className="btn btn-outline btn-sm">Mở FAQ & chính sách</Link></div>
+        <p>{catalogAt ? `AI Chat dùng danh mục sản phẩm và FAQ trên máy chủ, cập nhật lúc ${new Date(catalogAt).toLocaleString('vi-VN')}; sửa sản phẩm hoặc FAQ không cần xác nhận lại. Sản phẩm mẫu chưa chỉnh sửa không được dùng để trả lời khách.` : 'Danh mục sản phẩm và FAQ chưa có trên máy chủ (chưa chỉnh sửa gì, chưa đồng bộ được hoặc chưa chạy migration 024), nên AI Chat đang dùng bản đã xác nhận trước đó.'}</p>
+        <div className={styles.rowActions}><Link href="/cai-dat?tab=faq" className="btn btn-outline btn-sm">Mở FAQ & chính sách</Link></div>
         <details><summary>Xem tri thức sẽ áp dụng</summary><p>Shop: {knowledge?.shop.name || 'Chưa có tên shop'}</p>{knowledge?.faqs.map(faq => <div key={faq.id}><strong>{faq.question}</strong><p>{faq.answer}</p></div>)}{knowledge?.products.map(product => <p key={product.id}>{product.sku} · {product.name} · {product.price.toLocaleString('vi-VN')} đ</p>)}</details>
       </div>
       <div className={styles.careScope}><h3>Quy tắc riêng cho {page?.name || 'Fanpage này'}</h3><p>Xưng hô: {page?.address || profile.rules.address} · Giọng: {page?.tone || profile.rules.tone}</p>{page?.examples && <p>Ví dụ: {page.examples}</p>}<p>Tùy chỉnh dưới đây chỉ áp dụng cho Fanpage này, trong phạm vi quy tắc chung do quản trị viên thiết lập.</p></div>

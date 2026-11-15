@@ -3,21 +3,11 @@
 import { readDb } from '@/lib/services/mockDb';
 import type { AiChatReply, AiKnowledge, AiSessionMessage } from '@/lib/types/ai';
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
-import { parseProductDetails } from '@/lib/services/productDetails';
+import { buildKnowledge } from '@/lib/services/aiKnowledge';
 
 /** Đọc lại mỗi lần hỏi để áp dụng ngay thay đổi đã lưu trong FAQ & sản phẩm. */
 export function currentAiKnowledge(): AiKnowledge {
-  const db = readDb();
-  return structuredClone({
-    shop: { name: db.shop.name, email: db.shop.email, phone: db.shop.phone },
-    productSource: {
-      name: db.productSource.name, connected: db.productSource.connected, lastSyncedAt: db.productSource.lastSyncedAt,
-    },
-    products: db.products.map(p => ({ id: p.id, sku: p.sku, name: p.name, material: p.material, category: p.category,
-      colors: p.colors, sizes: p.sizes, qty: p.qty, price: p.price, ...parseProductDetails({ ...p }) })),
-    faqs: db.faqs.filter((f) => f.active),
-    emailTriggers: db.triggers.filter((t) => t.enabled),
-  });
+  return buildKnowledge(readDb());
 }
 
 export async function askShopAi(message: string, sessionContext: AiSessionMessage[] = []): Promise<AiChatReply> {

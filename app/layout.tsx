@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from 'next/font/local';
 import "./globals.css";
 import { AppSecurityProvider } from '@/components/shared/AppSecurityProvider';
+import { CatalogSync } from '@/components/shared/CatalogSync';
 
 const rem = localFont({ src: '../public/landing/fonts/REM.ttf', weight: '100 900', display: 'swap', variable: '--font-tendly' });
 
@@ -17,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className={rem.variable}>
-      <body><AppSecurityProvider>{children}</AppSecurityProvider></body>
+      <body><AppSecurityProvider><CatalogSync />{children}</AppSecurityProvider></body>
     </html>
   );
 }

@@ -3,6 +3,7 @@ import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
 import { CustomerCareError, generateCareReply, parseCareProfile, readCarePageProfile, saveCustomerCareSettings } from '@/lib/services/customerCare';
 import { InvalidAiKnowledge, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { readMessengerAiSettings } from '@/lib/services/messengerAi';
+import { readShopCatalog } from '@/lib/services/shopCatalog';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { saveConversationMemory } from '@/lib/services/conversationMemory';
 import { readConversationSources } from '@/lib/services/conversationSources';
@@ -16,7 +17,9 @@ async function handle(request: Request) {
   try {
     if (request.method === 'GET') {
       const [settings, currentPageProfile] = await Promise.all([readMessengerAiSettings(pageId), readCarePageProfile(pageId)]);
-      return Response.json({ ...settings, currentPageProfile }, { headers: { 'Cache-Control': 'no-store' } });
+      // Mốc danh mục sản phẩm/FAQ trên máy chủ; null = chưa đồng bộ (hoặc chưa chạy migration 024).
+      const catalogUpdatedAt = (await readShopCatalog(pageId).catch(() => null))?.updatedAt ?? null;
+      return Response.json({ ...settings, currentPageProfile, catalogUpdatedAt }, { headers: { 'Cache-Control': 'no-store' } });
     }
     sameOrigin(request);
     const raw = await request.text();
