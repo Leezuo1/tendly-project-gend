@@ -40,7 +40,7 @@ export function ReviewSummary({ review }: { review: PostReviewResult }) {
   const changes = review.variants.flatMap(v => v.changes);
   return <div className="mw-review-summary">
     <h4>Nhận xét tổng quan</h4>
-    <p>{review.status === 'completed' ? 'Review đã hoàn tất đối chiếu với căn cứ được chọn. Shop cần xem nội dung và xác nhận trước khi sử dụng.' : review.status === 'failed' ? 'Review chưa hoàn tất. Giữ bản gốc và thử Review lại.' : 'Có nội dung cần chỉnh hoặc bổ sung căn cứ trước khi duyệt.'}</p>
+    <p>{review.status === 'completed' ? 'Review đã hoàn tất đối chiếu với căn cứ được chọn. Shop cần xem nội dung và xác nhận trước khi sử dụng.' : review.status === 'failed' ? 'Review chưa hoàn tất. Giữ bản gốc; hệ thống tự thử lại.' : 'Có nội dung cần chỉnh hoặc bổ sung căn cứ trước khi duyệt.'}</p>
     {changes.length > 0 && <><h4>Đã chỉnh sửa ({changes.length})</h4><ul>{changes.map((change, i) => <li key={i}>{change.reason}</li>)}</ul></>}
     {issues.length > 0 && <><h4>Cần xử lý / lưu ý ({issues.length})</h4><ul>{issues.map((issue, i) => <li key={i}>{issue.message}</li>)}</ul></>}
     {!issues.length && review.status === 'completed' && <p className="mw-muted">Không có vấn đề còn lại được ghi nhận trong lượt Review này. Chấp thuận đăng vẫn thuộc shop.</p>}
