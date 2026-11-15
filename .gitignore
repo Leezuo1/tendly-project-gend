@@ -203,3 +203,6 @@ vite.config.ts.timestamp-*
 /.claude/skills/design-taste-frontend/
 /.taste-skill/
 /skills-lock.json
+
+# agent skills (local tooling)
+.agents/

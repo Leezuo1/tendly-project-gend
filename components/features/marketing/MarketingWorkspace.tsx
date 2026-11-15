@@ -6,7 +6,7 @@ import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { marketingWorkspaceClient } from '@/lib/services/marketingWorkspaceClient';
 import { dashboardRequest, prepareUploadImage } from '@/lib/services/postsClient';
 import { MARKETING_GOALS } from '@/lib/services/marketingBrief';
-import type { MarketingCampaign, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
+import type { MarketingCampaign, MarketingContentPlan, MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
 import { BusyStatus } from './BusyStatus';
 import { CampaignBriefForm } from './CampaignBriefForm';
 import { MarketingScheduleTab } from './MarketingScheduleTab';
@@ -27,6 +27,37 @@ export function autoReview(action: string, input: Record<string, unknown>, next:
   if (!meta || meta.publication !== 'draft' || !plan || !plan.items.length) return null;
   const itemId = plan.items.some(item => item.id === meta.plan?.itemId) ? meta.plan!.itemId : plan.items[0].id;
   return { action: 'review', input: { postId: meta.postId, plan: { id: plan.id, version: plan.version, itemId } } };
+}
+/** Việc Review tự chạy tiếp theo (kế hoạch thiếu/lỗi Review, lượt Review lỗi, bài cần Review lại); mỗi mục một lần nhờ `attempted`. Lượt bị chặn (blocked) cần chủ shop xử lý nên không tự thử lại. */
+export function nextAutoReview(view: MarketingWorkspaceView, attempted: Set<string>, campaignId?: string): { key: string; action: string; input: object } | null {
+  const { campaigns, contentPlans = [], reviewAttempts = [], reviews } = view.workspace;
+  for (const p of contentPlans.filter(p => !campaignId || p.campaignId === campaignId)) {
+    const key = `plan:${p.id}:${p.version}`;
+    if (!p.approvedAt && (!p.review || p.review.status === 'failed') && !attempted.has(key) && campaigns.some(c => c.id === p.campaignId && c.approvedAt && c.version === p.campaignVersion)) return { key, action: 'reviewPlan', input: { id: p.id } };
+  }
+  for (const a of reviewAttempts) {
+    const key = `attempt:${a.id}`;
+    if (!a.appliedAt && !a.discardedAt && a.status === 'failed' && !attempted.has(key)) return { key, action: 'retryReview', input: { attemptId: a.id } };
+  }
+  for (const r of reviews) {
+    const key = `post:${r.postId}:${r.reviewedAt}`;
+    // Bài đang chờ chủ shop áp dụng bản đề xuất đã được Review rồi; Review lại sẽ chỉ chồng thêm lượt trùng.
+    const waiting = reviewAttempts.some(a => a.targetPostId === r.postId && !a.appliedAt && !a.discardedAt);
+    const next = !r.reviewHash && !waiting && !attempted.has(key) ? autoReview('editPost', { postId: r.postId }, view) : null;
+    if (next) return { key, ...next };
+  }
+  return null;
+}
+/** Bản kế hoạch với tiêu đề/dàn ý thay bằng đề xuất của AI Review; null khi Review không đề xuất gì khác. */
+export function reviewedPlan(plan: MarketingContentPlan): MarketingContentPlan | null {
+  let changed = false;
+  const items = plan.items.map((item, i) => {
+    const fix = plan.review?.variants[i]?.finalDraft;
+    if (!fix || (fix.title.trim() === item.title.trim() && fix.content.trim() === item.outline.trim())) return item;
+    changed = true;
+    return { ...item, title: fix.title, outline: fix.content };
+  });
+  return changed ? { ...plan, items } : null;
 }
 interface Props { section: MarketingWorkflowSection; onNavigate: (section: string, postId?: string) => void; }
 type Ask = (title: string, message: string, action: () => Promise<unknown>) => void;
@@ -52,9 +83,46 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
     try { setView(await marketingWorkspaceClient.act(saved.revision, next.action, next.input)); setNotice('Đã lưu và Review xong. Xem đề xuất của AI rồi duyệt.'); }
     catch (e) {
       if ((e as { code?: string }).code === 'timeout') await load(); // server có thể đã Review xong; revision cũ sẽ làm lần sau bị từ chối
-      setError(`Đã lưu, nhưng Review tự động chưa xong: ${(e as Error).message} Bấm "Review lại" để thử lại.`);
+      setError(`Đã lưu, nhưng Review tự động chưa xong: ${(e as Error).message} Tải lại trang để hệ thống thử lại.`);
     }
   };
+  // Mỗi bước là một request riêng (giới hạn 60 giây mỗi request). Lỗi giữa chừng không làm mất phần đã lưu.
+  const chain = async (saved: MarketingWorkspaceView, steps: (run: (action: string, input: object, message: string) => Promise<MarketingWorkspaceView>) => Promise<void>) => {
+    let current = saved;
+    const run = async (action: string, input: object, message: string) => { setNotice(message); current = await marketingWorkspaceClient.act(current.revision, action, input); setView(current); return current; };
+    try { await steps(run); }
+    catch (e) {
+      if ((e as { code?: string }).code === 'timeout') await load();
+      setError(`Đã lưu, nhưng bước tự động chưa xong: ${(e as Error).message} Tải lại trang để hệ thống thử lại.`);
+    }
+  };
+  // Kế hoạch mới (AI hoặc tự soạn): Review ngay, tự sửa theo Review một lần, rồi Review lại bản đã sửa.
+  const settlePlan = (saved: MarketingWorkspaceView, planId: string) => chain(saved, async run => {
+    let view = saved;
+    const find = () => view.workspace.contentPlans?.find(p => p.id === planId);
+    if (!find()?.review || find()!.review!.status === 'failed') view = await run('reviewPlan', { id: planId }, 'AI đang Review dàn ý…');
+    const fixed = find() && reviewedPlan(find()!);
+    if (fixed) {
+      view = await run('editPlan', { id: planId, plan: fixed }, 'AI đang sửa dàn ý theo Review…');
+      await run('reviewPlan', { id: planId }, 'AI đang Review lại dàn ý đã sửa…');
+    }
+    setNotice('Đã Review dàn ý. Xem rồi duyệt kế hoạch.');
+  });
+  // Chủ shop duyệt kế hoạch xong thì AI viết và Review từng bài theo dàn ý; bài vẫn cần chủ shop duyệt riêng.
+  const writeAfterApproval = (saved: MarketingWorkspaceView, planId: string) => chain(saved, async run => {
+    let view = saved;
+    const plan = view.workspace.contentPlans?.find(p => p.id === planId);
+    if (!plan?.approvedAt) return;
+    for (const [i, item] of plan.items.entries()) {
+      const binding = { id: plan.id, version: plan.version, itemId: item.id };
+      const existing = view.workspace.reviews.find(r => r.plan?.id === plan.id && r.plan.itemId === item.id);
+      const message = `AI đang viết và Review bài ${i + 1}/${plan.items.length}…`;
+      if (!existing) view = await run('generate', { campaignId: plan.campaignId, plan: binding }, message);
+      // Bài viết theo bản dàn ý cũ: Review lại theo bản vừa duyệt (ra bản đề xuất, bài hiện tại giữ nguyên đến khi áp dụng).
+      else if (existing.plan!.version !== plan.version && existing.publication === 'draft') view = await run('review', { postId: existing.postId, plan: binding }, message);
+    }
+    setNotice('Đã viết và Review các bài theo dàn ý. Xem rồi duyệt từng bài.');
+  });
   const act = async (action: string, input: object): Promise<boolean> => {
     if (!view || busy || inflight.current) return false;
     if (['generatePlan', 'generate', 'review', 'applyReview'].includes(action) && document.querySelector('.mw-root [data-unsaved="true"]')) { setError('Lưu hoặc hủy phần đang sửa trước khi tiếp tục với AI.'); return false; }
@@ -68,15 +136,42 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
         const created = next.workspace.reviews.find(r => !view.workspace.reviews.some(old => old.postId === r.postId));
         setDetailPlanId(''); if (created) setDetailPostId(created.postId);
       }
+      if (action === 'createPlan') setDetailPlanId(next.workspace.contentPlans?.[0]?.id ?? '');
+      if (action === 'generatePlan' || action === 'createPlan') await settlePlan(next, next.workspace.contentPlans?.[0]?.id ?? '');
+      if (action === 'approvePlan') await writeAfterApproval(next, String((input as { id?: unknown }).id));
       return true;
     }
     catch (e) {
       // A failed publish still changes server state (draft/unknown), so reload it or the card and revision stay stale.
       if (action === 'publish' || (e as { code?: string }).code === 'timeout') await load();
-      setError((e as Error).message); return false;
+      const message = (e as Error).message;
+      setError(message);
+      // Duyệt/đăng bị từ chối vì căn cứ Review đã cũ (sản phẩm, FAQ, brief đổi): tự Review lại bài đó, không chờ người dùng bấm.
+      if ((action === 'approvePost' || action === 'publish') && /Review/.test(message)) {
+        try {
+          const fresh = await marketingWorkspaceClient.read(); setView(fresh);
+          const waiting = fresh.workspace.reviewAttempts?.some(a => a.targetPostId === (input as { postId?: string }).postId && !a.appliedAt && !a.discardedAt);
+          const next = waiting ? null : autoReview('editPost', input as Record<string, unknown>, fresh);
+          if (next) {
+            setNotice('Căn cứ đã thay đổi. AI đang Review lại bài…');
+            setView(await marketingWorkspaceClient.act(fresh.revision, next.action, next.input));
+            setError(''); setNotice('Đã Review lại theo căn cứ mới. Xem bản đề xuất rồi duyệt lại.');
+          }
+        } catch (inner) { setError(`${message} Review tự động chưa xong: ${(inner as Error).message}`); }
+      }
+      return false;
     }
     finally { inflight.current = false; setBusy(false); }
   };
+  // Không có nút Review: Review thiếu hoặc lỗi thì tự chạy lại, mỗi mục một lần mỗi lần mở trang.
+  const attempted = useRef(new Set<string>()), actRef = useRef(act);
+  useEffect(() => { actRef.current = act; });
+  useEffect(() => {
+    if (!view || busy || inflight.current || (section !== 'composer' && section !== 'approvals') || document.querySelector('.mw-root [data-unsaved="true"]')) return;
+    const next = nextAutoReview(view, attempted.current, section === 'composer' ? campaignId || view.workspace.campaigns[0]?.id : undefined);
+    if (!next) return;
+    attempted.current.add(next.key); void actRef.current(next.action, next.input);
+  }, [view, busy, section, campaignId]);
   const confirm: Ask = (title, message, action) => setApproval({ title, message, action });
   const upload = async (postId: string, file: File | null) => {
     if (!view || busy || inflight.current) return;
@@ -96,7 +191,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
   const filtered = view.workspace.reviews.filter(item => section === 'approvals' || item.campaignId === campaign?.id);
   return <div className="mw-root">
     {error && <div className="mw-error" role="alert">{error} <button className="btn btn-text btn-sm" onClick={() => void load()}>Tải dữ liệu mới</button></div>}
-    <p className="mw-status" aria-live="polite">{busy ? <BusyStatus /> : notice}</p>
+    <p className="mw-status" aria-live="polite">{busy ? <><BusyStatus /> {notice}</> : notice}</p>
     <fieldset className="mw-body" disabled={busy}>
       {editing ? <CampaignBriefForm key={editing === 'new' ? 'new' : editing.id} view={view} initial={editing === 'new' ? undefined : editing} owner={session.userId || session.username} act={act} onClose={() => setEditing(null)} /> : <>
       {(section === 'composer' || section === 'approvals') && (view.workspace.reviewAttempts ?? []).filter(attempt => !attempt.appliedAt && !attempt.discardedAt && (attempt.targetPostId || attempt.status !== 'completed')).map(attempt => <section className="mw-item mw-review-attempt" key={attempt.id}>
@@ -104,7 +199,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
         <p>{attempt.targetPostId ? 'Bài đang dùng được giữ nguyên đến khi bạn chọn áp dụng bản đề xuất.' : `${attempt.variants.filter(item => item.finalDraft).length}/${attempt.variants.length} phương án dùng được. Bản chưa đạt chưa được lưu thành bài sẵn sàng duyệt.`}</p>
         {attempt.variants.map(item => <div key={item.draftId}>{item.finalDraft ? <><h4>{item.finalDraft.title}</h4><p className="mw-copy">{item.finalDraft.content}</p>{attempt.targetPostId && <button className="btn btn-primary btn-sm" onClick={() => confirm('Áp dụng bản Review này?', 'Thay nội dung bài bằng bản đề xuất đang xem. Bài cần chủ shop duyệt lại; lịch liên quan sẽ tạm dừng.', () => act('applyReview', { attemptId: attempt.id, draftId: item.draftId }))}>Áp dụng bản đề xuất</button>}</> : <ul className="mw-review-issues" role="alert">{item.issues.map((issue, index) => <li key={index}>{issue.message}</li>)}</ul>}</div>)}
         <ReviewDetails review={attempt} />
-        <div className="mw-actions">{attempt.variants.some(item => !item.finalDraft) && <button className="btn btn-outline btn-sm" onClick={() => act('retryReview', { attemptId: attempt.id })}>Thử lại Review từ bản gốc đã lưu</button>}<button className="btn btn-text btn-sm" onClick={() => act('discardReview', { attemptId: attempt.id })}>Bỏ lượt đề xuất</button></div>
+        <div className="mw-actions">{attempt.variants.some(item => !item.finalDraft) && <p className="mw-muted">Review chưa xong; hệ thống tự thử lại.</p>}<button className="btn btn-text btn-sm" onClick={() => act('discardReview', { attemptId: attempt.id })}>Bỏ lượt đề xuất</button></div>
       </section>)}
       {section === 'campaigns' && <>
         <div className="mw-section-head"><div><h2>Chiến dịch của shop</h2><p>Từ brief đến bài đã duyệt và lịch đăng, trong cùng một luồng.</p></div><button className="btn btn-primary" onClick={() => setEditing('new')}>Tạo chiến dịch</button></div>
@@ -114,7 +209,7 @@ export function MarketingWorkspace({ section, onNavigate }: Props) {
       {(section === 'composer' || section === 'approvals') && <>
         <div className="mw-section-head"><div><h2>{section === 'composer' ? 'Soạn và rà soát nội dung' : 'Chủ shop duyệt nội dung'}</h2><p>{section === 'composer' ? 'Content viết → Review đối chiếu, sửa → bạn xem và duyệt.' : 'Đã Review không đồng nghĩa đã được duyệt đăng.'}</p></div><button className="btn btn-outline btn-sm" onClick={() => { if (document.querySelector('.mw-root [data-unsaved="true"]')) { setError('Lưu hoặc hủy bài đang chỉnh trước khi tạo chiến dịch.'); return; } onNavigate('campaigns'); setEditing('new'); }}>Tạo chiến dịch</button></div>
         {section === 'composer' && (campaign ? <section className="mw-summary"><label>Chiến dịch<select value={campaign.id} onChange={event => { if (document.querySelector('.mw-root [data-unsaved="true"]')) setError('Lưu hoặc hủy bài đang chỉnh trước khi đổi chiến dịch.'); else setCampaignId(event.target.value); }}>{campaigns.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><h3>{campaign.message || campaign.name}</h3><p>{campaign.audience} · {campaign.format} · {campaign.profile.name || view.accounts.find(account => account.id === campaign.accountId)?.name}</p><p>Giọng: {campaign.tone || campaign.profile.tone} · CTA: {campaign.cta}</p><p>{campaign.offer.kind === 'none' ? 'Không áp dụng ưu đãi' : `${campaign.offer.details} · ${campaign.offer.conditions}`}</p><div className="mw-actions"><button className="btn btn-outline btn-sm" onClick={() => setEditing(campaign)}>Chỉnh brief</button></div>{!campaign.approvedAt && <p className="mw-muted">Duyệt brief trong Chiến dịch trước khi tạo bài.</p>}</section> : <p className="mw-empty">Chưa có chiến dịch. Tạo brief để bắt đầu.</p>)}
-        {section === 'composer' && campaign && <MarketingContentPlanPanel key={campaign.id} view={view} campaign={campaign} busy={busy} error={error} openId={detailPlanId} onOpen={setDetailPlanId} onPostOpen={setDetailPostId} act={act} />}
+        {section === 'composer' && campaign && <MarketingContentPlanPanel key={campaign.id} view={view} campaign={campaign} busy={busy} error={error} notice={notice} openId={detailPlanId} onOpen={setDetailPlanId} onPostOpen={setDetailPostId} act={act} />}
         <div className="mw-list">{filtered.map(meta => { const post = view.posts.find(item => item.id === meta.postId); return post && <MarketingDraft key={`${post.id}:${post.updatedAt}:${meta.reviewedAt}:${post.image?.updatedAt}`} post={post} meta={meta} view={view} busy={busy} error={error} open={detailPostId === post.id} onOpen={() => setDetailPostId(post.id)} onClose={() => setDetailPostId('')} act={act} confirm={confirm} upload={upload} onComments={id => onNavigate('comments', id)} />; })}</div>
         {!filtered.length && <p className="mw-empty">Chưa có bài trong mục này.</p>}
       </>}

@@ -14,10 +14,12 @@ export class GeminiUnavailable extends Error {}
 
 interface GeminiResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
 }
 
 interface GenerateJsonOptions<T> {
-  role: AiRoleId;
+  /** 'sourcing' do dev đặt prompt cố định, không đi qua cấu hình admin/shop. */
+  role: AiRoleId | 'sourcing';
   platform?: string;
   pageId?: string;
   /** false khi nơi gọi đã tự nhúng hồ sơ shop (bản đã duyệt của campaign, hồ sơ AI Chat). */
@@ -35,14 +37,19 @@ interface GenerateJsonOptions<T> {
 export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Promise<{ result: T; model: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiNotConfigured('Chưa cấu hình GEMINI_API_KEY trên máy chủ.');
-  const system = `${await globalAiSystemPrompt(options.role, options.platform, options.pageId, options.includeShop)}\n\n${options.system}`;
+  const system = options.role === 'sourcing' ? options.system
+    : `${await globalAiSystemPrompt(options.role, options.platform, options.pageId, options.includeShop)}\n\n${options.system}`;
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : GEMINI_CANDIDATE_MODELS;
 
   for (const model of models) {
     if (options.signal?.aborted) break;
     const started = Date.now();
-    // One line per attempt: which role/model, how it ended, how long. Never the prompt or the answer, which may hold customer data.
-    const log = (outcome: string) => console.info(JSON.stringify({ ai: options.role, platform: options.platform, model, outcome, ms: Date.now() - started }));
+    let usage: GeminiResponse['usageMetadata'];
+    // One line per attempt: which role/model, how it ended, how long, tokens billed (for credit pricing). Never the prompt or the answer, which may hold customer data.
+    const log = (outcome: string) => console.info(JSON.stringify({
+      ai: options.role, platform: options.platform, model, outcome, ms: Date.now() - started,
+      tokens: usage && { in: usage.promptTokenCount, out: usage.candidatesTokenCount, think: usage.thoughtsTokenCount },
+    }));
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -64,6 +71,7 @@ export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Pr
       );
       if (!res.ok) { log(`http_${res.status}`); continue; }
       const data = await res.json() as GeminiResponse;
+      usage = data.usageMetadata;
       const output = data.candidates?.[0]?.content?.parts
         ?.filter((part) => !part.thought && typeof part.text === 'string')
         .map((part) => part.text).join('\n').trim();

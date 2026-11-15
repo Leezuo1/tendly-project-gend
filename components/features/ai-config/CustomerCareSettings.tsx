@@ -6,12 +6,13 @@ import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/components/shared/ToastProvider';
 import { dashboardRequest } from '@/lib/services/postsClient';
 import { currentAiKnowledge } from '@/lib/services/aiChat';
-import { AI_RULE_FIELDS, defaultAiConfiguration, type AiProfile } from '@/lib/services/aiConfiguration';
+import { defaultAiConfiguration, type AiPlatform, type AiProfile } from '@/lib/services/aiConfiguration';
 import type { AiChatReply, AiKnowledge } from '@/lib/types/ai';
 import type { CarePageProfile, CustomerCareSettings as Settings } from '@/lib/types/customerCare';
 import styles from './ai-configuration.module.css';
+import { RuleFields } from './RuleFields';
 
-export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' | 'settings'; initialProfile: AiProfile }) {
+export function CustomerCareSettings({ mode, initialProfile, platform }: { mode: 'manage' | 'settings'; initialProfile: AiProfile; platform?: AiPlatform }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [profile, setProfile] = useState<AiProfile>(defaultAiConfiguration().profiles.chat);
   const [page, setPage] = useState<CarePageProfile | null>(null);
@@ -36,11 +37,6 @@ export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' 
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
   const reset = () => setPreview(null);
   function change(patch: Partial<AiProfile>) { setProfile(current => ({ ...current, ...patch })); reset(); }
-  const override = profile.platformRules.facebook;
-  const rules = override?.enabled ? { ...profile.rules, ...override.values } : profile.rules;
-  function setRule(key: string, value: string) {
-    change({ platformRules: { ...profile.platformRules, facebook: { enabled: true, values: { ...override?.values, [key]: value } } } });
-  }
   async function toggle(enabled: boolean) {
     setBusy(true); setError('');
     try {
@@ -96,8 +92,7 @@ export function CustomerCareSettings({ mode, initialProfile }: { mode: 'manage' 
         <details><summary>Xem tri thức sẽ áp dụng</summary><p>Shop: {knowledge?.shop.name || 'Chưa có tên shop'}</p>{knowledge?.faqs.map(faq => <div key={faq.id}><strong>{faq.question}</strong><p>{faq.answer}</p></div>)}{knowledge?.products.map(product => <p key={product.id}>{product.sku} · {product.name} · {product.price.toLocaleString('vi-VN')} đ</p>)}</details>
       </div>
       <div className={styles.careScope}><h3>Quy tắc riêng cho {page?.name || 'Fanpage này'}</h3><p>Xưng hô: {page?.address || profile.rules.address} · Giọng: {page?.tone || profile.rules.tone}</p>{page?.examples && <p>Ví dụ: {page.examples}</p>}<p>Tùy chỉnh dưới đây chỉ áp dụng cho Fanpage này, trong phạm vi quy tắc chung do quản trị viên thiết lập.</p></div>
-      {AI_RULE_FIELDS.chat.map(field => <div className={styles.ruleField} key={field.key}><label htmlFor={`care-${field.key}`}>{field.label}</label><textarea id={`care-${field.key}`} rows={2} maxLength={500} disabled={busy || !settings} value={rules[field.key]} onChange={event => setRule(field.key, event.target.value)} />
-        {Object.hasOwn(override?.values ?? {}, field.key) && <button type="button" className="btn btn-text btn-sm" disabled={busy} onClick={() => { const values = { ...override?.values }; delete values[field.key]; change({ platformRules: { ...profile.platformRules, facebook: { enabled: true, values } } }); }}>Dùng lại quy tắc riêng của AI</button>}</div>)}
+      <RuleFields role="chat" profile={profile} platform={platform} disabled={busy || !settings} onChange={change} />
       <div className={styles.careScope}><h3>Giới hạn hành động</h3><p>AI hỏi lại khi thiếu căn cứ, chuyển nhân viên khi khách yêu cầu người thật hoặc có tranh chấp. Hoàn tiền, cấp voucher, đổi hàng và thay đổi đơn luôn cần quyền và phê duyệt riêng.</p></div>
       <div className={styles.ruleField}><label htmlFor="care-test">Thử tình huống</label><textarea id="care-test" rows={3} maxLength={8000} value={message} disabled={busy} onChange={event => { setMessage(event.target.value); setPreview(null); }} /><button type="button" className="btn btn-outline" disabled={busy || !settings || !message.trim()} onClick={() => void testReply()}>Thử câu trả lời</button>
         {preview && <div className={styles.carePreview} role="status"><strong>Câu trả lời thử · Chưa gửi cho khách</strong><p>{preview.reply}</p><p>{preview.analysis.needsHuman || !preview.analysis.canAutoReply ? 'Cần nhân viên kiểm tra' : 'Đủ căn cứ theo phân tích AI'} · {preview.analysis.reason}</p><small>{preview.sourceSummary}</small></div>}</div>

@@ -11,8 +11,7 @@ import { useAppSecurity } from '@/lib/hooks/useAppSecurity';
 import { dashboardRequest, postsClient } from '@/lib/services/postsClient';
 import { liveClient } from '@/lib/services/liveClient';
 import { readPageAiProfile, savePageAiProfile, type PageAiProfile } from '@/lib/services/aiSettingsClient';
-import { AI_ROLES, AI_PLATFORMS, AI_RULE_FIELDS, ROLE_PLATFORMS, defaultAiRules, effectiveAiRules,
-  defaultAiConfiguration,
+import { AI_ROLES, AI_PLATFORMS, ROLE_PLATFORMS, defaultAiConfiguration,
   type AiConfiguration, type AiPlatform, type AiProfile, type AiRoleId } from '@/lib/services/aiConfiguration';
 import type { MarketingPost } from '@/lib/types/posts';
 import type { MarketingWorkspaceView } from '@/lib/types/marketingWorkspace';
@@ -20,10 +19,11 @@ import type { LiveSessionListItem } from '@/lib/types/live';
 import styles from './ai-configuration.module.css';
 import { CustomerCareSettings } from './CustomerCareSettings';
 import { ChannelProfiles } from './ChannelProfiles';
+import { RuleFields } from './RuleFields';
 
 const TABS = [{ key: 'manage', label: 'Quản lý AI' }, { key: 'settings', label: 'Thiết lập AI' }, { key: 'channels', label: 'Hồ sơ kênh' }] as const;
-const LABELS: Record<AiRoleId, string> = { chat: 'AI Chat', content: 'AI Soạn nội dung', review: 'AI Kiểm tra nội dung', sourcing: 'AI Smart Sourcing', livestream: 'AI Livestream' };
-const ORDER: AiRoleId[] = ['chat', 'content', 'review', 'sourcing', 'livestream'];
+const LABELS: Record<AiRoleId, string> = { chat: 'AI Chat', content: 'AI Soạn nội dung', review: 'AI Kiểm tra nội dung', livestream: 'AI Livestream' };
+const ORDER: AiRoleId[] = ['chat', 'content', 'review', 'livestream'];
 
 export function AiConfigShell() {
   const [tab, setTab] = useTabParam(TABS.map(item => item.key), 'manage');
@@ -46,8 +46,6 @@ export function AiConfigShell() {
   const toast = useToast();
   const profile = config.profiles[selected];
   const currentPlatform = platform !== 'default' && ROLE_PLATFORMS[selected].includes(platform) ? platform : undefined;
-  const override = currentPlatform ? profile.platformRules[currentPlatform] : undefined;
-  const rules = effectiveAiRules(profile, currentPlatform);
   const dirty = ready && JSON.stringify(config) !== saved;
   const role = AI_ROLES.find(item => item.id === selected)!;
 
@@ -85,10 +83,6 @@ export function AiConfigShell() {
   function updateProfile(id: AiRoleId, patch: Partial<AiProfile>) {
     setConfig(current => ({ ...current, profiles: { ...current.profiles, [id]: { ...current.profiles[id], ...patch } } }));
   }
-  function setRule(key: string, value: string) {
-    if (!currentPlatform) updateProfile(selected, { rules: { ...profile.rules, [key]: value } });
-    else updateProfile(selected, { platformRules: { ...profile.platformRules, [currentPlatform]: { enabled: true, values: { ...override?.values, [key]: value } } } });
-  }
   function selectAi(id: AiRoleId) { setPlatform('default'); setTab('settings', { ai: id }); }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,13 +91,6 @@ export function AiConfigShell() {
     try { apply(await savePageAiProfile(page, config)); toast('Đã lưu thiết lập AI cho Page'); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa lưu được thiết lập. Vui lòng thử lại.'); }
     finally { setSaving(false); }
-  }
-  function template() {
-    const values = defaultAiRules(selected);
-    if (selected === 'content' && currentPlatform === 'instagram') values.format = 'Caption ngắn, lợi ích nổi bật, tối đa 5 hashtag phù hợp';
-    if (selected === 'content' && currentPlatform === 'facebook') values.format = 'Mở đầu thu hút, 3 lợi ích chính, giá đã xác nhận và CTA nhắn tin';
-    if (currentPlatform) updateProfile(selected, { platformRules: { ...profile.platformRules, [currentPlatform]: { enabled: true, values } } });
-    else updateProfile(selected, { rules: values });
   }
   const usage = (id: AiRoleId) => {
     if (id === 'content' || id === 'review') {
@@ -117,7 +104,6 @@ export function AiConfigShell() {
           {items.slice(0, 3).map(post => <p key={post.id}>{post.title} · {post.channel} · {post.status === 'draft' ? 'Bản nháp' : 'Đã đăng'}</p>)}</> : <p>Chưa tải được danh sách bài viết.</p>}
         <Link href={`/marketing?tab=${id === 'content' ? 'composer' : 'approvals'}`} className="btn btn-outline btn-sm">{id === 'content' ? 'Mở soạn nội dung' : 'Mở duyệt nội dung'}</Link></>;
     }
-    if (id === 'sourcing') return <><h3>Nguồn dữ liệu tìm kiếm</h3><p>TikTok: thu thập bài theo từ khóa. Google: tìm đầu mối nhà cung cấp.</p><p>Tiêu chí hiện tại: {config.profiles.sourcing.rules.category} · {config.profiles.sourcing.rules.region}</p><Link href="/smart-sourcing" className="btn btn-outline btn-sm">Mở Smart Sourcing</Link></>;
     const active = sessions?.filter(item => item.status === 'live');
     return <><h3>Kênh & phiên livestream</h3>{active ? active.length ? active.map(item => <p key={item.id}>{item.title} · {item.platform === 'facebook' ? 'Facebook' : item.platform}</p>) : <p>Chưa có phiên livestream đang hoạt động.</p> : <p>Chưa tải được phiên livestream.</p>}<Link href="/livestream" className="btn btn-outline btn-sm">Mở Livestream</Link></>;
   };
@@ -139,27 +125,13 @@ export function AiConfigShell() {
         </section>)}
       </div> : <div className={styles.settings}>
         <div className={styles.selectors}><div><label htmlFor="ai-selector">Chọn AI</label><select id="ai-selector" value={selected} onChange={event => selectAi(event.target.value as AiRoleId)}>{ORDER.map(id => <option key={id} value={id}>{LABELS[id]}</option>)}</select></div>
-          {selected !== 'chat' && ROLE_PLATFORMS[selected].length > 0 && <div><label htmlFor="ai-platform">Bộ quy tắc</label><select id="ai-platform" value={currentPlatform ?? 'default'} onChange={event => setPlatform(event.target.value as AiPlatform | 'default')}><option value="default">Quy tắc mặc định</option>{ROLE_PLATFORMS[selected].map(item => <option key={item} value={item}>{AI_PLATFORMS[item]}</option>)}</select></div>}</div>
-        {selected === 'chat' ? (ready || error) && <CustomerCareSettings mode="settings" initialProfile={config.profiles.chat} /> : ready && <section className={styles.editor} aria-labelledby="rules-heading"><header className={styles.editorHead}><div><h2 id="rules-heading">{LABELS[selected]} · {currentPlatform ? AI_PLATFORMS[currentPlatform] : 'Quy tắc mặc định'}</h2><p>{role.description}</p></div></header>
+          {ROLE_PLATFORMS[selected].length > 0 && <div><label htmlFor="ai-platform">Bộ quy tắc</label><select id="ai-platform" value={currentPlatform ?? 'default'} onChange={event => setPlatform(event.target.value as AiPlatform | 'default')}><option value="default">Quy tắc mặc định</option>{ROLE_PLATFORMS[selected].map(item => <option key={item} value={item}>{AI_PLATFORMS[item]}</option>)}</select></div>}</div>
+        {selected === 'chat' ? (ready || error) && <CustomerCareSettings mode="settings" initialProfile={config.profiles.chat} platform={currentPlatform} /> : ready && <section className={styles.editor} aria-labelledby="rules-heading"><header className={styles.editorHead}><div><h2 id="rules-heading">{LABELS[selected]} · {currentPlatform ? AI_PLATFORMS[currentPlatform] : 'Quy tắc mặc định'}</h2><p>{role.description}</p></div></header>
           <div className={styles.formBody}>
             {!currentPlatform && <><div className={styles.switchRow}><div><strong>Bật {LABELS[selected]}</strong><p>Thay đổi trạng thái rồi chọn “Lưu thiết lập” để áp dụng.</p></div><Switch checked={profile.enabled} label={`Bật ${LABELS[selected]}`} onChange={enabled => updateProfile(selected, { enabled })} /></div>
               {(['goal', 'input', 'output', 'instructions'] as const).map(key => <div className={styles.ruleField} key={key}><label htmlFor={`profile-${key}`}>{{ goal: 'Nhiệm vụ', input: 'Dữ liệu đầu vào', output: 'Kết quả đầu ra', instructions: 'Chỉ dẫn bổ sung' }[key]}</label><textarea id={`profile-${key}`} rows={3} maxLength={key === 'instructions' ? 2000 : 1500} required={key !== 'instructions'} value={profile[key]} onChange={event => updateProfile(selected, { [key]: event.target.value })} /></div>)}</>}
-            {currentPlatform && <div className={styles.switchRow}><div><strong>Tùy chỉnh cho nền tảng này</strong><p>Các mục chưa tùy chỉnh sẽ dùng quy tắc mặc định.</p></div><Switch checked={override?.enabled ?? false} label="Tùy chỉnh cho nền tảng này" onChange={enabled => updateProfile(selected, { platformRules: { ...profile.platformRules, [currentPlatform]: { enabled, values: override?.values ?? {} } } })} /></div>}
-            <div className={styles.templateRow}><p>Bắt đầu với mẫu có sẵn, rồi chỉnh theo shop.</p><button type="button" className="btn btn-outline btn-sm" disabled={!!currentPlatform && !override?.enabled} onClick={template}>Dùng mẫu gợi ý</button></div>
-            {AI_RULE_FIELDS[selected].map(field => {
-              const customized = !!override?.enabled && Object.hasOwn(override.values, field.key);
-              const disabled = !!currentPlatform && !customized;
-              return <div className={styles.ruleField} key={field.key}>
-                <div className={styles.fieldHeading}><label htmlFor={`rule-${field.key}`}>{field.label}</label>{currentPlatform && override?.enabled && <label className={styles.checkLabel}><input type="checkbox" aria-label={`Tùy chỉnh ${field.label}`} checked={customized} onChange={event => {
-                  const values = { ...override.values };
-                  if (event.target.checked) values[field.key] = profile.rules[field.key]; else delete values[field.key];
-                  updateProfile(selected, { platformRules: { ...profile.platformRules, [currentPlatform]: { enabled: true, values } } });
-                }} />Tùy chỉnh</label>}</div>
-                {field.type === 'check' ? <label className={styles.checkLabel}><input id={`rule-${field.key}`} type="checkbox" disabled={disabled} checked={rules[field.key] === 'yes'} onChange={event => setRule(field.key, event.target.checked ? 'yes' : 'no')} />Kiểm tra tiêu chí này</label> : field.type === 'number' ? <input id={`rule-${field.key}`} type="number" min={0} step={1} disabled={disabled} value={rules[field.key]} placeholder="Không giới hạn" onChange={event => setRule(field.key, event.target.value)} /> : <textarea id={`rule-${field.key}`} rows={2} maxLength={500} disabled={disabled} value={rules[field.key]} required onChange={event => setRule(field.key, event.target.value)} />}
-                {currentPlatform && !customized && <small>Dùng quy tắc mặc định</small>}
-              </div>;
-            })}
-            <p className={styles.ruleHint}>{selected === 'review' ? 'Kết quả kiểm tra cần chỉ ra lỗi và gợi ý sửa. Chủ shop quyết định duyệt bài.' : selected === 'sourcing' ? 'Chỉ đối chiếu giá, MOQ và khu vực khi nguồn hàng có cung cấp thông tin tương ứng.' : role.guard}</p>
+            <RuleFields role={selected} profile={profile} platform={currentPlatform} onChange={patch => updateProfile(selected, patch)} />
+            <p className={styles.ruleHint}>{selected === 'review' ? 'Kết quả kiểm tra cần chỉ ra lỗi và gợi ý sửa. Chủ shop quyết định duyệt bài.' : role.guard}</p>
           </div>
         </section>}
       </div>}

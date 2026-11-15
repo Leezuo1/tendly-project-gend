@@ -14,10 +14,10 @@ function fixture() {
   return { api: loadedModule.exports, values };
 }
 
-test('five roles start disabled and profile edits do not alter other roles or defaults', () => {
+test('four roles start disabled and profile edits do not alter other roles or defaults', () => {
   const { api } = fixture();
   const config = api.defaultAiConfiguration();
-  assert.equal(Object.keys(config.profiles).length, 5);
+  assert.equal(Object.keys(config.profiles).length, 4);
   assert.ok(Object.values(config.profiles).every(p => p.enabled === false));
   assert.equal(config.binding.enabled, false);
   config.profiles.chat.goal = 'Tư vấn riêng';
@@ -97,7 +97,7 @@ test('older v1 profiles keep their data and gain role-specific rules without inv
   assert.equal(next.profiles.chat.instructions, 'Giữ chỉ dẫn cũ');
   assert.deepEqual(next.pageBindings, []);
   assert.equal(next.binding.pageName, 'Tên trang cũ');
-  assert.ok(next.profiles.sourcing.rules.category);
+  assert.equal(next.profiles.sourcing, undefined);
 });
 
 test('platform overrides inherit unspecified defaults and survive disabling, page switches stay independent', () => {
@@ -123,9 +123,7 @@ test('rejects unsupported platform fields, invalid price ranges and unsafe page 
   for (const mutate of [
     c => { c.profiles.chat.rules.unknown = 'x'; },
     c => { c.profiles.review.rules.prices = 'sometimes'; },
-    c => { c.profiles.sourcing.rules.minPrice = '-1'; },
-    c => { c.profiles.sourcing.rules.minPrice = '100'; c.profiles.sourcing.rules.maxPrice = '10'; },
-    c => { c.profiles.sourcing.platformRules.facebook = { enabled: true, values: {} }; },
+    c => { c.profiles.review.platformRules.zalo = { enabled: true, values: {} }; },
     c => { c.profiles.chat.platformRules.facebook = { enabled: true, values: { cta: 'x' } }; },
     c => { c.pageBindings = [{ pageId: '123', assigned: false, enabled: true }]; },
     c => { c.pageBindings = [{ pageId: 'invalid', assigned: true, enabled: true }]; },

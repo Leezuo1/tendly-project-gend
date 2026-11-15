@@ -349,6 +349,26 @@ test('content plan approval is required before writing; binding and approved out
   assert.equal(f.publishes(), 0);
 });
 
+test('shop can write a content plan by hand without AI; Review then runs and approval still needs it', async () => {
+  const f = await fixture();
+  await f.act('campaign', { brief: { ...f.brief, accountId: '123' }, knowledge: f.knowledge, configuration: f.config });
+  const campaign = (await f.state()).workspace.campaigns[0];
+  const plan = { pillars: [{ name: 'Nhu cầu', objective: 'Khách hiểu lợi ích' }], items: [{ pillarIndex: 0, title: 'Tự soạn', outline: 'Mở đầu; Triển khai; CTA' }] };
+  await assert.rejects(f.act('createPlan', { campaignId: campaign.id, plan }), /Duyệt brief/);
+  await f.act('approveCampaign', { id: campaign.id });
+  const before = f.calls.length;
+  await assert.rejects(f.act('createPlan', { campaignId: campaign.id, plan: { ...plan, items: [] } }), /1–6 dàn ý/);
+  await f.act('createPlan', { campaignId: campaign.id, plan });
+  assert.equal(f.calls.length, before, 'writing by hand makes no AI call');
+  const saved = (await f.state()).workspace.contentPlans[0];
+  assert.equal(saved.contentModel, 'manual'); assert.equal(saved.review, undefined);
+  await assert.rejects(f.act('approvePlan', { id: saved.id }), /Review/);
+  await f.act('reviewPlan', { id: saved.id });
+  assert.ok((await f.state()).workspace.contentPlans[0].review);
+  await f.act('approvePlan', { id: saved.id });
+  assert.ok((await f.state()).workspace.contentPlans[0].approvedAt);
+});
+
 test('editing a plan invalidates post approval and schedules; stale candidates stay blocked after reapproval', async () => {
   const f = await fixture();
   await f.act('campaign', { brief: f.brief, knowledge: f.knowledge, configuration: f.config });
