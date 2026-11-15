@@ -21,7 +21,7 @@ function SourceFacts({ source }: { source: ReviewSource }) {
 }
 
 export function ReviewDetails({ review }: { review: PostReviewResult }) {
-  return <details className="mw-comparison mw-review-details"><summary>Xem thay đổi và căn cứ Review</summary>
+  return <details className="mw-comparison mw-review-details"><summary>Căn cứ và chi tiết kỹ thuật</summary>
     <p className="mw-muted">{REVIEW_STATUS[review.status]} · {new Date(review.evidence.checkedAt).toLocaleString('vi-VN')} · {review.reviewModel === 'mock' ? 'Kênh mẫu · kiểm tra bằng quy tắc' : `Content: ${review.contentModel} · Review: ${review.reviewModel || 'chưa hoàn tất'}`}</p>
     {review.evidence.targetAt && <p className="mw-muted">Thời điểm dự kiến sử dụng: {new Date(review.evidence.targetAt).toLocaleString('vi-VN')}. Kiểm tra lại hiệu lực khi đăng / lập lịch.</p>}
     {review.variants.map((item, index) => <section key={item.draftId}>

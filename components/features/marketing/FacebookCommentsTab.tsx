@@ -26,7 +26,7 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [selectedId, setSelectedId] = useState('');
-  const [settingsExpanded, setSettingsExpanded] = useState(true);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [edits, setEdits] = useState<Record<string, { revision: number; text: string }>>({});
   useEffect(() => {
     const refresh = () => { if (!document.hidden && !busy && !loading) reload(); };
@@ -61,24 +61,22 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
     <section className="tab-panel active fc-root" aria-label="Bình luận Facebook">
       <div className="card fc-settings">
         <div className="card-head fc-settings-head">
-          <h2>Bình luận → Messenger</h2>
+          <h2>Bình luận khách hàng</h2>
           {postFilter && <button type="button" className="btn btn-outline btn-sm" onClick={() => setPostFilter('')}>Bài {postFilter} · Xem tất cả</button>}
           <div className="fc-settings-controls">
-          <button type="button" className="fc-toggle" role="switch" aria-checked={data?.settings.autoReply ?? false}
-            aria-label="AI tự nhắn riêng" disabled={!!busy || !data}
-            onClick={() => run('settings', () => client.setAutoReply(!data!.settings.autoReply),
-              data?.settings.autoReply ? 'Đã tắt tự gửi.' : 'Đã lưu dữ liệu AI và bật tự gửi cho comment mới.')}>
-            <span>AI tự nhắn riêng <b>{busy === 'settings' ? 'Đang lưu…' : !data ? 'Đang tải…' : data.settings.autoReply ? 'Bật' : 'Tắt'}</b></span>
-            <span className="fc-toggle-track" aria-hidden="true"><span /></span>
-          </button>
-          <button type="button" className="fc-collapse" aria-expanded={settingsExpanded} aria-controls="fc-settings-body"
-            onClick={() => setSettingsExpanded(!settingsExpanded)}>
-            {settingsExpanded ? 'Thu gọn' : 'Mở cài đặt'}
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-          </button>
+          <span className="hint">AI tự nhắn riêng: <b>{!data ? 'đang tải' : data.settings.autoReply ? 'bật' : 'tắt'}</b></span>
+          <button type="button" className="btn btn-outline btn-sm" aria-expanded={settingsExpanded} aria-controls="fc-settings-body"
+            onClick={() => setSettingsExpanded(!settingsExpanded)}>Cài đặt phản hồi</button>
           </div>
         </div>
         <div id="fc-settings-body" hidden={!settingsExpanded}>
+        <button type="button" className="fc-toggle" role="switch" aria-checked={data?.settings.autoReply ?? false}
+          aria-label="AI tự nhắn riêng" disabled={!!busy || !data}
+          onClick={() => run('settings', () => client.setAutoReply(!data!.settings.autoReply),
+            data?.settings.autoReply ? 'Đã tắt tự gửi.' : 'Đã lưu dữ liệu AI và bật tự gửi cho comment mới.')}>
+          <span>AI tự nhắn riêng <b>{busy === 'settings' ? 'Đang lưu…' : !data ? 'Đang tải…' : data.settings.autoReply ? 'Bật' : 'Tắt'}</b></span>
+          <span className="fc-toggle-track" aria-hidden="true"><span /></span>
+        </button>
         <div className="card-desc">
           Bật để AI tự soạn và gửi tin riêng cho bình luận hỏi sản phẩm trên bài post Facebook khi đủ dữ liệu.
           Câu hỏi thiếu dữ liệu chờ shop duyệt; cài đặt này không thay đổi hộp thư inbox Messenger.
@@ -92,7 +90,7 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
           </button>
           <span id="fc-knowledge-status" className={data?.settings.updatedAt ? 'hint' : 'fc-warning'}>
             {data?.settings.updatedAt ? `${data.settings.productCount} sản phẩm · Đã đồng bộ ${relativeTime(data.settings.updatedAt).toLocaleLowerCase('vi')}`
-              : <><span aria-hidden="true">⚠</span> Chưa đồng bộ sản phẩm và FAQ</>}
+              : 'Chưa đồng bộ sản phẩm và FAQ'}
           </span>
         </div>
         <p id="fc-knowledge-help" className="fc-note">Cập nhật lại sau khi đổi sản phẩm hoặc FAQ để AI dùng dữ liệu mới nhất.</p>
@@ -140,7 +138,7 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
         <h3>Chưa có bình luận</h3><p>Bình luận mới sẽ tự động hiển thị tại đây khi khách hàng tương tác trên Fanpage.
           Đồng bộ dữ liệu sản phẩm để AI sẵn sàng hỗ trợ khách.</p>
         <div className="fc-empty-actions">
-          <Link className="btn btn-primary btn-sm" href="/cai-dat?tab=channels">Kiểm tra kết nối Fanpage →</Link>
+          <Link className="btn btn-primary btn-sm" href="/cai-dat?tab=channels">Kiểm tra kết nối Fanpage</Link>
           <Link className="btn btn-outline btn-sm" href="/cai-dat?tab=faq">Cài đặt dữ liệu AI</Link>
         </div>
       </div> : <div className="fc-workspace">
@@ -161,7 +159,7 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
         {selected && <article className="card fc-detail">
           <div className="card-head"><h2>{selected.authorName || 'Người dùng Facebook'}</h2>
             <a href={`https://www.facebook.com/${selected.postId}?comment_id=${selected.commentId.split('_')[1]}`}
-              target="_blank" rel="noreferrer">Xem trên Facebook ↗</a></div>
+              target="_blank" rel="noreferrer">Xem trên Facebook</a></div>
           <div className="fc-detail-body">
             <div className="fc-thread" role="group" aria-label="Chọn bình luận để trả lời">
               <p className="fc-reason">{selectedGroup.length} bình luận phù hợp của người dùng này · Chọn bình luận để trả lời</p>
@@ -193,7 +191,7 @@ export function FacebookCommentsTab({ onToast, initialPostId }: { onToast: (mess
                   const result = await client.send(selected, text);
                   onToast(result.persisted ? result.reason : `${result.reason} Đang chờ đồng bộ dữ liệu; không gửi lại.`);
                 })}>{busy === 'send' ? 'Đang gửi…' : 'Gửi riêng qua Page'}</button>
-              <Link href="/hop-thoai">Mở inbox Messenger →</Link>
+              <Link href="/hop-thoai">Mở inbox Messenger</Link>
             </div>
             <p className="fc-note">“AI soạn tin” tạo bản nháp; “Gửi riêng qua Page” gửi nội dung bạn đang nhập. Khi bật “AI tự nhắn riêng”, bình luận mới đủ điều kiện sẽ được AI tự trả lời. Hộp thư inbox giữ cách hoạt động hiện tại.</p>
           </div>
