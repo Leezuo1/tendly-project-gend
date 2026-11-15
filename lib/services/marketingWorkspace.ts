@@ -74,7 +74,8 @@ export function requireApprovedMarketingPost(state: MarketingWorkspace, post: Ma
   const review = findReview(state, post.id);
   const campaign = requireCurrentCampaign(state, review);
   const hash = marketingPostHash(post);
-  if (review.reviewHash !== hash || review.approvedHash !== hash || !review.approvedAt) throw new MarketingWorkflowError('Bài/ảnh chưa được Review và chủ shop duyệt đúng phiên bản.', 409);
+  // Bản đã qua AI Review hoặc bản chủ shop tự sửa (manualHash) đều dùng được, miễn chủ shop đã duyệt đúng phiên bản này.
+  if ((review.reviewHash !== hash && review.manualHash !== hash) || review.approvedHash !== hash || !review.approvedAt) throw new MarketingWorkflowError('Bài/ảnh chưa được chủ shop duyệt đúng phiên bản (AI Review hoặc bản tự sửa).', 409);
   if (!offerValidAt(campaign, at) || (campaign.endsAt && at >= Date.parse(campaign.endsAt))) throw new MarketingWorkflowError('Ưu đãi hoặc chiến dịch không còn hiệu lực tại giờ đăng.');
   return { review, campaign, hash };
 }
@@ -82,6 +83,7 @@ export function requireApprovedMarketingPost(state: MarketingWorkspace, post: Ma
 async function requireReviewSources(pageId: string, state: MarketingWorkspace, review: ReviewedMarketingPost, db: Pick<Pool, 'query'> = getMessengerPool()) {
   const campaign = requireCurrentCampaign(state, review), account = marketingAccounts(pageId).find(item => item.id === campaign.accountId);
   if (!account) throw new MarketingWorkflowError('Tài khoản Review không thuộc shop.', 403);
+  if (!review.reviewHash && review.manualHash) return; // bản chủ shop tự sửa: không có căn cứ AI để đối chiếu
   requireFreshReviewEvidence(review.review?.evidence, await postReviewCatalog(pageId, state, campaign, account, review.plan!, db));
 }
 
@@ -212,7 +214,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       requireFreshReviewEvidence(attempt.evidence, await postReviewCatalog(pageId, state, campaign, account, attempt.plan!, db));
       const final = await updateDraft(post.id, result.finalDraft, db);
       const { plan: currentPlan, item: currentOutline } = requireContentPlan(state, campaign, attempt.plan);
-      Object.assign(review, { original: result.original, changes: result.changes.map(change => change.reason), review: { ...attempt, variants: [result] }, reviewHash: marketingPostHash(final), reviewedAt: Date.now(), campaignVersion: campaign.version,
+      Object.assign(review, { original: result.original, changes: result.changes.map(change => change.reason), review: { ...attempt, variants: [result] }, reviewHash: marketingPostHash(final), manualHash: undefined, reviewedAt: Date.now(), campaignVersion: campaign.version,
         plan: attempt.plan, outlineSnapshot: { title: currentOutline.title, outline: currentOutline.outline, pillar: currentPlan.pillars[currentOutline.pillarIndex].name }, approvedAt: null, approvedHash: null, approvedBy: '', campaignSnapshot: campaign });
       attempt.appliedAt = Date.now(); invalidatePostSchedules(state, [post.id]);
     } else if (action === 'sourcingIdea') {
@@ -251,14 +253,15 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       const review = findReview(state, input.postId);
       if (review.publication !== 'draft') throw new MarketingWorkflowError('Bài đang đăng hoặc đã đăng không thể sửa/duyệt lại.');
       if (action === 'editPost') {
-        await updateDraft(review.postId, parsePostEdit(input.patch), db); review.approvedAt = null; review.approvedHash = null; review.reviewHash = '';
+        const edited = await updateDraft(review.postId, parsePostEdit(input.patch), db); review.approvedAt = null; review.approvedHash = null; review.reviewHash = ''; review.manualHash = marketingPostHash(edited);
         invalidatePostSchedules(state, [review.postId]);
       } else {
         requireCurrentCampaign(state, review);
         const post = await getPost(review.postId, db);
-        if (review.reviewHash !== marketingPostHash(post)) throw new MarketingWorkflowError('Chạy Review lại sau khi chỉnh bài hoặc ảnh.');
+        const hash = marketingPostHash(post);
+        if (review.reviewHash !== hash && review.manualHash !== hash) throw new MarketingWorkflowError('Bài đã thay đổi. Lưu bản sửa hoặc nhờ AI kiểm tra trước khi duyệt.');
         await requireReviewSources(pageId, state, review, db);
-        review.approvedHash = review.reviewHash; review.approvedAt = Date.now(); review.approvedBy = actor;
+        review.approvedHash = hash; review.approvedAt = Date.now(); review.approvedBy = actor;
       }
     } else if (action === 'schedule') {
       if (!Array.isArray(input.slots) || !input.slots.length || input.slots.length > 84) throw new MarketingWorkflowError('Chọn 1–84 mốc đăng.');
@@ -364,8 +367,10 @@ export async function changeMarketingImage(pageId: string, revision: number, pos
   await changeWorkspace(pageId, revision, async (state, db) => {
     const review = findReview(state, postId);
     if (review.publication !== 'draft') throw new MarketingWorkflowError('Không thay ảnh của bài đang gửi hoặc đã đăng.');
+    const manual = !review.reviewHash && !!review.manualHash; // bài chủ shop tự sửa vẫn là bài tự sửa sau khi đổi ảnh, không ép AI Review
     if (image) await setPostImage(postId, image, db); else await deletePostImage(postId, db);
     review.approvedAt = null; review.approvedHash = null; review.reviewHash = '';
+    review.manualHash = manual ? marketingPostHash(await getPost(postId, db)) : undefined;
     invalidatePostSchedules(state, [postId]);
   });
 }

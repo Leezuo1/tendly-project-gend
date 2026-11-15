@@ -20,6 +20,7 @@ export function draftStatus(view: MarketingWorkspaceView, meta: ReviewedMarketin
   if (meta.publication === 'published') return { label: mock ? 'Đã hoàn tất mẫu' : 'Đã đăng', tone: 'approved' };
   if (!isCurrent(view, meta)) return { label: 'Cần duyệt lại', tone: 'stale' };
   if (view.workspace.reviewAttempts?.some(a => a.targetPostId === meta.postId && !a.appliedAt && !a.discardedAt)) return { label: 'AI đã rà soát', tone: 'reviewed' };
+  if (!meta.reviewHash && meta.manualHash) return meta.approvedAt ? { label: 'Đã duyệt', tone: 'approved' } : { label: 'Chờ bạn duyệt', tone: 'waiting' };
   if (!meta.reviewHash) return { label: 'Bản nháp', tone: 'draft' };
   return meta.approvedAt ? { label: 'Đã duyệt', tone: 'approved' } : { label: 'Chờ bạn duyệt', tone: 'waiting' };
 }
@@ -28,9 +29,9 @@ interface Props {
   post: MarketingPost; meta: ReviewedMarketingPost; view: MarketingWorkspaceView; busy: boolean; error: string;
   act: (action: string, input: object) => Promise<boolean>;
   confirm: (title: string, message: string, action: () => Promise<unknown>) => void;
-  upload: (id: string, file: File | null) => Promise<void>; onComments: (id: string) => void;
+  upload: (id: string, file: File | null) => Promise<void>; onComments: (id: string) => void; onAskAi: (postId: string) => void;
 }
-export function MarketingDraft({ post, meta, view, busy, error, act, confirm, upload, onComments }: Props) {
+export function MarketingDraft({ post, meta, view, busy, error, onAskAi, act, confirm, upload, onComments }: Props) {
   const [edit, setEdit] = useState(false);
   const initial = { title: post.title, content: post.content, hashtags: post.hashtags.join(' '), imageIdea: post.imageIdea };
   const [form, setForm] = useState(initial);
@@ -43,13 +44,15 @@ export function MarketingDraft({ post, meta, view, busy, error, act, confirm, up
   const draft = meta.publication === 'draft';
   const candidate = view.workspace.reviewAttempts?.find(a => a.targetPostId === post.id && !a.appliedAt && !a.discardedAt);
   const proposed = candidate?.variants[0];
-  const review = candidate ?? meta.review;
-  const reviewValid = valid && !!meta.reviewHash;
+  // Bản chủ shop tự sửa: kết quả Review cũ thuộc về nội dung trước khi sửa nên không hiển thị.
+  const manual = !meta.reviewHash && !!meta.manualHash;
+  const review = candidate ?? (manual ? undefined : meta.review);
+  const reviewValid = valid && (!!meta.reviewHash || manual);
   const status = draftStatus(view, meta);
   const changes = review?.variants.flatMap(v => v.changes) ?? [];
   const issues = review?.variants.flatMap(v => v.issues) ?? [];
   return <article id={`mw-post-${post.id}`} className="mw-detail" data-unsaved={edit}>
-    <header className="mw-detail-head"><div><h3>{post.title}</h3><p className="mw-meta">{campaign.name} · {account.platform}{account.mock && ' · Kênh mẫu'}</p></div><span className={`mw-badge ${status.tone}`}>{status.label}</span></header>
+    <header className="mw-detail-head"><div><h3>{post.title}</h3><p className="mw-meta">{campaign.name} · {account.platform}{account.mock && ' · Kênh mẫu'}{manual && ' · Bạn tự sửa, AI chưa kiểm tra bản này'}</p></div><span className={`mw-badge ${status.tone}`}>{status.label}</span></header>
     {error && <p className="mw-error" role="alert">{error}</p>}
     {busy && <p role="status"><BusyStatus /></p>}
     {!valid && draft && <p className="mw-error">Brief hoặc dàn ý đã thay đổi so với lúc viết bài. Cần Review lại trước khi duyệt.</p>}
@@ -69,7 +72,8 @@ export function MarketingDraft({ post, meta, view, busy, error, act, confirm, up
     {!edit && snapshot && <details className="mw-fold"><summary>Dàn ý đã dùng để viết bài</summary><p className="mw-muted">{snapshot.pillar} · Dàn ý phiên bản {meta.plan?.version}</p><h4>{snapshot.title}</h4><div className="mw-copy">{snapshot.outline}</div></details>}
     {!edit && review && <ReviewDetails review={review} />}
     <div className="mw-actions mw-decision">
-      {edit ? <><button className="btn btn-outline" onClick={() => { setForm(initial); setEdit(false); }}>Hủy sửa</button><button className="btn btn-primary" type="submit" form={`mw-edit-${post.id}`} disabled={busy}>Lưu và Review lại</button></> : <>
+      {edit ? <><button className="btn btn-outline" onClick={() => { setForm(initial); setEdit(false); }}>Hủy sửa</button><button className="btn btn-primary" type="submit" form={`mw-edit-${post.id}`} disabled={busy}>Lưu</button></> : <>
+        {draft && manual && <button className="btn btn-text btn-sm" disabled={busy || !valid} onClick={() => onAskAi(post.id)}>Nhờ AI kiểm tra</button>}
         {draft && <button className="btn btn-text btn-sm" disabled={busy || !valid} onClick={() => act('generate', { campaignId: campaign.id, plan: meta.plan })}>Viết lại bằng AI</button>}
         {draft && <button className="btn btn-outline" onClick={() => { setForm(initial); setEdit(true); }}>Chỉnh sửa thủ công</button>}
         {draft && !meta.approvedAt && <button className="btn btn-primary" disabled={busy || !reviewValid || !!candidate} onClick={() => act('approvePost', { postId: post.id })}>Duyệt bản này</button>}

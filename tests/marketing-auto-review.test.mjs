@@ -19,19 +19,20 @@ const view = (overrides = {}) => ({ workspace: {
   reviews: [{ postId: 'post', campaignId: 'c1', publication: 'draft', plan: { id: 'p1', itemId: 'i2' } }],
   ...overrides } });
 
-test('Review runs automatically after the shop edits a post, plan or image', () => {
-  assert.deepEqual(autoReview('editPost', { postId: 'post' }, view()), { action: 'review', input: { postId: 'post', plan: { id: 'p1', version: 3, itemId: 'i2' } } });
+test('Review runs automatically after the shop edits a plan or image, never after a hand edit of the post', () => {
+  assert.equal(autoReview('editPost', { postId: 'post' }, view()), null, 'a manual edit stays independent of the AI');
+  assert.deepEqual(autoReview('image', { postId: 'post' }, view()), { action: 'review', input: { postId: 'post', plan: { id: 'p1', version: 3, itemId: 'i2' } } });
   assert.equal(autoReview('image', { postId: 'post' }, view()).action, 'review');
   assert.deepEqual(autoReview('editPlan', { id: 'p1' }, view()), { action: 'reviewPlan', input: { id: 'p1' } });
   const outdated = view({ reviews: [{ postId: 'post', campaignId: 'c1', publication: 'draft', plan: { id: 'old', itemId: 'x' } }] });
-  assert.equal(autoReview('editPost', { postId: 'post' }, outdated).input.plan.itemId, 'i1');
+  assert.equal(autoReview('image', { postId: 'post' }, outdated).input.plan.itemId, 'i1');
 });
 
 test('auto Review is skipped when it cannot run or is not needed', () => {
   assert.equal(autoReview('approvePost', { postId: 'post' }, view()), null);
-  assert.equal(autoReview('editPost', { postId: 'post' }, view({ campaigns: [{ id: 'c1', version: 2, approvedAt: null }] })), null);
-  assert.equal(autoReview('editPost', { postId: 'post' }, view({ reviews: [{ postId: 'post', campaignId: 'c1', publication: 'published' }] })), null);
-  assert.equal(autoReview('editPost', { postId: 'missing' }, view()), null);
+  assert.equal(autoReview('image', { postId: 'post' }, view({ campaigns: [{ id: 'c1', version: 2, approvedAt: null }] })), null);
+  assert.equal(autoReview('image', { postId: 'post' }, view({ reviews: [{ postId: 'post', campaignId: 'c1', publication: 'published' }] })), null);
+  assert.equal(autoReview('image', { postId: 'missing' }, view()), null);
 });
 
 test('reviewedPlan swaps in the Review suggestions and is null when nothing differs', () => {
@@ -57,6 +58,7 @@ test('nextAutoReview picks missing or failed Review once, and leaves blocked res
   const stalePost = { postId: 'post', campaignId: 'c1', publication: 'draft', reviewHash: '', reviewedAt: 5, plan: { id: 'p1', itemId: 'i2' } };
   const next = nextAutoReview(view({ reviews: [stalePost] }), new Set());
   assert.equal(next.key, 'post:post:5'); assert.equal(next.action, 'review');
+  assert.equal(nextAutoReview(view({ reviews: [{ ...stalePost, manualHash: 'abc' }] }), new Set()), null, 'a hand-edited post is not auto-reviewed');
   const waiting = { id: 'a2', status: 'blocked', targetPostId: 'post', variants: [{ finalDraft: null }] };
   assert.equal(nextAutoReview(view({ reviews: [stalePost], reviewAttempts: [waiting] }), new Set()), null, 'a post with a proposal waiting is not reviewed again');
   assert.equal(nextAutoReview(workspace({ contentPlans: [plan] }), new Set(), 'other'), null, 'only the selected campaign');

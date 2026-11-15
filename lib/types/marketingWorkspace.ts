@@ -30,6 +30,8 @@ export interface ReviewedMarketingPost {
   outlineSnapshot?: { title: string; outline: string; pillar: string };
   postId: string; campaignId: string; campaignVersion: number; accountId: string;
   original: GeneratedPostDraft; changes: string[]; reviewHash: string; reviewedAt: number;
+  /** Hash bản do chủ shop tự sửa (chưa qua AI Review): shop có thể duyệt trực tiếp, chịu trách nhiệm nội dung. Mất hiệu lực khi nội dung đổi. */
+  manualHash?: string;
   review?: PostReviewResult;
   campaignSnapshot?: MarketingCampaign;
   publications?: { externalId: string; externalUrl: string | null; at: number }[];
