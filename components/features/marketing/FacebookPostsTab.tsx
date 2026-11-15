@@ -37,7 +37,7 @@ function CommentThread({ comment, postUrl }: { comment: FacebookPostComment; pos
       <div className="fp-comment-meta"><time dateTime={new Date(comment.createdAt).toISOString()}>{dateTime(comment.createdAt)}</time>
         {comment.likes !== null && comment.likes > 0 && <span>{count(comment.likes)} lượt thích</span>}</div>
       {comment.replies.length > 0 && <ul className="fp-replies">{comment.replies.map((reply) => <CommentThread key={reply.id} comment={reply} postUrl={postUrl} />)}</ul>}
-      {comment.hasMoreReplies && <a className="fp-more-replies" href={postUrl} target="_blank" rel="noreferrer">Xem thêm phản hồi trên Facebook ↗</a>}
+      {comment.hasMoreReplies && <a className="fp-more-replies" href={postUrl} target="_blank" rel="noreferrer">Xem thêm phản hồi trên Facebook</a>}
     </div>
   </li>;
 }
@@ -67,16 +67,15 @@ function FacebookPostCard({ post }: { post: FacebookFeedPost }) {
       <span className="fp-overview"><strong className="fp-title">{title}</strong>
         <time className="fp-date" dateTime={new Date(post.createdAt).toISOString()}>{dateTime(post.createdAt)}</time>
         <span className="fp-stats">{([
-          ['heart', 'Cảm xúc', post.reactions], ['comment', 'Bình luận', post.comments], ['share', 'Chia sẻ', post.shares],
-        ] as const).map(([icon, label, value]) => <span key={icon} className={!value ? 'fp-stat-muted' : ''}
-          aria-label={`${label}: ${value === null ? 'chưa có dữ liệu' : value}`} title={`${label}: ${value === null ? 'chưa có dữ liệu' : value}`}>
-          <PostIcon name={icon} />{count(value)}</span>)}</span>
+          ['lượt thích', post.reactions], ['bình luận', post.comments], ['chia sẻ', post.shares],
+        ] as const).map(([label, value]) => <span key={label} className={!value ? 'fp-stat-muted' : ''}
+          aria-label={`${label}: ${value === null ? 'chưa có dữ liệu' : value}`}>{count(value)} {label}</span>)}</span>
       </span>
       <svg className="fp-chevron" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </summary>
     <div className="fp-expanded">
       <div className="fp-post-content">
-        <div className="fp-content-head"><span className="fp-page-label">Bài đăng Facebook</span><a href={post.url} target="_blank" rel="noreferrer">Mở trên Facebook ↗</a></div>
+        <div className="fp-content-head"><span className="fp-page-label">Bài đăng Facebook</span><a href={post.url} target="_blank" rel="noreferrer">Mở trên Facebook</a></div>
         <p className="fp-message">{post.message || 'Bài đăng này không có nội dung văn bản.'}</p>
         {post.imageUrl && <Image className="fp-image" unoptimized src={post.imageUrl} alt="Ảnh trong bài đăng Facebook" width={960} height={640}
           onError={(e) => { e.currentTarget.hidden = true; }} />}
