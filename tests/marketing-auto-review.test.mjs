@@ -10,7 +10,7 @@ const source = ts.transpileModule(readFileSync('components/features/marketing/Ma
 }).outputText;
 const loaded = { exports: {} };
 new Function('require', 'module', 'exports', source)(name => name.startsWith('@/') || name.startsWith('./') ? {} : require(name), loaded, loaded.exports);
-const { autoReview } = loaded.exports;
+const { autoReview, reviewedPlan } = loaded.exports;
 
 const view = (overrides = {}) => ({ workspace: {
   campaigns: [{ id: 'c1', version: 2, approvedAt: 1 }],
@@ -32,4 +32,12 @@ test('auto Review is skipped when it cannot run or is not needed', () => {
   assert.equal(autoReview('editPost', { postId: 'post' }, view({ campaigns: [{ id: 'c1', version: 2, approvedAt: null }] })), null);
   assert.equal(autoReview('editPost', { postId: 'post' }, view({ reviews: [{ postId: 'post', campaignId: 'c1', publication: 'published' }] })), null);
   assert.equal(autoReview('editPost', { postId: 'missing' }, view()), null);
+});
+
+test('reviewedPlan swaps in the Review suggestions and is null when nothing differs', () => {
+  const plan = { items: [{ id: 'a', title: 'T1', outline: 'O1' }, { id: 'b', title: 'T2', outline: 'O2' }],
+    review: { variants: [{ finalDraft: { title: 'T1', content: 'O1' } }, { finalDraft: { title: 'T2b', content: 'O2b' } }] } };
+  assert.deepEqual(reviewedPlan(plan).items.map(item => [item.id, item.title, item.outline]), [['a', 'T1', 'O1'], ['b', 'T2b', 'O2b']]);
+  assert.equal(reviewedPlan({ ...plan, review: { variants: [{ finalDraft: null }, {}] } }), null);
+  assert.equal(reviewedPlan({ ...plan, review: undefined }), null);
 });

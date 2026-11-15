@@ -172,6 +172,15 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
   }
   if (action === 'publish') { await publishMarketingPost(pageId, String(input.postId), undefined, revision); return; }
   await changeWorkspace(pageId, revision, async (state, db) => {
+    if (action === 'createPlan') {
+      // Chủ shop tự soạn kế hoạch, không cần AI; AI chỉ Review sau đó (client gọi reviewPlan ngay).
+      const campaign = findCampaign(state, input.campaignId);
+      if (!campaign.approvedAt) throw new MarketingWorkflowError('Duyệt brief trước khi lập kế hoạch.');
+      requireCampaignReady(campaign);
+      if ((state.contentPlans?.length ?? 0) >= 100) throw new MarketingWorkflowError('Tối đa 100 phương án kế hoạch.');
+      state.contentPlans = [{ ...parseContentPlan(input.plan), id: randomUUID(), campaignId: campaign.id, campaignVersion: campaign.version, version: 1, contentModel: 'manual', approvedAt: null, approvedBy: '' }, ...(state.contentPlans ?? [])];
+      return;
+    }
     if (action === 'editPlan' || action === 'approvePlan') {
       const plan = state.contentPlans?.find(p => p.id === input.id);
       if (!plan) throw new MarketingWorkflowError('Không tìm thấy kế hoạch.', 404);
