@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Conversation, InboxFilter } from '@/lib/types/inbox';
+import type { StaffLabelAction } from '@/lib/services/contextTagRules';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ConversationList } from './ConversationList';
 import { useMobileViewport } from '@/lib/hooks/useMobileViewport';
@@ -126,10 +127,18 @@ export function InboxShell() {
     };
   }, [conversations]);
 
-  const taggedConversations = useMemo(() => {
-    const rules = dbVersion < 0 ? [] : readContextTagRules();
-    return conversations.map(conversation => applyContextTags(conversation, rules));
-  }, [conversations, dbVersion]);
+  const tagRules = useMemo(() => dbVersion < 0 ? [] : readContextTagRules(), [dbVersion]);
+  const taggedConversations = useMemo(() => conversations.map(conversation => applyContextTags(conversation, tagRules)), [conversations, tagRules]);
+  const saveStaffLabels = async (target: Conversation, change: StaffLabelAction) => {
+    if (!target.messenger) return;
+    try {
+      const response = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ psid: target.messenger.psid, action: 'labels', change }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error);
+      setConversations(previous => previous.map(c => c.id === target.id ? { ...c, staffLabels: body.staffLabels } : c));
+    } catch (error) { showToast(error instanceof Error && error.message ? error.message : 'Không lưu được nhãn.'); }
+  };
   const filteredConversations = useMemo(() => {
     return sortReplyQueue(taggedConversations.filter((conv) => {
       if (filter === 'urgent' && (!conv.isUnreplied || !conv.isUrgent)) return false;
@@ -346,6 +355,8 @@ export function InboxShell() {
                   onDraftChange={setDraftText}
                   onToast={showToast}
                   onGenerateAiSuggestion={handleGenerateAiSuggestion}
+                  labelRules={tagRules}
+                  onSaveStaffLabels={(change) => saveStaffLabels(selectedConv, change)}
                   isSending={sendingIds.has(selectedConv.id)}
                   aiEnabled={autoReply}
                   savingAi={savingAiSettings}

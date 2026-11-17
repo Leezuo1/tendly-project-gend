@@ -14,6 +14,7 @@ export const AI_RESPONSE_SCHEMA = {
         needsHuman: { type: 'boolean' },
         canAutoReply: { type: 'boolean', description: 'Chỉ true khi đủ căn cứ trong nguồn tri thức để trả lời đầy đủ, không cần shop xác nhận.' },
         communicationStyle: { type: 'string', description: 'Phong cách giao tiếp quan sát được trong tin khách và ngữ cảnh, tối đa 200 ký tự. Không đủ căn cứ thì để chuỗi trống; không gán tính cách cố định hay chẩn đoán.' },
+        labels: { type: 'array', items: { type: 'string' }, description: 'Tối đa 3 id trong labelOptions phù hợp tình huống; không có thì mảng rỗng.' },
       },
       required: ['sentiment', 'emotion', 'priority', 'reason', 'needsHuman', 'communicationStyle', 'canAutoReply'],
       additionalProperties: false,
@@ -54,7 +55,8 @@ export function parseAiAnalysis(value: unknown): AiMessageAnalysis {
   return { sentiment, emotion, priority, priorityScore, reason: a.reason.trim(), needsHuman: a.needsHuman,
     canAutoReply: a.canAutoReply === true && !a.needsHuman,
     ...(typeof a.communicationStyle === 'string' && a.communicationStyle.trim()
-      ? { communicationStyle: a.communicationStyle.trim().slice(0, 200) } : {}) };
+      ? { communicationStyle: a.communicationStyle.trim().slice(0, 200) } : {}),
+    ...(Array.isArray(a.labels) ? { labels: [...new Set(a.labels.filter((id): id is string => typeof id === 'string' && !!id && id.length <= 100))].slice(0, 3) } : {}) };
 }
 
 export function parseAiChatOutput(text: string): { analysis: AiMessageAnalysis; reply: string } {

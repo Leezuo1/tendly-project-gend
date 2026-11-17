@@ -1,8 +1,10 @@
 import type { Pool } from 'pg';
 import { createSeed, LEGACY_PRODUCTS } from '@/lib/data/admin';
 import { buildKnowledge, InvalidAiKnowledge, parseAiKnowledge, type CatalogDb } from '@/lib/services/aiKnowledge';
+import { DEFAULT_CONTEXT_TAG_RULES, validateContextTagRules } from '@/lib/services/contextTagRules';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import type { AiKnowledge } from '@/lib/types/ai';
+import type { ContextTagRule } from '@/lib/types/contextTags';
 
 export class ShopCatalogError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
@@ -16,7 +18,20 @@ const samples = () => new Set([...createSeed().products, ...LEGACY_PRODUCTS].map
 
 function parseCatalog(value: unknown): CatalogDb {
   if (!isRecord(value) || !isRecord(value.shop) || !isRecord(value.productSource) || !Array.isArray(value.products) || !Array.isArray(value.faqs) || !Array.isArray(value.triggers)) throw new ShopCatalogError('Dữ liệu danh mục không hợp lệ.');
+  if (value.contextTagRules !== undefined) {
+    try { return { ...value, contextTagRules: validateContextTagRules(value.contextTagRules) } as unknown as CatalogDb; }
+    catch (error) { throw new ShopCatalogError(error instanceof Error ? error.message : 'Quy tắc gắn thẻ không hợp lệ.'); }
+  }
   return value as unknown as CatalogDb;
+}
+
+/** Bộ nhãn ngữ cảnh của shop (đồng bộ cùng danh mục); chưa có danh mục, chưa có bộ nhãn hoặc chưa chạy migration 024 thì dùng bộ mặc định. */
+export async function readShopTagRules(pageId: string, db: Db = getMessengerPool()): Promise<ContextTagRule[]> {
+  try {
+    const rules = (await db.query('SELECT catalog_json FROM shop_catalog WHERE page_id=$1', [pageId])).rows[0]?.catalog_json?.contextTagRules;
+    if (Array.isArray(rules)) return rules as ContextTagRule[];
+  } catch (error) { if (!noTable(error)) throw error; }
+  return structuredClone(DEFAULT_CONTEXT_TAG_RULES);
 }
 
 /** Phần tri thức AI được dùng: đã kiểm tra, bỏ sản phẩm mẫu chưa sửa. */

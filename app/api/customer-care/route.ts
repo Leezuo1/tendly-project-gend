@@ -3,7 +3,8 @@ import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
 import { CustomerCareError, generateCareReply, parseCareProfile, readCarePageProfile, saveCustomerCareSettings } from '@/lib/services/customerCare';
 import { InvalidAiKnowledge, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { readMessengerAiSettings } from '@/lib/services/messengerAi';
-import { readShopCatalog } from '@/lib/services/shopCatalog';
+import { readShopCatalog, readShopTagRules } from '@/lib/services/shopCatalog';
+import { staffLabelNotes } from '@/lib/services/staffLabels';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { saveConversationMemory } from '@/lib/services/conversationMemory';
 import { readConversationSources } from '@/lib/services/conversationSources';
@@ -44,7 +45,7 @@ async function handle(request: Request) {
     if (!settings.profile || !settings.knowledge) throw new CustomerCareError('Xác nhận tri thức và quy tắc Chat trong Cấu hình AI trước khi tạo gợi ý.', 409);
     const db = getMessengerPool();
     const id = JSON.stringify([pageId, body.psid]);
-    const latest = (await db.query(`SELECT m.* FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
+    const latest = (await db.query(`SELECT m.*,c.staff_labels FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
       WHERE m.page_id=$1 AND m.conversation_id=$2 AND c.hidden_at IS NULL
       AND ($3::text IS NULL OR m.message_id=$3) ORDER BY m.sent_at DESC,m.message_id DESC LIMIT 1`, [pageId, id, body.messageId ?? null])).rows[0];
     if (!latest || latest.direction !== 'in') throw new CustomerCareError('Không có tin khách cần phân tích.', 409);
@@ -55,7 +56,9 @@ async function handle(request: Request) {
     const sources = await readConversationSources(pageId, body.psid, latest.message_id, db);
     if (!sources) throw new CustomerCareError('Hội thoại không còn hiển thị.', 409);
     const history = await readCustomerOrderHistory(pageId, body.psid, db);
-    const reply = await generateCareReply(settings.knowledge, settings.profile, settings.pageProfile, latest.text.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history);
+    const rules = await readShopTagRules(pageId, db);
+    const reply = await generateCareReply(settings.knowledge, settings.profile, settings.pageProfile, latest.text.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history,
+      { rules, staff: staffLabelNotes(latest.staff_labels, rules) });
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updatedAt}`;
     if (!latest.text.trim() || latest.attachments_json.length || reply.reply.length > 2000) reply.analysis.canAutoReply = false;
     await assertOperationAllowed();

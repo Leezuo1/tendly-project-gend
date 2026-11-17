@@ -1,6 +1,7 @@
 import type { MessengerMessage } from './messenger';
 import type { ConversationMemoryEntry } from './conversationMemory';
 import type { CareSourceContext } from './customerCare';
+import type { StaffLabels } from './inbox';
 
 export interface MessengerCustomerProfile {
   name: string | null;
@@ -14,6 +15,7 @@ export interface MessengerCustomerProfile {
 
 export interface MessengerThread {
   sourceContext?: CareSourceContext;
+  staffLabels?: StaffLabels;
   autoReply?: boolean;
   aiUpdatedAt?: number;
   waitingConfirmation?: boolean;

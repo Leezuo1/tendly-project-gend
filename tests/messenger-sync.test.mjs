@@ -18,7 +18,7 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/015-marketing-workspace.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
-  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql']) {
+  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql', '024-shop-catalog.sql', '025-conversation-staff-labels.sql']) {
     await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
   }
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
@@ -56,6 +56,8 @@ async function fixture() {
   await db.exec('TRUNCATE messenger_ai_settings, messenger_orders');
   await db.exec('TRUNCATE marketing_workspaces');
   await db.exec('TRUNCATE facebook_comments,live_sessions CASCADE');
+  // A shop_catalog row would replace the approved knowledge AI tests rely on (liveKnowledge); label tests insert their own.
+  await db.exec('TRUNCATE shop_catalog');
   const load = loader();
   const writer = load('lib/services/messengerPostgres.ts');
   return { load, writer };
@@ -82,7 +84,7 @@ async function aiFixture(enabled = true) {
       return { model: 'test', result: options.parse(JSON.stringify({ reply: state.replyText, analysis: {
         sentiment: 'neutral', emotion: 'neutral', priority: state.priority, needsHuman: false,
         reason: state.canAutoReply ? 'Dựa vào FAQ giờ mở cửa.' : 'Thiếu dữ liệu đơn hàng.',
-        canAutoReply: state.canAutoReply,
+        canAutoReply: state.canAutoReply, ...(state.labels ? { labels: state.labels } : {}),
       } })) };
     } },
     'lib/services/messengerSend.ts': { ...load('lib/services/messengerSend.ts'), sendMessengerMessage: (input) => load('lib/services/messengerSend.ts').sendMessengerMessage(input, { ...pool, query: async (sql, values) => {
@@ -494,6 +496,106 @@ test('Customer Care API previews without persisting or sending, requires confirm
   assert.equal(suggestion.status, 200); assert.equal(f.state.sends, 0);
   assert.equal((await query('SELECT * FROM messenger_analysis_history')).rows.length, 1);
   assert.equal((await route.POST(req('POST', { action: 'suggest', psid: '333', messageId: 'manual-server' }))).status, 409);
+});
+
+// Shop label set for Page 111, stored the way catalog sync stores it, keeping the approved AI knowledge unchanged.
+const setTagRules = (rules) => query(`INSERT INTO shop_catalog(page_id,catalog_json,knowledge_json,updated_at)
+  VALUES('111',$1::json,(SELECT knowledge_json FROM messenger_ai_settings WHERE page_id='111'),1)
+  ON CONFLICT(page_id) DO UPDATE SET catalog_json=EXCLUDED.catalog_json`, [JSON.stringify({ contextTagRules: rules })]);
+const tagRule = (id, label) => ({ id, label, keywords: [], type: 'neutral', enabled: true });
+const labelRequest = (route, body) => route.POST(new Request('http://localhost/api/messenger/conversation', { method: 'POST',
+  headers: { origin: 'http://localhost', Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` }, body: JSON.stringify({ action: 'labels', ...body }) }));
+
+test('staff labels: changes are applied on the server against the shop set, no cap, unknown new label asks to retry, per Page', async () => {
+  const f = await aiFixture(false);
+  const route = f.load('app/api/messenger/conversation/route.ts');
+  await f.incoming('label-1');
+  await setTagRules([tagRule('buy', 'Muốn đặt hàng'), tagRule('delivery', 'Hỏi giao hàng'), ...Array.from({ length: 10 }, (_, i) => tagRule(`r${i}`, `Nhãn ${i}`))]);
+  const change = async (type, id, psid = '222') => labelRequest(route, { psid, change: { type, id } });
+  const labels = async (type, id) => (await (await change(type, id)).json()).staffLabels;
+  let response = await change('add', 'buy');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { staffLabels: { added: ['buy'], hidden: [] } });
+  assert.deepEqual(await labels('hideRule', 'delivery'), { added: ['buy'], hidden: ['delivery'] });
+  assert.deepEqual(await labels('hideRule', 'gone'), { added: ['buy'], hidden: ['delivery'] }, 'unknown id is ignored');
+  assert.deepEqual(await labels('removeStaff', 'buy'), { added: [], hidden: ['delivery', 'buy'] }, 'removing a staff label also hides it, so a matching keyword does not bring it back');
+  assert.deepEqual(await labels('add', 'buy'), { added: ['buy'], hidden: ['delivery'] }, 'adding again clears the hidden mark');
+  response = await change('add', 'khong-co');
+  assert.equal(response.status, 409);
+  assert.match((await response.json()).error, /chưa đồng bộ/);
+  for (let i = 0; i < 10; i++) assert.equal((await change('add', `r${i}`)).status, 200, 'no cap on applied labels: all 12 of the shop set fit');
+  assert.equal((await labels('add', 'delivery')).added.length, 12);
+  assert.equal((await change('add', 'buy')).status, 200, 'adding a label that is already there is a no-op');
+  for (const bad of [{ type: 'drop', id: 'buy' }, { type: 'add' }, { type: 'add', id: 5 }, 'add', undefined]) assert.equal((await labelRequest(route, { psid: '222', change: bad })).status, 400);
+  assert.equal((await labelRequest(route, { psid: '222', added: ['buy'], hidden: [] })).status, 400, 'the old whole-state body is refused');
+  // A rule deleted elsewhere never blocks or undoes another change: it is dropped on the server, and a stale tab only sends the one change it made.
+  await setTagRules([tagRule('buy', 'Muốn đặt hàng'), tagRule('delivery', 'Hỏi giao hàng'), ...Array.from({ length: 8 }, (_, i) => tagRule(`r${i}`, `Nhãn ${i}`))]); // r8, r9 deleted
+  const kept = await labels('hideRule', 'returns');
+  assert.ok(!kept.added.includes('r8') && !kept.added.includes('r9') && kept.added.includes('delivery') && kept.added.includes('r0'), 'other devices\' labels survive, deleted ones are dropped');
+  await f.writer.savePostgresMessages([m('label-other', { psid: '333', timestamp: Date.now() - 10 })], pool);
+  const snapshot = await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool);
+  assert.deepEqual(snapshot.conversations.find(thread => thread.psid === '222').staffLabels, kept);
+  assert.deepEqual(snapshot.conversations.find(thread => thread.psid === '333').staffLabels, { added: [], hidden: [] });
+  const { mergeMessengerThread } = f.load('lib/services/messengerView.ts');
+  const thread = snapshot.conversations.find(item => item.psid === '222');
+  const stale = { ...mergeMessengerThread(thread), staffLabels: { added: ['delivery'], hidden: [] } };
+  assert.deepEqual(mergeMessengerThread(thread, stale).staffLabels, kept, 'server labels win over the previous view');
+  assert.deepEqual(mergeMessengerThread({ ...thread, staffLabels: undefined }, stale).staffLabels, stale.staffLabels, 'a thread without the field keeps the previous labels');
+  assert.equal((await change('add', 'buy', '444')).status, 404, 'no such conversation on this Page');
+  await query('UPDATE messenger_conversations SET hidden_at=1');
+  assert.equal((await change('add', 'buy')).status, 404, 'hidden conversation');
+});
+
+test('a reply that names a staff label is held for review, never auto-sent', async () => {
+  const f = await aiFixture(true);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  const conversation = f.load('app/api/messenger/conversation/route.ts');
+  await f.incoming('label-ok');
+  await setTagRules([tagRule('bom', 'Khách bom hàng')]);
+  assert.equal((await labelRequest(conversation, { psid: '222', change: { type: 'add', id: 'bom' } })).status, 200);
+  f.state.replyText = 'Shop mở cửa lúc 8 giờ.';
+  await f.process();
+  assert.equal(f.state.sends, 1, 'a reply that does not name the label still sends');
+  f.state.replyText = 'Dạ vì bạn là khach bom hang nên shop xin phép từ chối.';
+  await f.incoming('label-leak', { timestamp: Date.now() + 5 }); await f.process();
+  assert.equal(f.state.sends, 1, 'a reply naming the label is not sent');
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='label-leak'")).rows[0].status, 'review');
+});
+
+test('AI reads staff labels by name (masked) and picks up to 3 labels from the shop set, on the webhook run and the re-analyse button', async () => {
+  const f = await aiFixture(false);
+  const conversation = f.load('app/api/messenger/conversation/route.ts'), care = f.load('app/api/customer-care/route.ts');
+  const suggest = () => care.POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
+    body: JSON.stringify({ action: 'suggest', psid: '222', messageId: 'ai-label-1' }) }));
+  await f.incoming('ai-label-1');
+  await setTagRules([{ ...tagRule('call', 'Gọi lại 0912345678'), type: 'risk', context: 'Gọi 0912345678 sau 5 giờ chiều' },
+    { ...tagRule('si', 'Khách sỉ'), context: 'Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ.' }, tagRule('buy', 'Muốn đặt hàng')]);
+  for (const id of ['si', 'call']) assert.equal((await labelRequest(conversation, { psid: '222', change: { type: 'add', id } })).status, 200);
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options); };
+  f.state.labels = ['buy', 'khong-co', 'buy'];
+  await f.process();
+  const applied = '"staffLabels":[{"label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"label":"Gọi lại [SĐT]","context":"Gọi [SĐT] sau 5 giờ chiều"}]';
+  assert.ok(seen[0].user.includes(applied), 'each applied label reaches the AI with its context, in the order applied, masked');
+  assert.ok(seen[0].user.includes('"labelOptions":[{"id":"call","label":"Gọi lại [SĐT]","context":"Gọi [SĐT] sau 5 giờ chiều"},{"id":"si","label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"id":"buy","label":"Muốn đặt hàng"}]'), 'options carry the context too, none when empty');
+  assert.doesNotMatch(seen[0].user, /0912345678/);
+  assert.ok(seen[0].system.includes('staffLabels là các nhãn nhân viên đã dán') && seen[0].system.includes('Đọc context để hiểu khách đang ở tình huống nào'));
+  assert.ok(seen[0].system.includes('labelOptions là bộ nhãn của shop'));
+  assert.deepEqual((await query('SELECT analysis FROM messenger_analysis_history')).rows[0].analysis.labels, ['buy'], 'unknown ids dropped, deduplicated');
+  assert.equal((await suggest()).status, 200);
+  assert.ok(seen.at(-1).user.includes(applied), 're-analyse button passes labels too');
+  await setTagRules([{ ...tagRule('call', 'Gọi lại 0912345678'), type: 'risk' }]);
+  await suggest();
+  assert.ok(seen.at(-1).user.includes('"staffLabels":[{"label":"Gọi lại [SĐT]"}]'), 'a label deleted from the set is no longer sent; a label without context sends its name only');
+  await setTagRules([]);
+  f.state.labels = undefined;
+  await suggest();
+  assert.doesNotMatch(seen.at(-1).user, /staffLabels|labelOptions/);
+  assert.equal((await query('SELECT analysis FROM messenger_analysis_history')).rows[0].analysis.labels, undefined);
+  const { parseAiAnalysis } = f.load('lib/services/aiAnalysis.ts');
+  assert.deepEqual(parseAiAnalysis({ sentiment: 'neutral', emotion: 'neutral', priority: 'normal', needsHuman: false, reason: 'x',
+    labels: ['a', 'b', 'a', 'c', 'd', ''] }).labels, ['a', 'b', 'c']);
 });
 
 async function sourceFixture() {

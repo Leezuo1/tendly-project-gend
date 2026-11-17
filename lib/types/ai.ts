@@ -31,6 +31,8 @@ export interface AiMessageAnalysis {
   needsHuman: boolean;
   canAutoReply?: boolean;
   communicationStyle?: string;
+  /** id nhãn ngữ cảnh AI chọn từ bộ nhãn của shop (tối đa 3). */
+  labels?: string[];
 }
 
 /** Ngữ cảnh đang có trong phiên hiện tại; không lưu thêm lịch sử vào database. */

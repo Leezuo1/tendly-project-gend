@@ -372,7 +372,10 @@ test('vòng xử lý: tức giận lên đầu hàng chờ, shop trả lời b�
   const result = { reply:'Shop xin lỗi vì giao nhầm. Bạn gửi mã đơn để nhân viên kiểm tra nhé.', analysis:angry, sourceSummary:'Cấu hình AI', model:'test' };
   const classified = f.inbox.applyConversationAnalysis(sample, question.id, result);
   assert.equal(classified.isUrgent, true);
-  assert.equal(classified.threadWho.badgeTag.label, '😠 Tức giận');
+  assert.equal(classified.threadWho.badgeTag, undefined, 'emotion is analysis only, no emotion chip');
+  assert.ok(!classified.tags.some((t) => t.kind === 'emotion') && !classified.profile.tags.some((t) => t.kind === 'emotion'));
+  assert.ok(classified.tags.some((t) => t.kind === 'priority'));
+  assert.equal(classified.aiSuggestion.label, '✨ AI đề xuất');
   assert.match(classified.aiSuggestion.text, /xin lỗi/);
   assert.equal(f.inbox.sortReplyQueue([f.samples[0],classified])[0].id, 'lan');
 

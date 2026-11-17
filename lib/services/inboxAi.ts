@@ -58,11 +58,7 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
     return { ...conversation, aiSuggestion: undefined, aiStatus: 'error', aiError: 'Nguồn hoặc ưu đãi đã thay đổi. Tạo lại gợi ý trước khi gửi.' };
   }
   const a = result.analysis;
-  const emotionTag: ConversationTag = {
-    label: EMOTION_LABELS[a.emotion],
-    type: a.sentiment === 'negative' ? 'high' : a.sentiment === 'positive' ? 'positive' : 'neutral',
-    source: 'ai', kind: 'emotion',
-  };
+  // Cảm xúc chỉ dùng để xếp ưu tiên và chọn giọng trả lời; không hiện thành chip.
   const priorityTag: ConversationTag = {
     label: PRIORITY_LABELS[a.priority], type: a.priority === 'high' ? 'high' : 'neutral',
     source: 'ai', kind: 'priority',
@@ -72,15 +68,15 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
     waitingConfirmation: conversation.waitingConfirmation || a.canAutoReply === false,
     analysis: { ...a, messageId }, aiStatus: 'ready', aiError: undefined,
     isUrgent: a.priority === 'high',
-    // Thay các nhãn cảm xúc demo/cũ; giữ nhãn khách VIP trong danh sách.
-    tags: [...conversation.tags.filter((t) => t.type === 'vip'), emotionTag, priorityTag],
-    threadWho: { ...conversation.threadWho, badgeTag: emotionTag },
+    // Bỏ nhãn cảm xúc demo/cũ; giữ nhãn khách VIP trong danh sách.
+    tags: [...conversation.tags.filter((t) => t.type === 'vip'), priorityTag],
+    threadWho: { ...conversation.threadWho, badgeTag: undefined },
     profile: { ...conversation.profile,
-      tags: [...conversation.profile.tags.filter((t) => t.type === 'vip' || (t.type === 'loop' && t.source !== 'ai')), emotionTag],
+      tags: conversation.profile.tags.filter((t) => t.type === 'vip' || (t.type === 'loop' && t.source !== 'ai')),
     },
     aiSuggestion: {
       sourceFingerprint: result.sourceContext?.fingerprint,
-      label: `✨ AI đề xuất · ${EMOTION_LABELS[a.emotion]}`,
+      label: '✨ AI đề xuất',
       source: result.sourceSummary, text: result.reply,
     },
   };

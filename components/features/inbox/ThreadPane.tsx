@@ -2,8 +2,10 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Conversation } from '@/lib/types/inbox';
-import { EMOTION_LABELS } from '@/lib/services/inboxAi';
+import type { StaffLabelAction } from '@/lib/services/contextTagRules';
+import type { ContextTagRule } from '@/lib/types/contextTags';
 import { CustomerAvatar } from './CustomerAvatar';
+import { LabelBar } from './LabelBar';
 import { IconChevrons } from '@/components/ui/Icons';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
@@ -24,6 +26,8 @@ interface ThreadPaneProps {
   onToast: (msg: string) => void;
   onCustomerSendMessage?: (text: string) => Promise<void> | void;
   onGenerateAiSuggestion: () => Promise<void>;
+  labelRules?: ContextTagRule[];
+  onSaveStaffLabels?: (action: StaffLabelAction) => Promise<void>;
 }
 
 const CUSTOMER_PROMPT_CHIPS = [
@@ -50,6 +54,8 @@ export function ThreadPane({
   aiEnabled = false,
   savingAi = false,
   onToggleAutoReply,
+  labelRules,
+  onSaveStaffLabels,
 }: ThreadPaneProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const previousConversationRef = useRef<string | null>(null);
@@ -201,11 +207,6 @@ export function ThreadPane({
               <div className="msg-meta">
                 {msg.isAiReply && <span className="msg-ai-tag">AI Gemini trả lời</span>}
                 <span>{msg.time}</span>
-                {conversation.analysis?.messageId === msg.id && (
-                  <span className={`tag tag-${conversation.analysis.sentiment === 'negative' ? 'high' : conversation.analysis.sentiment === 'positive' ? 'positive' : 'neutral'}`}>
-                    {EMOTION_LABELS[conversation.analysis.emotion]}
-                  </span>
-                )}
                 {msg.aiSource && <span>· {msg.aiSource}</span>}
               </div>
             </div>
@@ -321,6 +322,9 @@ export function ThreadPane({
         )}
 
         </div>
+        {role !== 'customer' && conversation.messenger && labelRules && onSaveStaffLabels && (
+          <LabelBar tags={conversation.tags} rules={labelRules} onChange={onSaveStaffLabels} disabled={isSending} />
+        )}
         {/* Khung nhập tin nhắn */}
         <div className={`compose-row ${role === 'customer' ? 'mode-customer' : ''}`}>
           <input

@@ -42,6 +42,8 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     aiUpdatedAt: Math.max(previous?.aiUpdatedAt ?? 0, thread.aiUpdatedAt ?? 0),
     waitingConfirmation: unanswered && thread.waitingConfirmation === true,
     memory: thread.memory || previous?.memory || [],
+    // Server copy wins so a removed label never comes back; previous only covers threads built without the field.
+    staffLabels: thread.staffLabels ?? previous?.staffLabels,
     personalitySummary: thread.personalitySummary || '',
     id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid, viewStartAt: thread.viewStartAt,
       hasOlder: previous?.messenger?.viewStartAt === thread.viewStartAt && previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
@@ -59,7 +61,6 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   };
   if (sameQuestion && previous) {
     base.analysis = previous.analysis;
-    base.threadWho.badgeTag = previous.threadWho.badgeTag;
     base.profile.tags = previous.profile.tags;
     base.tags = previous.tags.filter((t) => unanswered || t.kind !== 'priority');
     base.isUrgent = unanswered && Boolean(previous.isUrgent);

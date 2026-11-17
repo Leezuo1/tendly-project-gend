@@ -3,7 +3,8 @@ import type { Pool } from 'pg';
 import type { AiKnowledge } from '@/lib/types/ai';
 import type { CustomerCareSettings } from '@/lib/types/customerCare';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
-import { liveKnowledge } from '@/lib/services/shopCatalog';
+import { liveKnowledge, readShopTagRules } from '@/lib/services/shopCatalog';
+import { staffLabelNotes } from '@/lib/services/staffLabels';
 import { careRules, CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
 import { readConversationSources } from '@/lib/services/conversationSources';
 import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
@@ -53,7 +54,7 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
   const source = settings?.profile_json ? await liveKnowledge(pageId, settings.knowledge_json, db) ?? undefined : undefined;
   if (!source) return {};
   const profile = parseCareProfile(settings.profile_json);
-  const readLatest = async () => (await db.query(`SELECT m.*,c.ai_auto_reply,c.ai_updated_at,c.ai_enabled_at FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
+  const readLatest = async () => (await db.query(`SELECT m.*,c.ai_auto_reply,c.ai_updated_at,c.ai_enabled_at,c.staff_labels FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
     WHERE m.page_id=$1 AND m.conversation_id=$2 AND c.hidden_at IS NULL
     ORDER BY m.sent_at DESC,m.message_id DESC LIMIT 1`, [pageId, id])).rows[0];
   const latest = await readLatest();
@@ -95,7 +96,9 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     const sources = await readConversationSources(pageId, psid, latest.message_id, db);
     if (!sources) throw new CustomerCareError('Hội thoại không còn hiển thị.', 409);
     const history = await readCustomerOrderHistory(pageId, psid, db);
-    const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history);
+    const rules = await readShopTagRules(pageId, db);
+    const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history,
+      { rules, staff: staffLabelNotes(latest.staff_labels, rules) });
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updated_at}`;
     // Hard check on what the model wrote: masked data echoed back, links or amounts that the shop's own data (or the customer) never gave.
     const unsupported = unsupportedReplyReason(reply.reply, JSON.stringify([source.products, source.faqs, source.shop, history, customerText, sources, careRules(profile, settings.page_profile_json), settings.page_profile_json]));

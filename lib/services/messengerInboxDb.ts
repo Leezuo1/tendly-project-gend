@@ -4,6 +4,7 @@ import type { MessengerMessage } from '@/lib/types/messenger';
 import type { MessengerCustomerProfile, MessengerInboxSnapshot, MessengerThread } from '@/lib/types/messengerInbox';
 import { readConversationMemories } from '@/lib/services/conversationMemory';
 import { readConversationSourceContexts } from '@/lib/services/conversationSources';
+import { storedStaffLabels } from '@/lib/services/staffLabels';
 
 export function customerProfileFromRow(row: Record<string, unknown>): MessengerCustomerProfile {
   return {
@@ -49,7 +50,7 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
     conversations.push({ id: row.id, pageId, psid: row.psid, createdAt: Number(row.created_at), memory: memories.get(row.id) || [],
       viewStartAt: row.view_start_at == null ? undefined : Number(row.view_start_at), personalitySummary: row.personality_summary || '',
       waitingConfirmation: row.waiting_confirmation === true,
-      autoReply: row.ai_auto_reply === true, aiUpdatedAt: Number(row.ai_updated_at),
+      autoReply: row.ai_auto_reply === true, aiUpdatedAt: Number(row.ai_updated_at), staffLabels: storedStaffLabels(row.staff_labels),
       lastInAt: row.last_in_at === null ? null : Number(row.last_in_at),
       lastOutAt: row.last_out_at === null ? null : Number(row.last_out_at),
       messages: messages.slice(-50).map((m) => messageFromRow({ ...m, psid: row.psid })), hasOlder: messages.length > 50,

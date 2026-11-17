@@ -764,6 +764,86 @@
   flex-wrap: wrap;
 }
 
+/* Nhãn hội thoại trên ô nhập tin */
+.inbox-root .label-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.inbox-root .label-bar-ai {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.inbox-root .label-bar-remove {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 0 0 2px;
+  cursor: pointer;
+}
+
+.inbox-root .label-bar-remove:disabled,
+.inbox-root .label-bar-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inbox-root .label-bar-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-root .label-bar-toggle {
+  border: 1px dashed var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.inbox-root .label-bar-toggle:hover:not(:disabled) {
+  border-color: var(--coral);
+  color: var(--coral-deep);
+}
+
+.inbox-root .label-bar-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(43, 33, 30, 0.15);
+}
+
+.inbox-root .label-bar-menu .tag {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .inbox-root .compose-row {
   display: flex;
   gap: 10px;

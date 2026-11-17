@@ -70,3 +70,40 @@ test('a catalog read back from the database still recognizes demo products (key 
   await saveShopCatalog('111', again.catalog, again.revision, db);
   assert.deepEqual((await liveKnowledge('111', null, db)).products.map(product => product.sku), ['X-1']);
 });
+
+test('tag rules ride the catalog: validated on save, read per Page, defaults when missing', async () => {
+  const { readShopTagRules } = load('lib/services/shopCatalog.ts');
+  const { DEFAULT_CONTEXT_TAG_RULES } = load('lib/services/contextTagRules.ts');
+  assert.deepEqual(await readShopTagRules('111', wrap(bare)), DEFAULT_CONTEXT_TAG_RULES, 'no table yet: defaults');
+  await ready;
+  const db = wrap(full);
+  assert.deepEqual(await readShopTagRules('222', db), DEFAULT_CONTEXT_TAG_RULES, 'no row: defaults');
+  const wholesale = { id: 'si', label: 'Khách sỉ', keywords: [], type: 'vip', enabled: true };
+  await saveShopCatalog('222', { ...catalog([]), contextTagRules: [wholesale] }, 0, db);
+  assert.deepEqual(await readShopTagRules('222', db), [wholesale]);
+  assert.deepEqual(await readShopTagRules('333', db), DEFAULT_CONTEXT_TAG_RULES, 'another Page never sees it');
+  await saveShopCatalog('333', catalog([]), 0, db);
+  assert.deepEqual(await readShopTagRules('333', db), DEFAULT_CONTEXT_TAG_RULES, 'row without rules: defaults');
+  const many = Array.from({ length: 51 }, (_, i) => ({ ...wholesale, id: `r${i}`, label: `Nhãn ${i}` }));
+  for (const contextTagRules of [[{ ...wholesale, type: 'bad' }], many, [wholesale, { ...wholesale, id: 'si2' }]]) {
+    await assert.rejects(saveShopCatalog('444', { ...catalog([]), contextTagRules }, 0, db), error => error instanceof ShopCatalogError && error.status === 400);
+  }
+});
+
+test('custom tag rules alone make the browser catalog worth pushing', () => {
+  const { isPristine } = load('lib/services/catalogSync.ts');
+  const { DEFAULT_CONTEXT_TAG_RULES } = load('lib/services/contextTagRules.ts');
+  assert.equal(isPristine(catalog(seed.products)), true);
+  assert.equal(isPristine({ ...catalog(seed.products), contextTagRules: DEFAULT_CONTEXT_TAG_RULES }), true);
+  assert.equal(isPristine({ ...catalog(seed.products), contextTagRules: [{ id: 'si', label: 'Khách sỉ', keywords: [], type: 'vip', enabled: true }] }), false);
+});
+
+test('a server row from before label sync never wipes the browser\'s custom label set', () => {
+  const { remoteTagRules } = load('lib/services/catalogSync.ts');
+  const custom = [{ id: 'si', label: 'Khách sỉ', keywords: [], type: 'vip', enabled: true }];
+  assert.equal(remoteTagRules({ ...catalog([]) }, custom), custom, 'server row without rules: keep the local set so it gets pushed');
+  assert.deepEqual(remoteTagRules({ ...catalog([]), contextTagRules: [] }, custom), [], 'an explicit empty set from the server wins');
+  const other = [{ ...custom[0], id: 'b2b' }];
+  assert.equal(remoteTagRules({ ...catalog([]), contextTagRules: other }, custom), other, 'a stored set wins over the local one');
+  assert.equal(remoteTagRules(catalog([]), undefined), undefined);
+});

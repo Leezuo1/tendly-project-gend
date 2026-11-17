@@ -14,10 +14,18 @@ export type Channel = 'facebook' | 'zalo';
 export type TagType = 'high' | 'vip' | 'risk' | 'loop' | 'positive' | 'neutral';
 
 export interface ConversationTag {
+  /** id nhãn trong bộ nhãn ngữ cảnh của shop (chỉ nhãn ngữ cảnh). */
+  id?: string;
   label: string;
   type: TagType;
-  source?: 'ai' | 'rule';
+  source?: 'ai' | 'rule' | 'staff';
   kind?: 'emotion' | 'priority' | 'context';
+}
+
+/** Nhãn nhân viên dán (`added`) và nhãn tự động nhân viên đã gỡ (`hidden`) của một hội thoại, theo id nhãn. */
+export interface StaffLabels {
+  added: string[];
+  hidden: string[];
 }
 
 export interface ChatMessage {
@@ -68,6 +76,8 @@ export interface Conversation {
   memory?: ConversationMemoryEntry[];
   personalitySummary?: string;
   messenger?: { pageId: string; psid: string; hasOlder: boolean; viewStartAt?: number };
+  /** Nhãn nhân viên dán/gỡ, lấy từ máy chủ; không trộn vào `tags` (tags được dựng lại sau mỗi lần phân tích). */
+  staffLabels?: StaffLabels;
   id: string;
   name: string;
   avatar: string;
