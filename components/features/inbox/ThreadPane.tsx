@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Conversation } from '@/lib/types/inbox';
+import { Conversation, DraftImage, FailedImage } from '@/lib/types/inbox';
 import type { StaffLabelAction } from '@/lib/services/contextTagRules';
 import type { ContextTagRule } from '@/lib/types/contextTags';
 import { CustomerAvatar } from './CustomerAvatar';
 import { LabelBar } from './LabelBar';
+import { PhotoTray } from './PhotoTray';
 import { IconChevrons } from '@/components/ui/Icons';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
@@ -28,6 +29,12 @@ interface ThreadPaneProps {
   onGenerateAiSuggestion: () => Promise<void>;
   labelRules?: ContextTagRule[];
   onSaveStaffLabels?: (action: StaffLabelAction) => Promise<void>;
+  /** Ảnh sẽ gửi kèm (AI gợi ý + chọn từ máy) và các thao tác trên khay. */
+  images?: DraftImage[];
+  onAddFiles?: (files: File[]) => void;
+  onRemoveImage?: (key: string) => void;
+  failedImages?: FailedImage[];
+  onResendImage?: (imageId: string) => Promise<void> | void;
 }
 
 const CUSTOMER_PROMPT_CHIPS = [
@@ -56,10 +63,16 @@ export function ThreadPane({
   onToggleAutoReply,
   labelRules,
   onSaveStaffLabels,
+  images = [],
+  onAddFiles,
+  onRemoveImage,
+  failedImages = [],
+  onResendImage,
 }: ThreadPaneProps) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const previousConversationRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Mặc định cho phép người dùng đóng vai khách hàng hỏi ngay
   const [demoRole, setRole] = useState<'customer' | 'shop'>('customer');
@@ -98,7 +111,7 @@ export function ThreadPane({
   };
 
   const handleSend = async () => {
-    if (!draftText.trim() || isThinkingAi || isSending) return;
+    if ((!draftText.trim() && !(images.length && role !== 'customer')) || isThinkingAi || isSending) return;
     const text = draftText.trim();
     const conversationId = conversation.id;
 
@@ -202,7 +215,7 @@ export function ThreadPane({
               <div className="msg-bubble">{msg.text}
                 {msg.attachments?.map((attachment, index) => attachment.url && /^https:\/\//i.test(attachment.url) ? (
                   <div key={index}><a href={attachment.url} target="_blank" rel="noopener noreferrer">Mở {attachment.type}</a></div>
-                ) : <div key={index}>[{attachment.type}]</div>)}
+                ) : <div key={index}>[{attachment.type === 'image' ? 'Ảnh' : attachment.type}]</div>)}
               </div>
               <div className="msg-meta">
                 {msg.isAiReply && <span className="msg-ai-tag">AI Gemini trả lời</span>}
@@ -325,8 +338,30 @@ export function ThreadPane({
         {role !== 'customer' && conversation.messenger && labelRules && onSaveStaffLabels && (
           <LabelBar tags={conversation.tags} rules={labelRules} onChange={onSaveStaffLabels} disabled={isSending} />
         )}
+        {role !== 'customer' && conversation.messenger && failedImages.length > 0 && (
+          <div className="photo-failed" role="alert">
+            <strong>Ảnh chưa gửi</strong>
+            {failedImages.map((item) => (
+              <div className="photo-failed-item" key={item.imageId}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/product-images/${encodeURIComponent(item.imageId)}`} alt="Ảnh sản phẩm chưa gửi" />
+                <span>{item.status === 'unknown' ? 'Chưa rõ ảnh đã đến khách chưa (có thể đã gửi). Kiểm tra Messenger trước khi gửi lại.' : 'Gửi lỗi.'}</span>
+                <button type="button" className="btn btn-outline btn-sm" disabled={isSending} onClick={() => void onResendImage?.(item.imageId)}>Gửi lại ảnh</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {role !== 'customer' && conversation.messenger && onRemoveImage && <PhotoTray items={images} onRemove={onRemoveImage} disabled={isSending} />}
         {/* Khung nhập tin nhắn */}
         <div className={`compose-row ${role === 'customer' ? 'mode-customer' : ''}`}>
+          {role !== 'customer' && conversation.messenger && onAddFiles && (
+            <>
+              <button type="button" className="compose-attach" title="Đính kèm ảnh từ máy" aria-label="Đính kèm ảnh từ máy"
+                disabled={isThinkingAi || isSending} onClick={() => fileRef.current?.click()}>📎</button>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden
+                onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ''; if (files.length) onAddFiles(files); }} />
+            </>
+          )}
           <input
             ref={inputRef}
             type="text"
@@ -346,7 +381,7 @@ export function ThreadPane({
             type="button"
             className={`compose-send ${role === 'customer' ? 'send-as-customer' : ''}`}
             onClick={handleSend}
-            disabled={!draftText.trim() || isThinkingAi || isSending}
+            disabled={(!draftText.trim() && !(images.length && role !== 'customer')) || isThinkingAi || isSending}
             title={role === 'customer' ? 'Gửi với vai Khách hàng' : 'Gửi với vai Shop'}
             aria-label="Gửi tin nhắn"
           >

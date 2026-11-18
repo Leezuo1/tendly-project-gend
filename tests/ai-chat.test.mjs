@@ -479,3 +479,19 @@ test('câu trả lời đồng cảm không hứa đã chuyển nhân viên khi 
   assert.match(result.reply,/nhân viên kiểm tra/);
   assert.equal(result.reply.includes('đã chuyển'),false);
 });
+
+test('khay ảnh gồm ảnh AI gợi ý (trừ ảnh đã gỡ) cộng ảnh nhân viên đính kèm, và chỉ khi còn gợi ý', () => {
+  const f = fixture();
+  const c = structuredClone(f.samples[0]);
+  const withSuggestion = { ...c, analysis: { ...defaultAnalysis, messageId: 'm9', photoImageIds: ['a', 'b', 'c'] }, aiSuggestion: { label: 'x', source: 'y', text: 'z' } };
+  const file = { key: 'file-1', kind: 'file', file: {} };
+  assert.deepEqual(f.inbox.draftImages(withSuggestion, new Set([f.inbox.photoRemovalKey(withSuggestion, 'b')]), [file]).map((image) => image.key), ['a', 'c', 'file-1']);
+  assert.deepEqual(f.inbox.draftImages(withSuggestion, new Set(), []).map((image) => [image.kind, image.imageId]), [['product', 'a'], ['product', 'b'], ['product', 'c']]);
+  assert.deepEqual(f.inbox.draftImages({ ...withSuggestion, aiSuggestion: undefined }, new Set(), [file]).map((image) => image.key), ['file-1'], 'no suggestion, no suggested photos');
+});
+
+test('tin chỉ có ảnh hiện "[Ảnh]" ở danh sách', () => {
+  const f = fixture();
+  const answered = f.inbox.markConversationAnswered(structuredClone(f.samples[0]), { id: 'img', sender: 'out', text: '', time: 'Vừa xong', attachments: [{ type: 'image' }] });
+  assert.equal(answered.preview, '[Ảnh]');
+});

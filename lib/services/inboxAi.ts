@@ -1,5 +1,5 @@
 import type { AiChatReply, AiSessionMessage, CustomerEmotion, ReplyPriority } from '@/lib/types/ai';
-import type { ChatMessage, Conversation, ConversationTag } from '@/lib/types/inbox';
+import type { ChatMessage, Conversation, ConversationTag, DraftImage } from '@/lib/types/inbox';
 
 export const EMOTION_LABELS: Record<CustomerEmotion, string> = {
   happy: '😊 Tích cực', neutral: '😐 Trung lập', worried: '😟 Lo lắng',
@@ -84,10 +84,22 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
 
 export function markConversationAnswered(conversation: Conversation, message: ChatMessage): Conversation {
   return {
-    ...conversation, time: 'Vừa xong', preview: message.text,
+    ...conversation, time: 'Vừa xong', preview: message.text || '[Ảnh]',
     isUnreplied: false, isUrgent: false, aiSuggestion: undefined, waitingConfirmation: false,
     aiStatus: conversation.analysis ? 'ready' : undefined, aiError: undefined, pendingSince: undefined,
     tags: conversation.tags.filter((t) => t.kind !== 'priority'),
     messages: [...conversation.messages, message],
   };
+}
+
+/** Khóa để nhớ ảnh gợi ý mà nhân viên đã gỡ khỏi khay (theo tin khách đang trả lời, ảnh mới của lượt sau không bị che). */
+export const photoRemovalKey = (conversation: Conversation, imageId: string) => `${conversation.analysis?.messageId ?? ''}:${imageId}`;
+
+/**
+ * Khay ảnh trên ô soạn: ảnh sản phẩm AI gợi ý (chỉ khi gợi ý còn đó, trừ ảnh đã gỡ) rồi tới file nhân viên đính kèm.
+ * Dựng từ dữ liệu có sẵn thay vì lưu thêm trạng thái, để gợi ý mới hay đã gửi tự làm khay đúng theo.
+ */
+export function draftImages(conversation: Conversation, removed: ReadonlySet<string>, files: DraftImage[]): DraftImage[] {
+  const suggested = conversation.aiSuggestion ? conversation.analysis?.photoImageIds ?? [] : [];
+  return [...suggested.filter((id) => !removed.has(photoRemovalKey(conversation, id))).map((id): DraftImage => ({ key: id, kind: 'product', imageId: id })), ...files];
 }
