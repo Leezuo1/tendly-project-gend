@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
-import { apifyRequest, apifyToken, commentDatasets, groupTikTokComments, normalizeSupplierResults, normalizeTikTok, parseApifyRun, record,
+import { apifyRequest, apifyToken, commentDatasets, groupTikTokComments, MARKET_MAX_QUERIES, normalizeMarketResults, normalizeSupplierResults, normalizeTikTok, parseApifyRun, record,
   sourcingRequest, startApifyRun, SourcingProviderError, type SourcingKind } from '@/lib/services/sourcingApify';
 
 export class SourcingRunError extends Error {
@@ -80,7 +80,8 @@ export async function readSourcingRun(owner: string, id: string) {
     error = `Thu thập không hoàn tất (${run.status}). Không dùng dữ liệu một phần để phân tích.`;
   } else {
     if (!run.datasetId) throw new SourcingProviderError('Apify chưa trả dataset của lượt chạy.', 502, 'APIFY_BAD_RESPONSE');
-    const limit = row.kind === 'tiktok' ? 60 : 2;
+    // Google trả một bản ghi cho mỗi trang kết quả của mỗi truy vấn.
+    const limit = row.kind === 'tiktok' ? 60 : row.kind === 'market' ? MARKET_MAX_QUERIES : 2;
     const items = await apifyRequest(`datasets/${run.datasetId}/items?format=json&clean=true&limit=${limit}`, token);
     if (!Array.isArray(items)) throw new SourcingProviderError('Dataset Apify không hợp lệ.', 502, 'APIFY_BAD_DATASET');
     if (row.kind === 'tiktok') {
@@ -95,7 +96,7 @@ export async function readSourcingRun(owner: string, id: string) {
       result = { ...data, posts: data.posts.slice(0, Number(row.context_json.resultLimit ?? 60)) };
       status = data.posts.length ? 'succeeded' : 'empty';
     } else {
-      const data = normalizeSupplierResults(items);
+      const data = row.kind === 'market' ? normalizeMarketResults(items) : normalizeSupplierResults(items);
       result = { ...data, candidates: data.candidates.slice(0, Number(row.context_json.resultLimit ?? 20)) };
       status = data.candidates.length ? 'succeeded' : 'empty';
     }

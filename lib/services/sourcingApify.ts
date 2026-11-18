@@ -1,11 +1,17 @@
 import { hotScore, normalizeSourcingPosts, prepareSourcingSearch, SourcingInputError, type SourcingComment } from '@/lib/services/sourcingSearch';
-import type { SupplierCandidate } from '@/lib/types/sourcing';
+import { resolveOccasions } from '@/lib/services/sourcingOccasions';
+import type { SourcingKind, SupplierCandidate } from '@/lib/types/sourcing';
 
-export type SourcingKind = 'tiktok' | 'suppliers';
-export const sourcingActors = { tiktok: 'clockworks/tiktok-scraper', suppliers: 'apify/google-search-scraper' } as const;
+export type { SourcingKind };
+export const sourcingActors = { tiktok: 'clockworks/tiktok-scraper', suppliers: 'apify/google-search-scraper', market: 'apify/google-search-scraper' } as const;
 // Trần phí Apify cho mỗi lượt chạy (maxTotalChargeUsd). Apify từ chối trần dưới 0,5 USD (max-total-charge-usd-below-minimum), nên đây là mức thấp nhất dùng được.
 // Chi phí thật bị chặn bởi khối lượng (TIKTOK_MAX_RESULTS × COMMENTS_PER_POST), không phải bởi trần.
-export const sourcingBudgetUsd = { tiktok: 0.5, suppliers: 0.5 } as const;
+export const sourcingBudgetUsd = { tiktok: 0.5, suppliers: 0.5, market: 0.5 } as const;
+/** Theo dõi thị trường: tối đa 6 truy vấn Google × 1 trang (~10 kết quả), giữ tối đa 30 kết quả cho AI đọc. */
+export const MARKET_MAX_QUERIES = 6;
+export const MARKET_MAX_RESULTS = 30;
+export const MARKET_WINDOWS = { w1: '7 ngày qua', m1: '1 tháng qua', m3: '3 tháng qua' } as const;
+export type MarketWindow = keyof typeof MARKET_WINDOWS;
 // Giá thật mỗi lượt: ~0,0064 USD/video + ~0,00125 USD/bình luận; 15 video × 5 bình luận ≈ 0,19 USD.
 export const TIKTOK_MAX_RESULTS = 15;
 const COMMENTS_PER_POST = 5;
@@ -41,6 +47,7 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
       },
     };
   }
+  if (kind === 'market') return marketRequest(input, now);
   const product = typeof input.product === 'string' ? input.product.trim().replace(/\s+/g, ' ') : '';
   if (product.length < 2 || product.length > 120 || /[\u0000-\u001f\u007f]/.test(product)
     || !/^[\p{L}\p{N}\s.,()&+%\/-]+$/u.test(product) || product.split(' ').length > 16) {
@@ -55,6 +62,64 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
     context: { product, queries, market: 'VN', resultLimit: limit },
     actorInput: {
       queries: queries.join('\n'), countryCode: 'vn', languageCode: 'vi', maxPagesPerQuery: 1,
+      focusOnPaidAds: false, aiOverview: { scrapeFullAiOverview: false },
+      aiModeSearch: { enableAiMode: false }, websiteContentScraper: { enable: true },
+    },
+  };
+}
+
+const SAFE_TERM = /^[\p{L}\p{N}\s.,()&+%\/'-]+$/u;
+const term = (value: unknown) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+/** Đối thủ: tên thương hiệu, link website hoặc link fanpage Facebook. Trả truy vấn Google tương ứng, không nhận cú pháp tìm kiếm tự gõ. */
+export function competitorQuery(value: unknown) {
+  const raw = term(value);
+  if (raw.length < 2 || raw.length > 200 || /[\u0000-\u001f\u007f"]/.test(raw)) throw new SourcingInputError('Đối thủ cần là tên (2–120 ký tự) hoặc link website/fanpage.');
+  if (/^(https?:\/\/|www\.|[a-z0-9-]+\.(com|vn|net|shop|store|com\.vn)(\/|$))/i.test(raw)) {
+    let url: URL;
+    try { url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`); } catch { throw new SourcingInputError('Link đối thủ không hợp lệ.'); }
+    const host = url.hostname.replace(/^(www|m|web)\./, '').toLowerCase();
+    if (url.username || url.password || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(host)) throw new SourcingInputError('Link đối thủ không hợp lệ.');
+    if (host === 'facebook.com' || host === 'fb.com') {
+      // Fanpage ít được Google lập chỉ mục theo bài; tìm theo tên trang để ra cả báo chí, bài PR nhắc tới đối thủ.
+      const page = url.pathname.split('/').filter(Boolean)[0] ?? '';
+      if (!/^[A-Za-z0-9.\-]{2,80}$/.test(page) || ['profile.php', 'pages', 'groups'].includes(page)) throw new SourcingInputError('Link fanpage cần dạng facebook.com/ten-trang.');
+      return { label: `facebook.com/${page}`, query: `"${page.replace(/[.\-]+/g, ' ')}"` };
+    }
+    return { label: host, query: `site:${host}` };
+  }
+  if (raw.length > 120 || !SAFE_TERM.test(raw)) throw new SourcingInputError('Tên đối thủ chỉ gồm chữ, số và dấu câu thông thường.');
+  return { label: raw, query: `"${raw}"` };
+}
+
+/** Lượt theo dõi thị trường: tin tức ngành, xu hướng, dịp bán hàng sắp tới và động thái đối thủ trên Google trong khoảng thời gian chọn. */
+function marketRequest(input: Record<string, unknown>, now: Date) {
+  const industry = term(input.industry);
+  const topic = term(input.product) || (Array.isArray(input.keywords) ? term(input.keywords[0]) : '') || industry;
+  if (topic.length < 2 || topic.length > 120 || !SAFE_TERM.test(topic)) throw new SourcingInputError('Nhập chủ đề/ngành cần theo dõi (2–120 ký tự, không nhập URL).');
+  const keywords = (Array.isArray(input.keywords) ? input.keywords : []).map(term).filter(k => k && k !== topic);
+  if (keywords.length > 3 || keywords.some(k => k.length < 2 || k.length > 120 || !SAFE_TERM.test(k))) throw new SourcingInputError('Tối đa 3 từ khóa theo dõi, mỗi từ khóa 2–120 ký tự.');
+  const competitors = (Array.isArray(input.competitors) ? input.competitors : []);
+  if (competitors.length > 3) throw new SourcingInputError('Theo dõi tối đa 3 đối thủ mỗi lượt.');
+  const rivals = competitors.map(competitorQuery);
+  const occasionNames = (Array.isArray(input.occasions) ? input.occasions : []).map(term).filter(Boolean);
+  if (occasionNames.length > 2 || occasionNames.some(name => name.length > 60 || !SAFE_TERM.test(name))) throw new SourcingInputError('Chọn tối đa 2 dịp bán hàng.');
+  const occasions = resolveOccasions(occasionNames, now);
+  const window = (input.window ?? 'm1') as MarketWindow;
+  if (!(window in MARKET_WINDOWS)) throw new SourcingInputError('Khoảng thời gian theo dõi không hợp lệ.');
+  const year = now.getUTCFullYear();
+  // Ưu tiên đối thủ và dịp do shop chọn; tin ngành và xu hướng luôn có; từ khóa phụ lấp chỗ còn lại.
+  const queries = [...new Set([
+    `${topic} tin tức thị trường`, `xu hướng ${topic} ${year}`,
+    ...occasions.map(occasion => `${topic} ${occasion.name.replace(/\s*\d+\/\d+$/, '')} ${occasion.date.slice(0, 4) || year}`),
+    ...rivals.map(rival => rival.query),
+    ...keywords.map(keyword => `${keyword} tin tức`),
+  ])].slice(0, MARKET_MAX_QUERIES);
+  const limit = input.resultLimit ?? MARKET_MAX_RESULTS;
+  if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > MARKET_MAX_RESULTS) throw new SourcingInputError(`Giới hạn kết quả phải từ 1–${MARKET_MAX_RESULTS}.`);
+  return {
+    context: { industry, topic, keywords, competitors: rivals.map(rival => rival.label), occasions, window, queries, market: 'VN', resultLimit: limit },
+    actorInput: {
+      queries: queries.join('\n'), countryCode: 'vn', languageCode: 'vi', maxPagesPerQuery: 1, quickDateRange: window,
       focusOnPaidAds: false, aiOverview: { scrapeFullAiOverview: false },
       aiModeSearch: { enableAiMode: false }, websiteContentScraper: { enable: true },
     },
@@ -208,4 +273,8 @@ export function normalizeSupplierResults(items: unknown[], now = new Date()) {
   }
   return { candidates: [...candidates.values()], rejectedCount, duplicateCount,
     message: 'Đầu mối từ kết quả Google; chưa đọc trang gốc, chưa xác minh bán sỉ, giá hoặc MOQ.' };
+}
+/** Kết quả theo dõi thị trường: cùng định dạng Google nhưng là tin/bài tham khảo, không phải nhà cung cấp. */
+export function normalizeMarketResults(items: unknown[], now = new Date()) {
+  return { ...normalizeSupplierResults(items, now), message: 'Tin và bài viết từ kết quả Google trong khoảng thời gian đã chọn; chưa xác minh độ chính xác.' };
 }

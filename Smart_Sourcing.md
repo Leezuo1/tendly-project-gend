@@ -2,6 +2,17 @@
 
 Tài liệu chốt hướng phát triển Smart Sourcing cho Tendly. UI đã nối API thu thập, lưu yêu cầu/shortlist và duyệt chuyển dữ liệu; provider thật và phân tích tăng trưởng chưa được xác minh. Chi tiết phạm vi hiện hành tại [kế hoạch redesign](docs/smart-sourcing-redesign-plan.md#7-phạm-vi-đã-triển-khai).
 
+## Theo dõi thị trường & đối thủ (kind `market`)
+
+Theo góp ý mentor: Smart Sourcing phải khác deep research ở chỗ đầu ra đi thẳng vào AI Marketing.
+
+- Đầu vào: chủ đề (mặc định là ngành của shop), tối đa 3 đối thủ (tên, website hoặc fanpage), tối đa 3 từ khóa, tối đa 2 dịp bán hàng, khoảng thời gian 7 ngày / 1 tháng / 3 tháng.
+- Thu thập: `apify/google-search-scraper`, tối đa 6 truy vấn × 1 trang, `quickDateRange` theo khoảng đã chọn, đọc nội dung trang. Website đối thủ tìm bằng `site:`; fanpage tìm theo tên trang, vì Google ít lập chỉ mục bài trên fanpage.
+- Lịch dịp bán hàng (`lib/services/sourcingOccasions.ts`) do code tính, gồm cả Tết và Trung thu quy đổi sẵn tới 2030. AI không được tự đặt tên hay ngày dịp.
+- Báo cáo AI gồm: tóm tắt, tin tức kèm "shop nên làm gì" (cơ hội / rủi ro), cách khai thác dịp sắp tới, động thái đối thủ, xu hướng, từ khóa, và 3–6 ý tưởng nội dung (bài Facebook / video ngắn / infographic / blog). Tin, đối thủ, xu hướng bắt buộc có nguồn thật; ý tưởng cần có nguồn hoặc gắn một dịp trong lịch.
+- **Gửi sang AI Marketing** (cả ý tưởng nội dung lẫn sản phẩm hot của TikTok): server dựng brief nháp từ báo cáo đã lưu (`lib/services/sourcingBrief.ts`), không nhận nội dung brief từ trình duyệt. Brief điền sẵn tên, mục tiêu, đối tượng, thông điệp, định dạng, thời gian chạy tới hết ngày của dịp, từ khóa và bài học từ đối thủ. Link nguồn chỉ ghi trong notes, không điền ô link vì ô đó được chèn vào bài đăng.
+- Migration `025-sourcing-market.sql` mở rộng CHECK của `sourcing_runs.kind`. Kiểm tra: `node --test tests/sourcing-market.test.mjs`.
+
 ## Tiến độ triển khai
 
 Backend thu thập cho hai Actor đã được viết và kiểm tra bằng provider mock; chưa chạy Apify thật:

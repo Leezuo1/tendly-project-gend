@@ -3,7 +3,7 @@ import type { SourcingCriteria, SourcingItem, SourcingRun } from '@/lib/types/so
 
 export function defaultSourcingCriteria(industry = ''): SourcingCriteria {
   return { industry, kind: 'tiktok', keywords: [], product: '', minPrice: null, maxPrice: null, currency: 'VND', unit: 'sản phẩm',
-    quantity: null, maxMoq: null, region: 'Việt Nam', required: '', excluded: '', quality: '', leadTime: '', audience: '', resultLimit: 15 };
+    quantity: null, maxMoq: null, region: 'Việt Nam', required: '', excluded: '', quality: '', leadTime: '', audience: '', resultLimit: 15, competitors: [], occasions: [], window: 'm1' };
 }
 /** Từ khóa mặc định từ danh mục của shop: tối đa 3 loại sản phẩm nhiều nhất (bỏ nhãn ngành do nhập từ Smart Sourcing). Từ chung của ngành như "thời trang" chỉ ra video rác.
  * samples: id → JSON của sản phẩm mẫu seed; sản phẩm mẫu chưa chỉnh sửa bị bỏ vì seed luôn là thời trang, bất kể ngành của shop. */
@@ -30,14 +30,23 @@ export function parseSourcingCriteria(value: unknown): SourcingCriteria {
     if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > 1_000_000_000) throw new SourcingInputError(`Trường ${key} cần số nguyên không âm hoặc để trống.`);
     return value;
   };
-  if (input.kind !== 'tiktok' && input.kind !== 'suppliers') throw new SourcingInputError('Chọn khám phá hoặc tìm nhà cung cấp.');
+  if (input.kind !== 'tiktok' && input.kind !== 'suppliers' && input.kind !== 'market') throw new SourcingInputError('Chọn khám phá, tìm nhà cung cấp hoặc theo dõi thị trường.');
+  // Lượt lưu trước khi có chế độ theo dõi thị trường không có các trường này: coi là rỗng.
+  const strings = (key: string, max: number, maxLength: number) => {
+    const value = input[key] ?? [];
+    if (!Array.isArray(value) || value.length > max || value.some(item => typeof item !== 'string' || item.trim().length < 2 || item.length > maxLength || /[\u0000-\u001f\u007f]/.test(item))) throw new SourcingInputError(`Trường ${key} không hợp lệ.`);
+    return [...new Set((value as string[]).map(item => item.trim()))];
+  };
+  const window = input.window ?? 'm1';
+  if (window !== 'w1' && window !== 'm1' && window !== 'm3') throw new SourcingInputError('Khoảng thời gian theo dõi không hợp lệ.');
   if (input.currency !== 'VND') throw new SourcingInputError('Hiện hỗ trợ tiêu chí giá VND.');
   if (!Array.isArray(input.keywords) || input.keywords.length > 3 || input.keywords.some(k => typeof k !== 'string' || k.trim().length < 2 || k.length > 120 || !/^[\p{L}\p{N} .(),&+%\/-]+$/u.test(k))) throw new SourcingInputError('Chọn tối đa 3 truy vấn, mỗi truy vấn 2–120 ký tự, không có URL/cú pháp tìm kiếm.');
   const criteria: SourcingCriteria = { industry: text('industry', 100), kind: input.kind, keywords: [...new Set(input.keywords.map(k => k.trim()).filter(Boolean))], product: text('product', 120),
     minPrice: number('minPrice'), maxPrice: number('maxPrice'), currency: 'VND', unit: text('unit', 60), quantity: number('quantity'), maxMoq: number('maxMoq'),
-    region: text('region', 100), required: text('required'), excluded: text('excluded'), quality: text('quality'), leadTime: text('leadTime', 100), audience: text('audience'), resultLimit: Number(input.resultLimit) };
+    region: text('region', 100), required: text('required'), excluded: text('excluded'), quality: text('quality'), leadTime: text('leadTime', 100), audience: text('audience'), resultLimit: Number(input.resultLimit),
+    competitors: strings('competitors', 3, 200), occasions: strings('occasions', 2, 60), window };
   if (criteria.minPrice !== null && criteria.maxPrice !== null && criteria.minPrice > criteria.maxPrice) throw new SourcingInputError('Giá tối đa phải lớn hơn hoặc bằng giá tối thiểu.');
-  if (!criteria.unit || !criteria.region || !Number.isInteger(input.resultLimit) || criteria.resultLimit < 1 || criteria.resultLimit > (criteria.kind === 'tiktok' ? 15 : 20)) throw new SourcingInputError('Nhập đơn vị, khu vực và giới hạn kết quả (1–15 với TikTok, 1–20 với Google).');
+  if (!criteria.unit || !criteria.region || !Number.isInteger(input.resultLimit) || criteria.resultLimit < 1 || criteria.resultLimit > { tiktok: 15, suppliers: 20, market: 30 }[criteria.kind]) throw new SourcingInputError('Nhập đơn vị, khu vực và giới hạn kết quả (1–15 với TikTok, 1–20 với nhà cung cấp, 1–30 với theo dõi thị trường).');
   return criteria;
 }
 

@@ -13,4 +13,4 @@ export interface UrgentItem {
   suggestedReply: string;
 }
 
-export type DashboardTab = 'overview' | 'report';
+export type DashboardTab = 'overview' | 'orders' | 'customers' | 'report';

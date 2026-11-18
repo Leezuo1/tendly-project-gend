@@ -17,7 +17,7 @@
 
 /* Ngữ cảnh shop và hai chế độ làm việc */
 .context { font-size: 13px; padding-bottom: 12px; }
-.tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
 .tabs button { display: grid; gap: 2px; text-align: left; padding: 12px 4px 12px 0; margin-right: 20px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--ink-soft); font: inherit; cursor: pointer; min-height: 44px; }
 .tabs button strong { font-size: 16px; font-weight: 600; }
 .tabs button small { font-size: 12px; line-height: 1.45; }
@@ -55,6 +55,12 @@
 .suggest button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--sand); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; min-height: 36px; }
 .suggest button:hover:not(:disabled) { border-color: var(--ink-soft); }
 .grow { flex: 1 1 260px; }
+/* Chọn dịp bán hàng (theo dõi thị trường) */
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips button { display: grid; gap: 0; text-align: left; padding: 6px 12px; min-height: 44px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.chips button small { font-size: 11px; font-weight: 400; color: var(--ink-soft); }
+.chips button:hover:not(:disabled) { border-color: var(--ink-soft); }
+.chips button[aria-pressed='true'] { border-color: var(--coral); background: var(--coral-soft); color: var(--coral-deep); }
 .range { display: flex; gap: 8px; flex: 0 1 280px; }
 .range .field { flex: 1 1 0; }
 .static { display: grid; gap: 6px; font-size: 13px; min-width: 120px; }
@@ -124,6 +130,20 @@
 .sources li { display: grid; gap: 4px; padding: 12px 14px; background: var(--canvas); border: 1px solid var(--line); border-radius: var(--radius-card); }
 .sources a { color: var(--coral-deep); font-weight: 600; text-underline-offset: 3px; }
 .sourceText { color: var(--ink-soft); font-size: 14px; white-space: pre-wrap; }
+.ideaMeta { display: flex; flex-wrap: wrap; gap: 6px; }
+.ideas .hook { color: var(--ink); font-style: italic; }
+.kw { display: flex; flex-wrap: wrap; gap: 6px; }
+.kw span { padding: 2px 8px; border-radius: 4px; background: var(--sand); border: 1px solid var(--line); font-size: 12px; color: var(--ink); }
+.srcLinks { font-size: 12px; color: var(--ink-soft); }
+.srcLinks a { color: var(--coral-deep); text-underline-offset: 3px; }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.feed > li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 14px 16px; align-items: start; }
+.feed > li + li { border-top: 1px solid var(--line); }
+.feed > li > .badge { justify-self: start; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.feed > li > div { display: grid; gap: 4px; font-size: 14px; }
+.feed p { color: var(--ink-soft); }
+.feed .todo { color: var(--ink); }
+.briefPreview { display: grid; gap: 6px; padding: 14px; background: var(--sand); border-radius: var(--radius-card); font-size: 14px; }
 .message { display: grid; gap: 10px; justify-items: start; padding: 14px 16px; background: var(--sand); border-radius: var(--radius-card); }
 .message p { white-space: pre-wrap; font-size: 14px; line-height: 1.7; }
 
@@ -165,6 +185,7 @@
   .hero { flex-wrap: wrap; }
   .hero :global(.btn) { width: 100%; }
   .range { flex: 1 1 100%; }
+  .feed > li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   /* Bảng thành thẻ xếp dọc trên màn hình hẹp */
   .tableWrap { border: 0; background: none; overflow: visible; }
   .table { min-width: 0; }

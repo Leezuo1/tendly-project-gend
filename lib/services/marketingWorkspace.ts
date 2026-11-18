@@ -13,6 +13,9 @@ import { blockingIssue } from '@/lib/services/reviewEvidence';
 import { generateContentPlan, parseContentPlan, planReviewSource, requireContentPlan, reviewContentPlan } from '@/lib/services/marketingContentPlan';
 import { emptyCampaignBrief, emptyMarketingProfile, emptyMarketingWorkspace, marketingText, MarketingWorkflowError, MARKETING_POST_GOALS, offerValidAt, parseCampaignBrief, parseMarketingProfile, requireCampaignReady } from '@/lib/services/marketingBrief';
 import { readSourcingSelection } from '@/lib/services/sourcingWorkflow';
+import { readSourcingBriefSeed } from '@/lib/services/sourcingBrief';
+import { SourcingRunError } from '@/lib/services/sourcingRuns';
+import { SourcingInputError } from '@/lib/services/sourcingSearch';
 import type { MarketingAccount, MarketingCampaign, MarketingPlanBinding, MarketingSchedule, MarketingWorkspace, MarketingWorkspaceView, ReviewedMarketingPost } from '@/lib/types/marketingWorkspace';
 import type { GeneratedPostDraft, MarketingPost } from '@/lib/types/posts';
 import type { ReviewAttempt } from '@/lib/types/postReview';
@@ -221,6 +224,18 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
       if (!sourcingOwner || input.confirmed !== true) throw new MarketingWorkflowError('Xác nhận mapping trước khi tạo brief nháp.');
       if (state.campaigns.some(campaign => campaign.sourcing?.runId === input.runId && campaign.sourcing?.itemKey === input.itemKey)) return;
       if (state.campaigns.length >= 50) throw new MarketingWorkflowError('Tối đa 50 chiến dịch.');
+      if (input.idea !== undefined) {
+        // Đề xuất trong báo cáo Smart Sourcing: brief dựng từ báo cáo đã lưu trên server, shop chỉ còn chọn sản phẩm/ưu đãi rồi duyệt.
+        const seed = await readSourcingBriefSeed(sourcingOwner, input.runId, input.idea, db).catch(error => {
+          throw error instanceof SourcingRunError ? new MarketingWorkflowError(error.message, error.status) : error instanceof SourcingInputError ? new MarketingWorkflowError(error.message) : error;
+        });
+        if (state.campaigns.some(campaign => campaign.sourcing?.runId === input.runId && campaign.sourcing?.itemKey === seed.itemKey)) return;
+        const { itemKey, ...brief } = seed;
+        state.campaigns.unshift({ ...emptyCampaignBrief(pageId), ...brief, id: randomUUID(), version: 1, approvedAt: null, approvedBy: '',
+          knowledge: parseAiKnowledge(input.knowledge), configuration: (await readPageProfile(pageId, db)).configuration,
+          profile: state.profiles[pageId] ?? emptyMarketingProfile(), sourcing: { runId: String(input.runId), itemKey } });
+        return;
+      }
       const item = await readSourcingSelection(sourcingOwner, input.runId, input.itemKey);
       const campaign: MarketingCampaign = { ...emptyCampaignBrief(pageId), id: randomUUID(), version: 1,
         name: `Ý tưởng: ${item.title}`.slice(0, 150), message: item.title.slice(0, 500),

@@ -51,7 +51,7 @@ export function Sidebar({
           <button
             type="button"
             data-nav="overview"
-            className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+            className={`nav-item ${activeTab ? 'active' : ''}`}
             onClick={() => setActiveTab && setActiveTab('overview')}
           >
             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -12,12 +12,16 @@ import { catalogKeywords, defaultSourcingCriteria, sourcingItems } from '@/lib/s
 import { industries } from '@/lib/data/workspace';
 import { scopedTiktokQueries } from '@/lib/services/sourcingSearch';
 import { createSeed } from '@/lib/data/admin';
-import type { SourcingAnalysis, SourcingCriteria, SourcingDecision, SourcingItem, SourcingPoint, SourcingRequest, SourcingRun, SupplierTier, TikTokReport, TrendStatus } from '@/lib/types/sourcing';
+import { upcomingOccasions } from '@/lib/services/sourcingOccasions';
+import type { ContentFormat, MarketReport, NewsImpact, SourcingAnalysis, SourcingCriteria, SourcingDecision, SourcingItem, SourcingPoint, SourcingRequest, SourcingRun, SupplierTier, TikTokReport, TrendStatus } from '@/lib/types/sourcing';
 import styles from './sourcing.module.css';
 
 type Workspace = { requests: SourcingRequest[]; decisions: SourcingDecision[] };
 type Kind = SourcingCriteria['kind'];
-type TransferState = { item: SourcingItem; runId: string; kind: 'product' | 'marketing'; name?: string };
+/** idea: đề xuất trong báo cáo gửi sang AI Marketing; server dựng brief từ báo cáo đã lưu. Ý tưởng chỉ dựa vào lịch dịp lễ thì không có bài nguồn (item = null). */
+type IdeaTransfer = { section: 'product' | 'content'; index: number; title: string; lines: string[] };
+type TransferState = { item: SourcingItem | null; runId: string; kind: 'product' | 'marketing'; name?: string; idea?: IdeaTransfer };
+type OnTransfer = (item: SourcingItem | null, kind: 'product' | 'marketing', name?: string, idea?: IdeaTransfer) => void;
 type Notice = { message: string; href?: string; label?: string } | null;
 const api = async (body?: object): Promise<Workspace & { id?: string; run?: SourcingRun; analysis?: SourcingAnalysis }> =>
   (await dashboardRequest('/api/sourcing/requests', body ? { method: 'POST', body: JSON.stringify(body) } : undefined)).json();
@@ -28,9 +32,15 @@ const RUN_BADGE: Record<string, { label: string; tone: string }> = {
   succeeded: { label: 'Thành công', tone: 'green' }, empty: { label: 'Không có kết quả', tone: 'muted' }, failed: { label: 'Thất bại', tone: 'red' }, unknown: { label: 'Chưa rõ', tone: 'red' },
 };
 const MODES: { kind: Kind; label: string; hint: string }[] = [
+  { kind: 'market', label: 'Theo dõi thị trường & đối thủ', hint: 'Tin tức ngành, dịp sắp tới, đối thủ đang làm gì, ý tưởng bài cho AI Marketing' },
   { kind: 'tiktok', label: 'Khám phá xu hướng sản phẩm', hint: 'Món nào đang nổi trên TikTok, khách thích và lo điều gì' },
   { kind: 'suppliers', label: 'Tìm nhà cung cấp và xưởng sỉ', hint: 'Xưởng, tổng kho, MOQ, giá sỉ và cách liên hệ' },
 ];
+const WINDOWS: [NonNullable<SourcingCriteria['window']>, string][] = [['w1', '7 ngày qua'], ['m1', '1 tháng qua'], ['m3', '3 tháng qua']];
+const windowLabel = (criteria: SourcingCriteria) => WINDOWS.find(([value]) => value === (criteria.window ?? 'm1'))?.[1] ?? '1 tháng qua';
+const requestTitle = (criteria: SourcingCriteria, industry: string) => criteria.kind === 'market' ? `Thị trường ${criteria.product || criteria.industry || industry}`
+  : criteria.product || (criteria.kind === 'tiktok' ? `Xu hướng ngành ${criteria.industry || industry}` : 'Nhà cung cấp');
+const UNIT: Record<Kind, string> = { tiktok: 'video TikTok', suppliers: 'trang web', market: 'bài viết và trang tin' };
 const REGIONS = [['Việt Nam', 'Toàn quốc'], ['Hà Nội', 'Hà Nội'], ['TP. Hồ Chí Minh', 'TP. Hồ Chí Minh'], ['Đà Nẵng', 'Đà Nẵng']];
 const resultCount = (run: SourcingRun | null | undefined) => run?.result?.posts?.length ?? run?.result?.candidates?.length ?? 0;
 
@@ -57,7 +67,9 @@ function SourcingFlow({ industry, shopName }: { industry: string; shopName: stri
   const [transfer, setTransfer] = useState<TransferState | null>(null);
   const inFlight = useRef(false);
   const kind = criteria.kind;
-  const isSupplier = kind === 'suppliers';
+  const isSupplier = kind === 'suppliers', isMarket = kind === 'market';
+  // Lịch tính theo ngày lúc mở trang; đủ để gợi ý dịp trong 90 ngày tới.
+  const [calendar] = useState(() => upcomingOccasions(new Date(), 90).slice(0, 8));
   const selected = view.requests.find(request => request.id === selectedId);
   const run = selected?.run;
   const mine = view.requests.filter(request => request.criteria.kind === kind);
@@ -142,25 +154,33 @@ function SourcingFlow({ industry, shopName }: { industry: string; shopName: stri
   const openRequest = (request: SourcingRequest) => { setSelectedId(request.id); setCriteria(request.criteria.industry === industry ? request.criteria : { ...defaultSourcingCriteria(industry), kind: request.criteria.kind }); setTransfer(null); setHistoryOpen(false); };
   const regionOptions = REGIONS.some(([value]) => value === criteria.region) ? REGIONS : [...REGIONS, [criteria.region, criteria.region]];
   const phase = !run ? 0 : ['starting', 'running'].includes(run.status) ? 0 : ['succeeded', 'empty'].includes(run.status) && !run.analysis && !analysisError ? 1 : 2;
-  const progress = selected?.runId && phase < 2 ? <ol className={styles.progress} aria-label="Tiến trình"><li data-state={phase === 0 ? 'current' : 'done'}>{isSupplier ? 'Tìm và đọc trang web nhà cung cấp' : 'Thu thập video TikTok mới nhất'}</li><li data-state={phase === 1 ? 'current' : 'todo'}>AI đọc dữ liệu và viết phân tích</li><li data-state="todo">Báo cáo sẵn sàng</li></ol> : null;
-  const title = selected ? selected.criteria.product || (selected.criteria.kind === 'tiktok' ? `Xu hướng ngành ${selected.criteria.industry || industry}` : 'Nhà cung cấp') : '';
+  const progress = selected?.runId && phase < 2 ? <ol className={styles.progress} aria-label="Tiến trình"><li data-state={phase === 0 ? 'current' : 'done'}>{isSupplier ? 'Tìm và đọc trang web nhà cung cấp' : isMarket ? 'Tìm tin tức, bài viết về thị trường và đối thủ' : 'Thu thập video TikTok mới nhất'}</li><li data-state={phase === 1 ? 'current' : 'todo'}>{isMarket ? 'AI chọn tin quan trọng và lên ý tưởng bài' : 'AI đọc dữ liệu và viết phân tích'}</li><li data-state="todo">Báo cáo sẵn sàng</li></ol> : null;
+  const title = selected ? requestTitle(selected.criteria, industry) : '';
+  const occasions = criteria.occasions ?? [];
+  const toggleOccasion = (name: string) => change('occasions', occasions.includes(name) ? occasions.filter(item => item !== name) : [...occasions, name].slice(-2));
   return <>
     <div className={styles.context}><span><strong>{shopName}</strong> · {industry}</span></div>
     <div className={styles.tabs} role="tablist" aria-label="Chế độ làm việc">{MODES.map(mode => <button key={mode.kind} type="button" role="tab" id={`tab-${mode.kind}`} aria-selected={kind === mode.kind} aria-controls="sourcing-panel" disabled={busy} onClick={() => switchKind(mode.kind)}><strong>{mode.label}</strong><small>{mode.hint}</small></button>)}</div>
     <div id="sourcing-panel" role="tabpanel" aria-labelledby={`tab-${kind}`}>
       <form className={styles.bar} onSubmit={e => { e.preventDefault(); void search(); }}>
         <fieldset disabled={busy} className={styles.hero}>
-          <label className={styles.heroField}>{isSupplier ? 'Sản phẩm cần tìm' : 'Ngách hoặc sản phẩm bạn quan tâm (không bắt buộc)'}<input required={isSupplier} maxLength={120} value={criteria.product} onChange={e => change('product', e.target.value)} placeholder={isSupplier ? 'Ví dụ: áo thun cotton' : `Ví dụ: ${scopedTiktokQueries(industry, [])[0] || 'áo thun cotton'}`} /></label>
-          <button className="btn btn-primary" type="submit">{busy ? 'Đang xử lý…' : isSupplier ? 'Phân tích ngay' : 'Khám phá ngay'}</button>
+          <label className={styles.heroField}>{isSupplier ? 'Sản phẩm cần tìm' : isMarket ? 'Chủ đề cần theo dõi (để trống = ngành hàng của shop)' : 'Ngách hoặc sản phẩm bạn quan tâm (không bắt buộc)'}<input required={isSupplier} maxLength={120} value={criteria.product} onChange={e => change('product', e.target.value)} placeholder={isSupplier ? 'Ví dụ: áo thun cotton' : isMarket ? `Ví dụ: ${industry}` : `Ví dụ: ${scopedTiktokQueries(industry, [])[0] || 'áo thun cotton'}`} /></label>
+          <button className="btn btn-primary" type="submit">{busy ? 'Đang xử lý…' : isSupplier ? 'Phân tích ngay' : isMarket ? 'Cập nhật thị trường' : 'Khám phá ngay'}</button>
         </fieldset>
         <fieldset disabled={busy} className={styles.barFields} onKeyDown={noEnterSubmit}>
-          {isSupplier ? <>
+          {isMarket ? <>
+            <label className={styles.field}>Khoảng thời gian<select value={criteria.window ?? 'm1'} onChange={e => change('window', e.target.value as SourcingCriteria['window'])}>{WINDOWS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <div role="group" aria-labelledby="occasion-label" className={`${styles.field} ${styles.grow}`}><span id="occasion-label">Dịp bán hàng sắp tới (chọn tối đa 2)</span>
+              <ul className={styles.chips}>{calendar.map(item => <li key={item.name}><button type="button" aria-pressed={occasions.includes(item.name)} onClick={() => toggleOccasion(item.name)}>{item.name}<small>{item.daysLeft === 0 ? 'hôm nay' : `còn ${item.daysLeft} ngày`}</small></button></li>)}</ul></div>
+          </> : isSupplier ? <>
             <label className={styles.field}>Khu vực ưu tiên<select value={criteria.region} onChange={e => change('region', e.target.value)}>{regionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <div className={styles.range}>{(['minPrice', 'maxPrice'] as const).map((key, i) => <label key={key} className={styles.field}>{['Giá nhập từ (đ)', 'Đến (đ)'][i]}<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria[key] ?? ''} onChange={e => change(key, e.target.value === '' ? null : Number(e.target.value))} /></label>)}</div>
           </> : <p className={styles.industry}>Ngành hàng của shop: <strong>{industry}</strong></p>}
         </fieldset>
         <details className={styles.more}><summary>Tùy chỉnh thêm</summary><fieldset disabled={busy} className={styles.moreFields} onKeyDown={noEnterSubmit}>
-          {!isSupplier && <TagInput label="Từ khóa riêng" hint="Tối đa 3. Để trống để tìm theo loại sản phẩm trong danh mục của shop." max={3} value={criteria.keywords} onChange={keywords => change('keywords', keywords)} placeholder={scopedTiktokQueries(industry, [])[1] || 'tên sản phẩm, kiểu dáng'} clean={text => text.replace(/[^\p{L}\p{N} .(),&+%\/-]/gu, '').slice(0, 120)} />}
+          {isMarket && <TagInput label="Đối thủ cần theo dõi" hint="Tối đa 3: tên thương hiệu, link website hoặc fanpage Facebook." max={3} value={criteria.competitors ?? []} onChange={list => change('competitors', list)} placeholder="Ví dụ: facebook.com/tenshop" clean={text => text.replace(/[\u0000-\u001f"]/g, '').trim().slice(0, 200)} />}
+          {isMarket && <TagInput label="Từ khóa theo dõi thêm" hint="Tối đa 3, ví dụ giá nguyên liệu, chính sách, thời tiết." max={3} value={criteria.keywords} onChange={keywords => change('keywords', keywords)} placeholder="Ví dụ: giá hoa Đà Lạt" clean={text => text.replace(/[^\p{L}\p{N} .(),&+%\/-]/gu, '').slice(0, 120)} />}
+          {kind === 'tiktok' && <TagInput label="Từ khóa riêng" hint="Tối đa 3. Để trống để tìm theo loại sản phẩm trong danh mục của shop." max={3} value={criteria.keywords} onChange={keywords => change('keywords', keywords)} placeholder={scopedTiktokQueries(industry, [])[1] || 'tên sản phẩm, kiểu dáng'} clean={text => text.replace(/[^\p{L}\p{N} .(),&+%\/-]/gu, '').slice(0, 120)} />}
           {isSupplier && <><label className={styles.field}>Lượng dự kiến nhập<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria.quantity ?? ''} onChange={e => change('quantity', e.target.value === '' ? null : Number(e.target.value))} /></label>
             <label className={styles.field}>MOQ tối đa<input type="number" min="0" max="1000000000" inputMode="numeric" value={criteria.maxMoq ?? ''} onChange={e => change('maxMoq', e.target.value === '' ? null : Number(e.target.value))} /></label>
             <label className={styles.field}>Đơn vị hàng<input maxLength={60} value={criteria.unit} onChange={e => change('unit', e.target.value)} /></label>
@@ -169,29 +189,31 @@ function SourcingFlow({ industry, shopName }: { industry: string; shopName: stri
           <TagInput label="Điều cần có" value={splitList(criteria.required)} onChange={list => change('required', list.join(', '))} placeholder="Ví dụ: cotton" clean={text => text.replace(/,/g, '').slice(0, 100)} />
           <TagInput label="Điều cần loại bỏ" value={splitList(criteria.excluded)} onChange={list => change('excluded', list.join(', '))} placeholder="Ví dụ: hàng order nước ngoài" clean={text => text.replace(/,/g, '').slice(0, 100)} />
         </fieldset></details>
-        <p className={styles.lastRun}>{latest ? <>Lần quét gần nhất: {when(latest.updatedAt)}{resultCount(latest.run) > 0 && ` (${resultCount(latest.run)} ${isSupplier ? 'trang web' : 'video TikTok'})`}</> : 'Chưa có lần quét nào.'}
+        <p className={styles.lastRun}>{latest ? <>Lần quét gần nhất: {when(latest.updatedAt)}{resultCount(latest.run) > 0 && ` (${resultCount(latest.run)} ${UNIT[kind]})`}</> : 'Chưa có lần quét nào.'}
           {mine.length > 1 && <> · <button type="button" className={styles.link} aria-expanded={historyOpen} aria-controls="sourcing-history" onClick={() => setHistoryOpen(open => !open)}>{historyOpen ? 'Ẩn các lần trước' : 'Xem các lần trước'}</button></>}</p>
         {historyOpen && <ul id="sourcing-history" className={styles.history}>{mine.map(request => { const badge = RUN_BADGE[request.run?.status ?? 'draft'] ?? RUN_BADGE.draft; return <li key={request.id}><button type="button" aria-current={request.id === selectedId ? 'true' : undefined} disabled={busy} onClick={() => openRequest(request)}>
-          <span className={styles.historyTitle}>{request.criteria.product || (request.criteria.kind === 'tiktok' ? `Xu hướng ngành ${request.criteria.industry}` : 'Nhà cung cấp')}</span>
+          <span className={styles.historyTitle}>{requestTitle(request.criteria, industry)}</span>
           <span className={styles.muted}>{when(request.updatedAt)}</span><span className={styles.badge} data-tone={badge.tone}>{badge.label}</span></button></li>; })}</ul>}
       </form>
       {error && <p role="alert" className={styles.error}>{error} <button className="btn btn-outline btn-sm" onClick={() => work(async () => { await load(); })}>Tải lại</button></p>}
       <p aria-live="polite" className={styles.notice}>{notice && <>{notice.message}{notice.href && <> <Link href={notice.href}>{notice.label}</Link></>}</>}</p>
       <section className={styles.results} aria-label="Kết quả">
-        {!selected ? <div className={styles.idle}><h2>{isSupplier ? 'Tìm xưởng và nhà phân phối cho món bạn muốn bán' : 'Xem ngành của bạn đang có món gì nổi'}</h2>
-          <p>{isSupplier ? 'Nhập sản phẩm muốn nhập hàng rồi bấm Phân tích ngay. AI so sánh xưởng, tổng kho sỉ, MOQ, giá sỉ và gợi ý cách liên hệ.' : 'Bấm Khám phá ngay. AI cho biết món nào đang nổi, khách thích và lo điều gì, và nên quay video thế nào.'}</p>
-          {!isSupplier && scopedTiktokQueries(industry, []).length > 0 && <div className={styles.suggest}><span className={styles.muted}>Gợi ý ngách cho ngành {industry}:</span><ul>{scopedTiktokQueries(industry, []).map(query => <li key={query}><button type="button" disabled={busy} onClick={() => change('product', query)}>{query}</button></li>)}</ul></div>}</div> : <>
-          <header className={styles.resultHead}><div><h2>{title}</h2><p className={styles.muted}>{selected.criteria.kind === 'tiktok' ? 'TikTok Việt Nam · 7 ngày gần nhất' : `Google · ${selected.criteria.region}`}{resultCount(run) > 0 && ` · ${resultCount(run)} ${selected.criteria.kind === 'tiktok' ? 'video' : 'trang web'}`} · {when(selected.updatedAt)}</p></div>
+        {!selected ? <div className={styles.idle}><h2>{isSupplier ? 'Tìm xưởng và nhà phân phối cho món bạn muốn bán' : isMarket ? 'Tối nay thị trường của bạn có gì mới?' : 'Xem ngành của bạn đang có món gì nổi'}</h2>
+          <p>{isSupplier ? 'Nhập sản phẩm muốn nhập hàng rồi bấm Phân tích ngay. AI so sánh xưởng, tổng kho sỉ, MOQ, giá sỉ và gợi ý cách liên hệ.'
+            : isMarket ? 'Chọn dịp sắp tới, thêm đối thủ muốn theo dõi rồi bấm Cập nhật thị trường. AI đọc tin tức, bài viết về ngành và đối thủ, nói rõ shop nên làm gì, và đề xuất bài viết, video, infographic để gửi thẳng sang AI Marketing.'
+            : 'Bấm Khám phá ngay. AI cho biết món nào đang nổi, khách thích và lo điều gì, và nên quay video thế nào.'}</p>
+          {kind === 'tiktok' && scopedTiktokQueries(industry, []).length > 0 && <div className={styles.suggest}><span className={styles.muted}>Gợi ý ngách cho ngành {industry}:</span><ul>{scopedTiktokQueries(industry, []).map(query => <li key={query}><button type="button" disabled={busy} onClick={() => change('product', query)}>{query}</button></li>)}</ul></div>}</div> : <>
+          <header className={styles.resultHead}><div><h2>{title}</h2><p className={styles.muted}>{selected.criteria.kind === 'tiktok' ? 'TikTok Việt Nam · 7 ngày gần nhất' : selected.criteria.kind === 'market' ? `Google · ${windowLabel(selected.criteria)}` : `Google · ${selected.criteria.region}`}{resultCount(run) > 0 && ` · ${resultCount(run)} ${UNIT[selected.criteria.kind]}`} · {when(selected.updatedAt)}</p></div>
             {run && <span className={styles.badge} data-tone={(RUN_BADGE[run.status] ?? RUN_BADGE.draft).tone}>{(RUN_BADGE[run.status] ?? RUN_BADGE.draft).label}</span>}</header>
-          {!selected.runId ? <p className={styles.warning}>Lượt này chưa được quét. Bấm {isSupplier ? 'Phân tích ngay' : 'Quét xu hướng mới nhất'} để bắt đầu.</p>
+          {!selected.runId ? <p className={styles.warning}>Lượt này chưa được quét. Bấm {isSupplier ? 'Phân tích ngay' : isMarket ? 'Cập nhật thị trường' : 'Khám phá ngay'} để bắt đầu.</p>
             : progress ? <div role="status" className={styles.working}>{progress}<p className={styles.muted}>{run?.status === 'starting' || !run ? 'Đang kết nối nguồn dữ liệu…' : phase === 0 ? 'Đang thu thập dữ liệu…' : `AI đang đọc ${items.length} kết quả…`} Thường mất 1–3 phút. Bạn có thể rời trang; kết quả vẫn được lưu.</p></div>
             : run && ['failed', 'unknown'].includes(run.status) ? <div className={styles.error}><strong>{run.status === 'failed' ? 'Quét không thành công' : 'Chưa rõ kết quả lượt quét'}</strong><p>{run.error || 'Không nhận được kết quả từ nhà cung cấp dữ liệu.'}</p><p>{run.status === 'unknown' ? 'Đừng quét lại ngay để tránh tính phí trùng; hãy liên hệ quản trị để kiểm tra lượt này.' : 'Thử quét lại.'}</p></div>
-            : run?.analysis ? <Report analysis={run.analysis} items={items} kind={run.kind} product={selected.criteria.product} onTransfer={(item, transferKind, name) => { setError(''); setTransfer({ item, kind: transferKind, runId: run.id, name }); }} />
+            : run?.analysis ? <Report analysis={run.analysis} items={items} kind={run.kind} product={selected.criteria.product} onTransfer={(item, transferKind, name, idea) => { setError(''); setTransfer({ item, kind: transferKind, runId: run.id, name, idea }); }} />
             : analysisError ? <div className={styles.error}><p>{analysisError}</p><div className={styles.actions}><button className="btn btn-primary btn-sm" onClick={() => run && void analyze(run.id)}>Phân tích lại</button></div></div> : null}
         </>}
       </section>
     </div>
-    {transfer && <Transfer key={`${transfer.runId}:${transfer.item.key}:${transfer.kind}`} {...transfer} industry={industry} busy={busy} error={error} work={work} onClose={() => setTransfer(null)} onDone={setNotice} />}
+    {transfer && <Transfer key={`${transfer.runId}:${transfer.item?.key}:${transfer.kind}:${transfer.idea?.section}:${transfer.idea?.index}`} {...transfer} industry={industry} busy={busy} error={error} work={work} onClose={() => setTransfer(null)} onDone={setNotice} />}
   </>;
 }
 
@@ -229,16 +251,17 @@ const reportSources = (report: TikTokReport) => [report.trend.sources, report.bu
 const bullets = (list: SourcingPoint[]) => list.length ? <ul className={styles.bullets}>{list.map((point, i) => <li key={i}>{point.text}</li>)}</ul> : <p className={styles.muted}>Chưa đủ dữ liệu từ các bài đã quét.</p>;
 
 /** Báo cáo của AI trình bày ngay trên trang; bài nguồn gom vào mục gập ở cuối để đối chiếu. */
-function Report({ analysis, items, kind, product, onTransfer }: { analysis: SourcingAnalysis; items: SourcingItem[]; kind: SourcingRun['kind']; product: string; onTransfer: (item: SourcingItem, kind: 'product' | 'marketing', name?: string) => void }) {
-  const { report, suppliers } = analysis;
+function Report({ analysis, items, kind, product, onTransfer }: { analysis: SourcingAnalysis; items: SourcingItem[]; kind: SourcingRun['kind']; product: string; onTransfer: OnTransfer }) {
+  const { report, suppliers, market } = analysis;
   const [copied, setCopied] = useState('');
+  if (market) return <MarketView analysis={analysis} market={market} items={items} onTransfer={onTransfer} />;
   const copy = (id: string, text: string) => void navigator.clipboard.writeText(text).then(() => { setCopied(id); setTimeout(() => setCopied(''), 2000); }, () => {});
   const keys = report ? [...reportSources(report), ...analysis.productIdeas.flatMap(idea => idea.sources)] : suppliers ? [...suppliers.suppliers.map(card => card.source), ...[...suppliers.tierMix, ...suppliers.regions].flatMap(point => point.sources)]
     : [...analysis.findings, ...analysis.productIdeas].flatMap(entry => entry.sources);
   const cited = [...new Set(keys)].map(key => items.find(item => item.key === key)).filter((item): item is SourcingItem => !!item);
   const top = suppliers && [...suppliers.suppliers].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))[0];
   const views = items.reduce((sum, item) => sum + (item.metrics?.views ?? 0), 0);
-  const ideas = analysis.productIdeas.length > 0 && <section className={styles.block}><h3>Sản phẩm đáng tìm hiểu</h3><ul className={styles.ideas}>{analysis.productIdeas.map((idea, i) => { const item = items.find(entry => entry.key === idea.sources[0]); return <li key={i}><strong>{idea.name}</strong><p>{idea.reason}</p>{item && <span className={styles.actions}><button type="button" className="btn btn-primary btn-sm" onClick={() => onTransfer(item, 'product', idea.name)}>Nhập sản phẩm</button><button type="button" className="btn btn-outline btn-sm" onClick={() => onTransfer(item, 'marketing', idea.name)}>Tạo brief Marketing</button></span>}</li>; })}</ul></section>;
+  const ideas = analysis.productIdeas.length > 0 && <section className={styles.block}><h3>Sản phẩm đáng tìm hiểu</h3><ul className={styles.ideas}>{analysis.productIdeas.map((idea, i) => { const item = items.find(entry => entry.key === idea.sources[0]); return <li key={i}><strong>{idea.name}</strong><p>{idea.reason}</p>{item && <span className={styles.actions}><button type="button" className="btn btn-primary btn-sm" onClick={() => onTransfer(item, 'product', idea.name)}>Nhập sản phẩm</button><button type="button" className="btn btn-outline btn-sm" onClick={() => onTransfer(item, 'marketing', idea.name, { section: 'product', index: i, title: `Ý tưởng: ${idea.name}`, lines: [idea.reason] })}>Gửi sang AI Marketing</button></span>}</li>; })}</ul></section>;
   return <div className={styles.report}>
     <p className={styles.lead}>{analysis.summary}</p>
     {report ? <>
@@ -306,11 +329,63 @@ function Report({ analysis, items, kind, product, onTransfer }: { analysis: Sour
   </div>;
 }
 
+const IMPACT: Record<NewsImpact, { label: string; tone: string }> = { opportunity: { label: 'Cơ hội', tone: 'green' }, risk: { label: 'Rủi ro', tone: 'red' }, neutral: { label: 'Cần biết', tone: 'muted' } };
+const FORMAT: Record<ContentFormat, string> = { post: 'Bài đăng Facebook', video: 'Video ngắn', infographic: 'Infographic', blog: 'Bài blog' };
+const dayText = (date: string, daysLeft: number) => `${date.split('-').reverse().join('/')}${daysLeft > 0 ? ` · còn ${daysLeft} ngày` : daysLeft === 0 ? ' · hôm nay' : ''}`;
+
+/** Báo cáo theo dõi thị trường: đọc theo thứ tự "chuyện gì xảy ra → shop nên làm gì → gửi ý tưởng sang AI Marketing". */
+function MarketView({ analysis, market, items, onTransfer }: { analysis: SourcingAnalysis; market: MarketReport; items: SourcingItem[]; onTransfer: OnTransfer }) {
+  const find = (sources: string[]) => sources.map(key => items.find(item => item.key === key)).filter((item): item is SourcingItem => !!item);
+  const links = (sources: string[]) => { const found = find(sources); return found.length > 0 && <span className={styles.srcLinks}>Nguồn: {found.slice(0, 3).map((item, i) => <a key={item.key} href={item.url} target="_blank" rel="noopener noreferrer">{i > 0 && ', '}{host(item.url)}</a>)}</span>; };
+  const risks = market.news.filter(news => news.impact === 'risk').length, chances = market.news.filter(news => news.impact === 'opportunity').length;
+  const cited = find([...new Set([...market.news, ...market.competitors, ...market.trends, ...market.contentIdeas, ...market.occasions].flatMap(entry => entry.sources))]);
+  return <div className={styles.report}>
+    <p className={styles.lead}>{analysis.summary}</p>
+    <section className={styles.metrics} aria-label="Tóm tắt">
+      <div className={styles.metric}><span>Tin đáng chú ý</span><strong>{market.news.length}</strong><p>{chances} cơ hội · {risks} rủi ro, chọn từ {items.length} bài viết và trang tin.</p></div>
+      <div className={styles.metric}><span>Dịp gần nhất</span><strong>{market.occasions[0]?.name ?? 'Chưa có'}</strong><p>{market.occasions[0] ? dayText(market.occasions[0].date, market.occasions[0].daysLeft) : 'Không có dịp phù hợp trong 60 ngày tới.'}</p></div>
+      <div className={styles.metric}><span>Ý tưởng cho AI Marketing</span><strong>{market.contentIdeas.length}</strong><p>Bấm Gửi sang AI Marketing để tạo brief nháp có sẵn thông điệp và từ khóa.</p></div>
+    </section>
+    <section className={styles.block}><h3>Ý tưởng nội dung nên làm ngay</h3><p className={styles.muted}>Mỗi ý tưởng thành một brief nháp trong Marketing: AI Marketing viết bài, AI Review kiểm tra, shop duyệt rồi đăng.</p>
+      {market.contentIdeas.length ? <ul className={styles.ideas}>{market.contentIdeas.map((idea, i) => { const source = find(idea.sources)[0] ?? null; return <li key={i}>
+        <span className={styles.ideaMeta}><em className={styles.badge} data-tone="green">{FORMAT[idea.format]}</em>{idea.occasion && <em className={styles.badge} data-tone="amber">{idea.occasion}</em>}</span>
+        <strong>{idea.title}</strong><p>{idea.angle}</p>
+        {idea.hook && <p className={styles.hook}>Mở đầu: “{idea.hook}”</p>}
+        {idea.audience && <p>Khách nhắm tới: {idea.audience}</p>}
+        {idea.keywords.length > 0 && <p className={styles.kw}>{idea.keywords.map(keyword => <span key={keyword}>{keyword}</span>)}</p>}
+        <span className={styles.actions}><button type="button" className="btn btn-primary btn-sm" onClick={() => onTransfer(source, 'marketing', undefined, { section: 'content', index: i, title: `${FORMAT[idea.format]}: ${idea.title}`, lines: [idea.angle, idea.hook && `Mở đầu: ${idea.hook}`, idea.keywords.length ? `Từ khóa: ${idea.keywords.join(', ')}` : '', idea.occasion && `Dịp: ${idea.occasion}`].filter(Boolean) })}>Gửi sang AI Marketing</button>{links(idea.sources)}</span>
+      </li>; })}</ul> : <p className={styles.muted}>Chưa đủ dữ liệu để đề xuất nội dung. Thử chọn dịp sắp tới hoặc mở rộng khoảng thời gian.</p>}
+    </section>
+    <section className={styles.block}><h3>Tin tức ảnh hưởng tới shop</h3>
+      {market.news.length ? <ul className={styles.feed}>{market.news.map((news, i) => <li key={i}>
+        <span className={styles.badge} data-tone={IMPACT[news.impact].tone}>{IMPACT[news.impact].label}</span>
+        <div><strong>{news.title}</strong><p>{news.detail}</p>{news.action && <p className={styles.todo}><b>Shop nên:</b> {news.action}</p>}{links(news.sources)}</div>
+      </li>)}</ul> : <p className={styles.muted}>Không có tin nào đủ liên quan trong khoảng thời gian đã chọn.</p>}
+    </section>
+    {market.occasions.length > 0 && <section className={styles.block}><h3>Dịp sắp tới và cách khai thác</h3>
+      <ul className={styles.feed}>{market.occasions.map(occasion => <li key={occasion.name}><span className={styles.badge} data-tone="amber">{dayText(occasion.date, occasion.daysLeft)}</span><div><strong>{occasion.name}</strong><p>{occasion.angle}</p>{links(occasion.sources)}</div></li>)}</ul>
+    </section>}
+    <section className={styles.block}><h3>Đối thủ đang làm gì</h3>
+      {market.competitorsTracked.length > 0 && <p className={styles.muted}>Đang theo dõi: {market.competitorsTracked.join(' · ')}</p>}
+      {market.competitors.length ? <div className={styles.tableWrap}><table className={styles.table}>
+        <thead><tr><th scope="col">Đối thủ</th><th scope="col">Hoạt động</th><th scope="col">Shop học được gì</th></tr></thead>
+        <tbody>{market.competitors.map((rival, i) => <tr key={i}><th scope="row" data-label="Đối thủ"><strong>{rival.name}</strong>{links(rival.sources)}</th><td data-label="Hoạt động">{rival.activity}</td><td data-label="Shop học được gì">{rival.takeaway || '—'}</td></tr>)}</tbody>
+      </table></div> : <p className={styles.muted}>{market.competitorsTracked.length ? 'Chưa tìm thấy hoạt động mới của đối thủ trong khoảng thời gian này. Fanpage Facebook ít được Google cập nhật; thử thêm link website của đối thủ.' : 'Thêm đối thủ ở mục Tùy chỉnh thêm để theo dõi.'}</p>}
+    </section>
+    {(market.trends.length > 0 || market.keywords.length > 0) && <section className={styles.block}><h3>Xu hướng và từ khóa của ngành</h3>
+      <div className={styles.versus}><div><h4>Xu hướng</h4>{bullets(market.trends)}</div><div><h4>Từ khóa nên dùng khi viết bài</h4>{market.keywords.length ? <p className={styles.kw}>{market.keywords.map(keyword => <span key={keyword}>{keyword}</span>)}</p> : <p className={styles.muted}>Chưa đủ dữ liệu.</p>}</div></div>
+    </section>}
+    {analysis.caveats.length > 0 && <section className={styles.block}><h3>Lưu ý khi dùng báo cáo</h3><ul className={styles.caveats}>{analysis.caveats.map((caveat, i) => <li key={i}>{caveat}</li>)}</ul></section>}
+    {cited.length > 0 && <details className={styles.fold}><summary>Nguồn đối chiếu ({cited.length})</summary><ul className={styles.sources}>{cited.map(item => <li key={item.key}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.title || host(item.url)}</a><span className={styles.muted}>{host(item.url)}</span>{item.text && <span className={styles.sourceText}>{item.text.slice(0, 240)}</span>}</li>)}</ul></details>}
+    <p className={styles.footnote}>Phân tích bởi AI Smart Sourcing lúc {when(analysis.createdAt)}. AI có thể sai; hãy mở nguồn để kiểm tra trước khi đăng bài hoặc ra quyết định.</p>
+  </div>;
+}
+
 /** Ngăn kéo bên phải: điền sẵn từ báo cáo, lưu xong vẫn ở lại trang kết quả. */
-function Transfer({ item, runId, kind, name: suggested, industry, busy, error, work, onClose, onDone }: TransferState & { industry: string; busy: boolean; error: string; work: (fn: () => Promise<void>) => Promise<void>; onClose: () => void; onDone: (notice: Notice) => void }) {
+function Transfer({ item, runId, kind, name: suggested, idea, industry, busy, error, work, onClose, onDone }: TransferState & { industry: string; busy: boolean; error: string; work: (fn: () => Promise<void>) => Promise<void>; onClose: () => void; onDone: (notice: Notice) => void }) {
   const first = useRef<HTMLInputElement>(null), panel = useRef<HTMLElement>(null);
   const [sku, setSku] = useState('');
-  const [name, setName] = useState((suggested || item.title).slice(0, 500));
+  const [name, setName] = useState((suggested || item?.title || '').slice(0, 500));
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState(''); // do shop tự viết: văn bản cào về không đi thẳng vào danh mục mà AI Chat đọc
   const [done, setDone] = useState<Notice>(null);
@@ -330,10 +405,17 @@ function Transfer({ item, runId, kind, name: suggested, industry, busy, error, w
     return () => { window.removeEventListener('keydown', onKey); if (previous?.isConnected) previous.focus(); };
   }, []);
   return <div className={styles.backdrop} onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-    <aside ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-label={kind === 'product' ? 'Nhập sản phẩm mới' : 'Tạo brief Marketing'} className={styles.drawer}>
-      <header className={styles.drawerHead}><h2>{kind === 'product' ? 'Nhập sản phẩm mới' : 'Tạo brief Marketing'}</h2><button type="button" className="btn btn-text btn-sm" onClick={onClose}>Đóng</button></header>
-      <p className={styles.muted}>Nguồn: <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title || host(item.url)}</a></p>
+    <aside ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-label={kind === 'product' ? 'Nhập sản phẩm mới' : 'Gửi sang AI Marketing'} className={styles.drawer}>
+      <header className={styles.drawerHead}><h2>{kind === 'product' ? 'Nhập sản phẩm mới' : 'Gửi sang AI Marketing'}</h2><button type="button" className="btn btn-text btn-sm" onClick={onClose}>Đóng</button></header>
+      <p className={styles.muted}>Nguồn: {item ? <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title || host(item.url)}</a> : 'lịch dịp bán hàng của Tendly'}</p>
       {done ? <div className={styles.drawerDone} role="status"><p>{done.message}</p><div className={styles.actions}>{done.href && <Link className="btn btn-outline btn-sm" href={done.href}>{done.label}</Link>}<button type="button" className="btn btn-primary btn-sm" onClick={onClose}>Đóng</button></div></div> : <form onSubmit={e => { e.preventDefault(); void work(async () => {
+        if (kind === 'marketing' && idea) {
+          const view = await marketingWorkspaceClient.read();
+          await marketingWorkspaceClient.act(view.revision, 'sourcingIdea', { runId, idea: { section: idea.section, index: idea.index }, confirmed: true, knowledge: currentAiKnowledge() });
+          const result = { message: 'Đã tạo brief nháp trong Marketing, có sẵn thông điệp, đối tượng và từ khóa. Chọn sản phẩm rồi duyệt để AI viết bài.', href: '/marketing?tab=campaigns', label: 'Mở Marketing' }; setDone(result); onDone(result);
+          return;
+        }
+        if (!item) throw new Error('Không có bài nguồn để nhập.');
         const query = new URLSearchParams({ run: runId, item: item.key });
         const { item: source }: { item: SourcingItem } = await (await dashboardRequest(`/api/sourcing/requests?${query}`)).json();
         if (kind === 'product') {
@@ -352,7 +434,8 @@ function Transfer({ item, runId, kind, name: suggested, industry, busy, error, w
             <label className={styles.field}>Giá bán dự kiến (đ)<input type="number" min="0" max="1000000000" required value={price} onChange={e => setPrice(e.target.value)} /></label>
             <label className={styles.field}>Mô tả sản phẩm (tự viết, có thể để trống)<textarea rows={3} maxLength={2000} value={description} onChange={e => setDescription(e.target.value)} /><small>AI Chat sẽ đọc phần này.</small></label>
             <p className={styles.muted}>Ngành hàng: {industry} · Tồn kho chưa xác nhận, lượng ban đầu 0 · Giá nhập, size, màu chưa có nguồn.</p></>
-            : <p>Tên brief: Ý tưởng: {item.title}<br /><span className={styles.muted}>Sản phẩm đang bán và ưu đãi chưa chọn. Brief ở trạng thái nháp, chờ shop hoàn thiện và duyệt.</span></p>}
+            : idea ? <div className={styles.briefPreview}><strong>{idea.title}</strong>{idea.lines.map((line, i) => <p key={i}>{line}</p>)}<p className={styles.muted}>Brief nháp được điền sẵn từ báo cáo. Sản phẩm đang bán và ưu đãi chưa chọn; shop hoàn thiện rồi duyệt.</p></div>
+            : <p>Tên brief: Ý tưởng: {item?.title}<br /><span className={styles.muted}>Sản phẩm đang bán và ưu đãi chưa chọn. Brief ở trạng thái nháp, chờ shop hoàn thiện và duyệt.</span></p>}
           <div className={styles.actions}><button type="submit" className="btn btn-primary">{kind === 'product' ? 'Lưu vào danh mục sản phẩm' : 'Tạo brief nháp'}</button><button type="button" className="btn btn-outline" onClick={onClose}>Hủy</button></div>
         </fieldset>
       </form>}

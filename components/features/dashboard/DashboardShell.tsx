@@ -9,15 +9,21 @@ import { Sidebar } from './Sidebar';
 import { StatCards } from './StatCards';
 import { EmailAutomationLog } from './EmailAutomationLog';
 import { ReportAnalytics } from './ReportAnalytics';
+import { CustomersPanel, OrdersPanel, useCrmOverview } from './CrmPanels';
 import { Toast } from '@/components/shared/Toast';
+
+const TABS: [DashboardTab, string][] = [['overview', 'Tổng quan'], ['orders', 'Đơn hàng'], ['customers', 'Khách hàng'], ['report', 'Báo cáo chi tiết']];
 
 export function DashboardShell() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [range, setRange] = useState(30);
   const [data, setData] = useState<DashboardData | null>(null);
   const { ready, error: sessionError } = useInboxSession();
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const ownerName = useShopOwnerName();
+  // Đơn hàng/khách hàng chỉ tải khi mở tab; nút Làm mới tải lại cả hai.
+  const crm = useCrmOverview(ready && (activeTab === 'orders' || activeTab === 'customers'), range, refresh);
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
@@ -60,9 +66,8 @@ export function DashboardShell() {
           <Link href="/pricing" className="btn btn-outline btn-sm">Nâng cấp gói</Link>
         </div>
       </div>
-      <div className="tabs">
-        <button type="button" className={'tab-btn ' + (activeTab === 'overview' ? 'active' : '')} onClick={() => setActiveTab('overview')}>Tổng quan</button>
-        <button type="button" className={'tab-btn ' + (activeTab === 'report' ? 'active' : '')} onClick={() => setActiveTab('report')}>Báo cáo chi tiết</button>
+      <div className="tabs" role="tablist" aria-label="Nội dung tổng quan">
+        {TABS.map(([tab, label]) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={'tab-btn ' + (activeTab === tab ? 'active' : '')} onClick={() => setActiveTab(tab)}>{label}</button>)}
       </div>
       {activeTab === 'overview' && <div className="tab-panel" id="tab-overview">
         <StatCards data={data} />
@@ -75,6 +80,8 @@ export function DashboardShell() {
           <Link href="/hop-thoai" className="card-foot-link">Xem hội thoại →</Link>
         </div><EmailAutomationLog /></div>
       </div>}
+      {activeTab === 'orders' && <OrdersPanel data={crm.data} error={crm.error} range={range} onRange={setRange} />}
+      {activeTab === 'customers' && <CustomersPanel data={crm.data} error={crm.error} range={range} onRange={setRange} />}
       {activeTab === 'report' && <ReportAnalytics data={data} />}
     </main>
   </div><Toast message={error} /></div>;

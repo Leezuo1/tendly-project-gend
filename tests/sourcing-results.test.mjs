@@ -62,7 +62,7 @@ test('TikTok queries: keywords are never glued to the industry seed; only the ch
 });
 
 test('supplier report: one card per real result, phones must be on that page, landscape points need sources', () => {
-  const { parseSupplierReport } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {} });
+  const { parseSupplierReport } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {}, '@/lib/services/sourcingOccasions': {} });
   const ids = new Map([['S1', 'k1'], ['S2', 'k2']]);
   const pages = new Map([['k1', 'Xưởng may Tân Bình. Hotline: 0901.234.567'], ['k2', 'Top 10 nguồn hàng']]);
   const card = { sourceId: 'S1', name: 'Xưởng may A', tier: 'factory', matchScore: 8, moq: 'Từ 50 chiếc', price: '', strengths: 'Áo polo', address: 'Tân Bình',
@@ -82,7 +82,7 @@ test('supplier report: one card per real result, phones must be on that page, la
 });
 
 test('TikTok report keeps only sourced points; buying intent needs comments; hashtags must exist in the data', () => {
-  const { parseTikTokReport } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {} });
+  const { parseTikTokReport } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {}, '@/lib/services/sourcingOccasions': {} });
   const ids = new Map([['S1', 'k1'], ['S2', 'k2']]);
   const empty = { whyNow: [], specs: [], audience: [], price: [], drivers: [], hesitations: [], hooks: [], formats: [], keywords: [] };
   const output = { ...empty, summary: 'Áo dài trẻ em được hỏi giá nhiều', trendStatus: 'peaking', trendReason: 'Nhiều video mới', trendSourceIds: ['S1'],
@@ -125,7 +125,7 @@ test('TikTok items: posts matching the search keywords come first, then by hot s
 
 test('TikTok keeps Vietnamese videos (and VN hashtag-only ones), drops foreign-language or foreign-origin videos', () => {
   const search = load('lib/services/sourcingSearch.ts', { '@/lib/data/workspace': { industries: [] } });
-  const { normalizeTikTok, isVietnamese } = load('lib/services/sourcingApify.ts', { '@/lib/services/sourcingSearch': search });
+  const { normalizeTikTok, isVietnamese } = load('lib/services/sourcingApify.ts', { '@/lib/services/sourcingSearch': search, '@/lib/services/sourcingOccasions': {} });
   const now = new Date('2026-11-14T00:00:00Z');
   const raw = (id, extra) => ({ id, text: `video ${id}`, webVideoUrl: `https://www.tiktok.com/@a/video/${id}`, createTimeISO: '2026-11-13T00:00:00Z', playCount: 100, ...extra });
   const items = [raw('1', { textLanguage: 'vi', locationCreated: 'VN' }), raw('2', { textLanguage: 'un', locationCreated: 'VN' }), raw('3', { textLanguage: 'es', locationCreated: 'BO' }),
@@ -137,7 +137,7 @@ test('TikTok keeps Vietnamese videos (and VN hashtag-only ones), drops foreign-l
 });
 
 test('hot products need sources from at least two different authors', () => {
-  const { parseTikTokReport } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {} });
+  const { parseTikTokReport } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {}, '@/lib/services/sourcingOccasions': {} });
   const ids = new Map([['S1', 'k1'], ['S2', 'k2'], ['S3', 'k3']]);
   const authors = new Map([['k1', 'a'], ['k2', 'a'], ['k3', 'b']]);
   const empty = { whyNow: [], specs: [], audience: [], price: [], drivers: [], hesitations: [], hooks: [], formats: [], keywords: [], hashtags: [], sources: [], caveats: [] };
@@ -152,7 +152,7 @@ test('hot products need sources from at least two different authors', () => {
 });
 
 test('buying intent counts comments that ask price, link, size or how to buy', () => {
-  const { buyingIntentCount } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {} });
+  const { buyingIntentCount } = load('lib/services/sourcingAnalysis.ts', { '@/lib/services/messengerPostgres': {}, '@/lib/services/gemini': {}, '@/lib/services/sourcingRuns': {}, '@/lib/services/sourcingCriteria': {}, '@/lib/services/sourcingPrompts': {}, '@/lib/services/sourcingOccasions': {} });
   const c = text => ({ text, likes: null });
   const items = [{ key: 'a', comments: [c('Áo này giá bao nhiêu vậy shop'), c('xinh quá'), c('cho mình xin link'), c('Ib size M nhé')] }, { key: 'b', comments: [c('đẹp, quá đẹp')] }, { key: 'c' }];
   assert.deepEqual(buyingIntentCount(items), { hits: 3, sources: ['a'] });

@@ -1,11 +1,15 @@
 import type { SourcingComment, SourcingPost } from '@/lib/services/sourcingSearch';
 export interface SourcingCriteria {
-  industry: string; kind: 'tiktok' | 'suppliers'; keywords: string[]; product: string;
+  industry: string; kind: SourcingKind; keywords: string[]; product: string;
   minPrice: number | null; maxPrice: number | null; currency: 'VND'; unit: string;
   quantity: number | null; maxMoq: number | null; region: string;
   required: string; excluded: string; quality: string; leadTime: string; audience: string;
   resultLimit: number;
+  /** Chế độ theo dõi thị trường: tên/fanpage/website đối thủ (tối đa 3) và dịp bán hàng sắp tới (tối đa 2). Lượt cũ không có thì coi là rỗng. */
+  competitors?: string[]; occasions?: string[]; window?: 'w1' | 'm1' | 'm3';
 }
+/** tiktok = khám phá sản phẩm hot, suppliers = tìm nhà cung cấp, market = theo dõi thị trường, tin tức và đối thủ. */
+export type SourcingKind = 'tiktok' | 'suppliers' | 'market';
 export interface SourcingPlan {
   queries: string[]; market: 'VN'; language: 'vi'; days: 7; resultLimit: number;
   maxChargeUsd: number; timeoutSeconds: number;
@@ -17,7 +21,7 @@ export interface SupplierCandidate {
   page?: string;
 }
 export interface SourcingRun {
-  id: string; kind: 'tiktok' | 'suppliers'; status: string; context: Record<string, unknown>;
+  id: string; kind: SourcingKind; status: string; context: Record<string, unknown>;
   result: null | { posts?: SourcingPost[]; candidates?: SupplierCandidate[]; message?: string; duplicateCount?: number; rejectedCount?: number };
   error: string | null; createdAt: number; updatedAt: number;
   analysis?: SourcingAnalysis | null;
@@ -32,6 +36,8 @@ export interface SourcingAnalysis {
   report?: TikTokReport;
   /** Báo cáo tìm nhà cung cấp 4 phần, chỉ có ở lượt Google phân tích từ bản này trở đi. */
   suppliers?: SupplierReport;
+  /** Báo cáo theo dõi thị trường & đối thủ, chỉ có ở lượt market. */
+  market?: MarketReport;
 }
 /** Một nhận định kèm key các bài làm căn cứ; nhận định không có nguồn thật bị loại khi kiểm tra đầu ra AI. */
 export interface SourcingPoint { text: string; sources: string[] }
@@ -69,4 +75,21 @@ export interface SourcingDecision { runId: string; itemKey: string; status: 'sho
 export interface SourcingItem {
   key: string; title: string; url: string; text: string; source: string; collectedAt: string;
   author?: string | null; metrics?: SourcingPost['metrics']; comments?: SourcingComment[]; page?: string; price: number | null; currency: string | null; unit: string | null; moq: number | null; region: string | null;
+}
+export type NewsImpact = 'opportunity' | 'risk' | 'neutral';
+export type ContentFormat = 'post' | 'video' | 'infographic' | 'blog';
+/** Tin thị trường kèm tác động tới shop; sources là key kết quả Google chứa tin. */
+export interface MarketNews { title: string; impact: NewsImpact; detail: string; action: string; sources: string[] }
+/** Dịp bán hàng: ngày do code tính (lịch cố định), góc khai thác do AI đề xuất. */
+export interface MarketOccasion { name: string; date: string; daysLeft: number; angle: string; sources: string[] }
+export interface CompetitorMove { name: string; activity: string; takeaway: string; sources: string[] }
+/** Đề xuất nội dung có thể gửi thẳng sang AI Marketing thành brief nháp. */
+export interface ContentIdea {
+  title: string; format: ContentFormat; angle: string; hook: string; audience: string;
+  keywords: string[]; occasion: string; sources: string[];
+}
+export interface MarketReport {
+  topics: string[]; competitorsTracked: string[];
+  news: MarketNews[]; occasions: MarketOccasion[]; competitors: CompetitorMove[];
+  trends: SourcingPoint[]; keywords: string[]; contentIdeas: ContentIdea[];
 }
