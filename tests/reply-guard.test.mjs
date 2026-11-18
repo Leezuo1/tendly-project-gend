@@ -24,3 +24,19 @@ test('a reply is held when it echoes masked data, or has a link or amount the sh
   assert.match(unsupportedReplyReason('Em gọi [SĐT] nhé', known), /che/);
   assert.equal(unsupportedReplyReason('Dạ shop mở cửa lúc 8 giờ ạ', known), null);
 });
+
+test('with photos in the message, a long digit run (account, ID or phone number) the shop never supplied holds the reply', () => {
+  const known = JSON.stringify({ shop: { phone: '0912345678' }, faq: 'Mã đơn 20240101.' });
+  const withPhotos = { longNumbers: true };
+  assert.match(unsupportedReplyReason('STK của bạn là 0123456789, CCCD 079123456789.', known, withPhotos), /dãy số/);
+  assert.match(unsupportedReplyReason('Số tài khoản 0123 456 789 0 ạ', known, withPhotos), /dãy số/, 'spaces between digits do not hide it');
+  assert.match(unsupportedReplyReason('Số 0123.456.7890', known, withPhotos), /dãy số/);
+  assert.equal(unsupportedReplyReason('Gọi shop số 0912345678 nhé.', known, withPhotos), null, 'the shop\'s own number is fine');
+  assert.equal(unsupportedReplyReason('Gọi shop số 0912 345 678 nhé.', known, withPhotos), null, 'spaced form of the shop\'s own number is fine');
+  assert.equal(unsupportedReplyReason('Mã đơn của bạn là 20240101.', known, withPhotos), null);
+  assert.equal(unsupportedReplyReason('Giá 1.500.000đ ạ', JSON.stringify([{ price: 1500000 }]), withPhotos), null, 'ordinary prices are not long numbers');
+  assert.equal(unsupportedReplyReason('Size 38, màu 02, còn 15 cái ạ', known, withPhotos), null);
+  assert.equal(unsupportedReplyReason('STK của bạn là 0123456789.', known), null, 'text-only messages keep the old rules');
+  assert.equal(unsupportedReplyReason('Còn size 38 39 40 41 ạ', known, withPhotos), null, 'a list of short numbers is not one long number');
+  assert.equal(unsupportedReplyReason('Size 36, 37, 38, 39, 40, 41 đều còn', known, withPhotos), null);
+});

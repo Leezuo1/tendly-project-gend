@@ -17,7 +17,7 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   const latest = messages.at(-1);
   const latestIn = [...messages].reverse().find((m) => m.sender === 'in');
   const latestOut = [...messages].reverse().find((m) => m.sender === 'out');
-  const unanswered = latestIn !== undefined && (!latestOut || (latestIn.timestamp || 0) > (latestOut.timestamp || 0));
+  const unanswered = latestIn !== undefined && (!latestOut || (latestIn.timestamp || 0) > (latestOut.timestamp || 0) || thread.handoff === true);
   const sameQuestion = previous?.analysis?.messageId === latestIn?.id;
   const previousIn = previous && [...previous.messages].reverse().find((m) => m.sender === 'in');
   // Only a newer customer message creates an unread marker; echoes and loaded history do not.
@@ -42,6 +42,10 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     aiUpdatedAt: Math.max(previous?.aiUpdatedAt ?? 0, thread.aiUpdatedAt ?? 0),
     waitingConfirmation: unanswered && thread.waitingConfirmation === true,
     memory: thread.memory || previous?.memory || [],
+    // Server copy wins so a removed label never comes back; previous only covers threads built without the field.
+    staffLabels: thread.staffLabels ?? previous?.staffLabels,
+    // Danh sách từ máy chủ luôn thắng: một ảnh đã gửi bù thì không còn trong danh sách.
+    failedImages: thread.failedImages,
     personalitySummary: thread.personalitySummary || '',
     id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid, viewStartAt: thread.viewStartAt,
       hasOlder: previous?.messenger?.viewStartAt === thread.viewStartAt && previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
@@ -59,7 +63,6 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   };
   if (sameQuestion && previous) {
     base.analysis = previous.analysis;
-    base.threadWho.badgeTag = previous.threadWho.badgeTag;
     base.profile.tags = previous.profile.tags;
     base.tags = previous.tags.filter((t) => unanswered || t.kind !== 'priority');
     base.isUrgent = unanswered && Boolean(previous.isUrgent);
@@ -77,6 +80,8 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     merged = unanswered ? restored : { ...restored, isUnreplied: false, isUrgent: false, aiSuggestion: undefined,
       tags: restored.tags.filter((t) => t.kind !== 'priority') };
   }
+  // Tin mẫu báo khách đã gửi rồi: không gợi ý lại để nhân viên khỏi gửi trùng.
+  if (merged.analysis?.imageOutcome && latestIn && latestOut && (latestOut.timestamp || 0) > (latestIn.timestamp || 0)) merged = { ...merged, aiSuggestion: undefined };
   if (merged.aiSuggestion && thread.sourceContext && (merged.aiSuggestion.sourceFingerprint || thread.sourceContext.sources.length)
     && merged.aiSuggestion.sourceFingerprint !== thread.sourceContext.fingerprint) {
     return { ...merged, aiSuggestion: undefined, aiStatus: 'error', aiError: 'Nguồn hoặc ưu đãi đã thay đổi. Tạo lại gợi ý trước khi gửi.' };

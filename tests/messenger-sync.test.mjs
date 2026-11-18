@@ -18,7 +18,7 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/015-marketing-workspace.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
-  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql']) {
+  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql', '024-shop-catalog.sql', '025-conversation-staff-labels.sql', '026-conversation-handoff.sql', '027-shop-product-images.sql']) {
     await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
   }
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
@@ -56,6 +56,9 @@ async function fixture() {
   await db.exec('TRUNCATE messenger_ai_settings, messenger_orders');
   await db.exec('TRUNCATE marketing_workspaces');
   await db.exec('TRUNCATE facebook_comments,live_sessions CASCADE');
+  // A shop_catalog row would replace the approved knowledge AI tests rely on (liveKnowledge); label tests insert their own.
+  await db.exec('TRUNCATE shop_catalog');
+  await db.exec('TRUNCATE shop_product_images');
   const load = loader();
   const writer = load('lib/services/messengerPostgres.ts');
   return { load, writer };
@@ -70,29 +73,34 @@ after(() => { for (const [key, value] of Object.entries(original)) {
 
 async function aiFixture(enabled = true) {
   const { load, writer } = await fixture();
-  const state = { canAutoReply: true, priority: 'normal', sends: 0, beforeReply: async () => {}, beforeTransport: async () => {}, failSend: false, failAi: false, replyText: 'Shop mở cửa lúc 8 giờ.' };
+  const state = { canAutoReply: true, priority: 'normal', sends: 0, beforeReply: async () => {}, beforeTransport: async () => {}, failSend: false, failAi: false, replyText: 'Shop mở cửa lúc 8 giờ.', geminiCalls: 0, bodies: [],
+    imageTransport: async () => new Response(new Uint8Array([65, 66, 67]), { headers: { 'content-type': 'image/jpeg' } }) };
   const knowledge = { shop: { name: 'Shop', email: '', phone: '' },
     productSource: { name: 'Catalog', connected: true, lastSyncedAt: 1 }, products: [],
     faqs: [{ id: 'f1', question: 'Giờ mở cửa?', answer: '8 giờ', tag: '', keywords: [], active: true }], emailTriggers: [] };
   const aiLoad = loader({
     'lib/services/messengerPostgres.ts': { ...load('lib/services/messengerPostgres.ts'), getMessengerPool: () => pool },
+    // Photos are downloaded through state.imageTransport so no test touches the network.
+    'lib/services/imageIntake.ts': { ...load('lib/services/imageIntake.ts'), buildImageInput: (attachments, text) => load('lib/services/imageIntake.ts').buildImageInput(attachments, text, state.imageTransport) },
     'lib/services/gemini.ts': { generateGeminiJson: async (options) => {
+      state.geminiCalls++;
       await state.beforeReply(options);
       if (state.failAi) throw new Error('AI unavailable');
       return { model: 'test', result: options.parse(JSON.stringify({ reply: state.replyText, analysis: {
         sentiment: 'neutral', emotion: 'neutral', priority: state.priority, needsHuman: false,
         reason: state.canAutoReply ? 'Dựa vào FAQ giờ mở cửa.' : 'Thiếu dữ liệu đơn hàng.',
-        canAutoReply: state.canAutoReply,
+        canAutoReply: state.canAutoReply, ...(state.labels ? { labels: state.labels } : {}), ...(state.imageKinds ? { imageKinds: state.imageKinds } : {}),
+        ...(state.photoProductIds ? { photoProductIds: state.photoProductIds } : {}), ...(state.analysisExtra ?? {}),
       } })) };
     } },
     'lib/services/messengerSend.ts': { ...load('lib/services/messengerSend.ts'), sendMessengerMessage: (input) => load('lib/services/messengerSend.ts').sendMessengerMessage(input, { ...pool, query: async (sql, values) => {
       const result = await query(sql, values);
       if (sql.includes('INSERT INTO messenger_outbound_requests')) await state.beforeTransport();
       return result;
-    } }, async () => {
-      state.sends++;
+    } }, async (_url, options) => {
+      state.sends++; state.bodies.push(options.body);
       if (state.failSend) throw new Error('Timeout after sending');
-      return Response.json({ message_id: 'auto-' + state.sends });
+      return state.respond?.(state.sends) ?? Response.json({ message_id: 'auto-' + state.sends });
     }) },
   });
   const service = aiLoad('lib/services/messengerAi.ts');
@@ -312,7 +320,8 @@ test('missing evidence flag, unread attachments and AI errors fail closed with p
     const f = await aiFixture();
     if (mode === 'missing-flag') f.state.canAutoReply = undefined;
     if (mode === 'ai-error') f.state.failAi = true;
-    await f.incoming(mode, mode === 'attachment' ? { attachments: [{ type: 'image', url: 'https://example.com/a.jpg' }] } : {});
+    // Not a photo: readable photos now go through the image path (see the photo tests below).
+    await f.incoming(mode, mode === 'attachment' ? { attachments: [{ type: 'video', url: 'https://example.com/a.mp4' }] } : {});
     if (mode === 'ai-error') await assert.rejects(f.process(), /căn cứ/);
     else await f.process();
     assert.equal(f.state.sends, 0);
@@ -494,6 +503,357 @@ test('Customer Care API previews without persisting or sending, requires confirm
   assert.equal(suggestion.status, 200); assert.equal(f.state.sends, 0);
   assert.equal((await query('SELECT * FROM messenger_analysis_history')).rows.length, 1);
   assert.equal((await route.POST(req('POST', { action: 'suggest', psid: '333', messageId: 'manual-server' }))).status, 409);
+});
+
+// Shop label set for Page 111, stored the way catalog sync stores it, keeping the approved AI knowledge unchanged.
+const setTagRules = (rules) => query(`INSERT INTO shop_catalog(page_id,catalog_json,knowledge_json,updated_at)
+  VALUES('111',$1::json,(SELECT knowledge_json FROM messenger_ai_settings WHERE page_id='111'),1)
+  ON CONFLICT(page_id) DO UPDATE SET catalog_json=EXCLUDED.catalog_json`, [JSON.stringify({ contextTagRules: rules })]);
+const tagRule = (id, label) => ({ id, label, keywords: [], type: 'neutral', enabled: true });
+const labelRequest = (route, body) => route.POST(new Request('http://localhost/api/messenger/conversation', { method: 'POST',
+  headers: { origin: 'http://localhost', Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` }, body: JSON.stringify({ action: 'labels', ...body }) }));
+
+test('staff labels: changes are applied on the server against the shop set, no cap, unknown new label asks to retry, per Page', async () => {
+  const f = await aiFixture(false);
+  const route = f.load('app/api/messenger/conversation/route.ts');
+  await f.incoming('label-1');
+  await setTagRules([tagRule('buy', 'Muốn đặt hàng'), tagRule('delivery', 'Hỏi giao hàng'), ...Array.from({ length: 10 }, (_, i) => tagRule(`r${i}`, `Nhãn ${i}`))]);
+  const change = async (type, id, psid = '222') => labelRequest(route, { psid, change: { type, id } });
+  const labels = async (type, id) => (await (await change(type, id)).json()).staffLabels;
+  let response = await change('add', 'buy');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { staffLabels: { added: ['buy'], hidden: [] } });
+  assert.deepEqual(await labels('hideRule', 'delivery'), { added: ['buy'], hidden: ['delivery'] });
+  assert.deepEqual(await labels('hideRule', 'gone'), { added: ['buy'], hidden: ['delivery'] }, 'unknown id is ignored');
+  assert.deepEqual(await labels('removeStaff', 'buy'), { added: [], hidden: ['delivery', 'buy'] }, 'removing a staff label also hides it, so a matching keyword does not bring it back');
+  assert.deepEqual(await labels('add', 'buy'), { added: ['buy'], hidden: ['delivery'] }, 'adding again clears the hidden mark');
+  response = await change('add', 'khong-co');
+  assert.equal(response.status, 409);
+  assert.match((await response.json()).error, /chưa đồng bộ/);
+  for (let i = 0; i < 10; i++) assert.equal((await change('add', `r${i}`)).status, 200, 'no cap on applied labels: all 12 of the shop set fit');
+  assert.equal((await labels('add', 'delivery')).added.length, 12);
+  assert.equal((await change('add', 'buy')).status, 200, 'adding a label that is already there is a no-op');
+  for (const bad of [{ type: 'drop', id: 'buy' }, { type: 'add' }, { type: 'add', id: 5 }, 'add', undefined]) assert.equal((await labelRequest(route, { psid: '222', change: bad })).status, 400);
+  assert.equal((await labelRequest(route, { psid: '222', added: ['buy'], hidden: [] })).status, 400, 'the old whole-state body is refused');
+  // A rule deleted elsewhere never blocks or undoes another change: it is dropped on the server, and a stale tab only sends the one change it made.
+  await setTagRules([tagRule('buy', 'Muốn đặt hàng'), tagRule('delivery', 'Hỏi giao hàng'), ...Array.from({ length: 8 }, (_, i) => tagRule(`r${i}`, `Nhãn ${i}`))]); // r8, r9 deleted
+  const kept = await labels('hideRule', 'returns');
+  assert.ok(!kept.added.includes('r8') && !kept.added.includes('r9') && kept.added.includes('delivery') && kept.added.includes('r0'), 'other devices\' labels survive, deleted ones are dropped');
+  await f.writer.savePostgresMessages([m('label-other', { psid: '333', timestamp: Date.now() - 10 })], pool);
+  const snapshot = await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool);
+  assert.deepEqual(snapshot.conversations.find(thread => thread.psid === '222').staffLabels, kept);
+  assert.deepEqual(snapshot.conversations.find(thread => thread.psid === '333').staffLabels, { added: [], hidden: [] });
+  const { mergeMessengerThread } = f.load('lib/services/messengerView.ts');
+  const thread = snapshot.conversations.find(item => item.psid === '222');
+  const stale = { ...mergeMessengerThread(thread), staffLabels: { added: ['delivery'], hidden: [] } };
+  assert.deepEqual(mergeMessengerThread(thread, stale).staffLabels, kept, 'server labels win over the previous view');
+  assert.deepEqual(mergeMessengerThread({ ...thread, staffLabels: undefined }, stale).staffLabels, stale.staffLabels, 'a thread without the field keeps the previous labels');
+  assert.equal((await change('add', 'buy', '444')).status, 404, 'no such conversation on this Page');
+  await query('UPDATE messenger_conversations SET hidden_at=1');
+  assert.equal((await change('add', 'buy')).status, 404, 'hidden conversation');
+});
+
+test('a reply that names a staff label is held for review, never auto-sent', async () => {
+  const f = await aiFixture(true);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  const conversation = f.load('app/api/messenger/conversation/route.ts');
+  await f.incoming('label-ok');
+  await setTagRules([tagRule('bom', 'Khách bom hàng')]);
+  assert.equal((await labelRequest(conversation, { psid: '222', change: { type: 'add', id: 'bom' } })).status, 200);
+  f.state.replyText = 'Shop mở cửa lúc 8 giờ.';
+  await f.process();
+  assert.equal(f.state.sends, 1, 'a reply that does not name the label still sends');
+  f.state.replyText = 'Dạ vì bạn là khach bom hang nên shop xin phép từ chối.';
+  await f.incoming('label-leak', { timestamp: Date.now() + 5 }); await f.process();
+  assert.equal(f.state.sends, 1, 'a reply naming the label is not sent');
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='label-leak'")).rows[0].status, 'review');
+});
+
+test('AI reads staff labels by name (masked) and picks up to 3 labels from the shop set, on the webhook run and the re-analyse button', async () => {
+  const f = await aiFixture(false);
+  const conversation = f.load('app/api/messenger/conversation/route.ts'), care = f.load('app/api/customer-care/route.ts');
+  const suggest = () => care.POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
+    body: JSON.stringify({ action: 'suggest', psid: '222', messageId: 'ai-label-1' }) }));
+  await f.incoming('ai-label-1');
+  await setTagRules([{ ...tagRule('call', 'Gọi lại 0912345678'), type: 'risk', context: 'Gọi 0912345678 sau 5 giờ chiều' },
+    { ...tagRule('si', 'Khách sỉ'), context: 'Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ.' }, tagRule('buy', 'Muốn đặt hàng')]);
+  for (const id of ['si', 'call']) assert.equal((await labelRequest(conversation, { psid: '222', change: { type: 'add', id } })).status, 200);
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options); };
+  f.state.labels = ['buy', 'khong-co', 'buy'];
+  await f.process();
+  const applied = '"staffLabels":[{"label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"label":"Gọi lại [SĐT]","context":"Gọi [SĐT] sau 5 giờ chiều"}]';
+  assert.ok(seen[0].user.includes(applied), 'each applied label reaches the AI with its context, in the order applied, masked');
+  assert.ok(seen[0].user.includes('"labelOptions":[{"id":"call","label":"Gọi lại [SĐT]","context":"Gọi [SĐT] sau 5 giờ chiều"},{"id":"si","label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"id":"buy","label":"Muốn đặt hàng"}]'), 'options carry the context too, none when empty');
+  assert.doesNotMatch(seen[0].user, /0912345678/);
+  assert.ok(seen[0].system.includes('staffLabels là các nhãn nhân viên đã dán') && seen[0].system.includes('Đọc context để hiểu khách đang ở tình huống nào'));
+  assert.ok(seen[0].system.includes('labelOptions là bộ nhãn của shop'));
+  assert.deepEqual((await query('SELECT analysis FROM messenger_analysis_history')).rows[0].analysis.labels, ['buy'], 'unknown ids dropped, deduplicated');
+  assert.equal((await suggest()).status, 200);
+  assert.ok(seen.at(-1).user.includes(applied), 're-analyse button passes labels too');
+  await setTagRules([{ ...tagRule('call', 'Gọi lại 0912345678'), type: 'risk' }]);
+  await suggest();
+  assert.ok(seen.at(-1).user.includes('"staffLabels":[{"label":"Gọi lại [SĐT]"}]'), 'a label deleted from the set is no longer sent; a label without context sends its name only');
+  await setTagRules([]);
+  f.state.labels = undefined;
+  await suggest();
+  assert.doesNotMatch(seen.at(-1).user, /staffLabels|labelOptions/);
+  assert.equal((await query('SELECT analysis FROM messenger_analysis_history')).rows[0].analysis.labels, undefined);
+  const { parseAiAnalysis } = f.load('lib/services/aiAnalysis.ts');
+  assert.deepEqual(parseAiAnalysis({ sentiment: 'neutral', emotion: 'neutral', priority: 'normal', needsHuman: false, reason: 'x',
+    labels: ['a', 'b', 'a', 'c', 'd', ''] }).labels, ['a', 'b', 'c']);
+});
+
+// --- Photos the customer sends (design: 2026-11-17-ai-chat-image-understanding) ---
+const photo = { type: 'image', url: 'https://scontent.xx.fbcdn.net/v/p.jpg' };
+const enableAutoReply = async (f) => {
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+};
+const sentTexts = async () => (await query("SELECT text FROM messenger_outbound_requests WHERE status='sent' ORDER BY created_at")).rows.map(row => row.text);
+const jobStatus = async (id) => (await query('SELECT status FROM messenger_ai_jobs WHERE message_id=$1', [id])).rows[0]?.status;
+const savedAnalysis = async (id) => (await query('SELECT analysis FROM messenger_analysis_history WHERE message_id=$1', [id])).rows[0]?.analysis;
+
+test('a product photo is answered like text and may be sent automatically', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options); };
+  f.state.imageKinds = ['product'];
+  f.state.replyText = 'Mình có Áo thun basic AT-01 ạ, bạn muốn xem size nào?';
+  await f.incoming('photo-product', { text: '', attachments: [photo] }); await f.process();
+  assert.equal(f.state.sends, 1);
+  assert.deepEqual(await sentTexts(), [f.state.replyText]);
+  assert.equal(seen[0].images.length, 1);
+  assert.deepEqual(seen[0].images[0], { mimeType: 'image/jpeg', data: 'QUJD' });
+  assert.ok(seen[0].system.includes('Khách có gửi ảnh') && seen[0].system.includes('analysis.imageKinds'));
+  assert.match(seen[0].user, /"imageCount":1/);
+  const analysis = await savedAnalysis('photo-product');
+  assert.deepEqual(analysis.imageKinds, ['product']);
+  assert.equal(analysis.imageOutcome, undefined);
+  assert.equal(await jobStatus('photo-product'), 'sent');
+});
+
+test('a product-photo reply that repeats a long number read from the image is held for review, not sent', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  f.state.imageKinds = ['product'];
+  f.state.replyText = 'Số tài khoản trên ảnh là 0123456789, đúng không ạ?';
+  await f.incoming('photo-number', { text: '', attachments: [photo] }); await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal(await jobStatus('photo-number'), 'review');
+  assert.match((await savedAnalysis('photo-number')).reason, /dãy số/);
+  // The same words typed by the customer themselves (a text message with no photo) keep the old rules.
+  const text = await aiFixture(true); await enableAutoReply(text);
+  text.state.replyText = 'Mình đã nhận số 0123456789 bạn gửi ạ.';
+  await text.incoming('typed-number', { text: 'Số của mình là 0123456789' }); await text.process();
+  assert.equal(text.state.sends, 1);
+});
+
+test('defect, receipt and other_support photos send the handoff template', async () => {
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  for (const kind of ['defect', 'receipt', 'other_support']) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    f.state.imageKinds = [kind];
+    f.state.replyText = 'Câu do model viết: shop hoàn tiền 100% ngay.';
+    await f.incoming(`photo-${kind}`, { text: '', attachments: [photo] }); await f.process();
+    assert.deepEqual(await sentTexts(), [HANDOFF_REPLY], kind);
+    const analysis = await savedAnalysis(`photo-${kind}`);
+    assert.deepEqual([analysis.imageOutcome, analysis.needsHuman, analysis.priority], ['handoff', true, 'high'], kind);
+    assert.equal(await jobStatus(`photo-${kind}`), 'sent', kind);
+  }
+});
+
+test('an unrelated photo alone gets the one-line decline; with a text question it is answered normally', async () => {
+  const { DECLINE_REPLY } = loader()('lib/services/imageIntake.ts');
+  const alone = await aiFixture(true); await enableAutoReply(alone);
+  alone.state.imageKinds = ['unrelated'];
+  await alone.incoming('photo-meme', { text: '', attachments: [photo] }); await alone.process();
+  assert.deepEqual(await sentTexts(), [DECLINE_REPLY]);
+  assert.equal((await savedAnalysis('photo-meme')).imageOutcome, 'decline');
+  const withText = await aiFixture(true); await enableAutoReply(withText);
+  withText.state.imageKinds = ['unrelated'];
+  await withText.incoming('photo-text', { text: 'Shop mở cửa mấy giờ?', attachments: [photo] }); await withText.process();
+  assert.deepEqual(await sentTexts(), ['Shop mở cửa lúc 8 giờ.']);
+});
+
+test('an unreadable photo (foreign host, download error, more than 3) hands off without calling Gemini', async () => {
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  const cases = { 'foreign host': [{ type: 'image', url: 'https://evilfbcdn.net/p.jpg' }], 'download error': [photo], 'four photos': [photo, photo, photo, photo] };
+  for (const [name, attachments] of Object.entries(cases)) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    if (name === 'download error') f.state.imageTransport = async () => { throw new Error('network'); };
+    f.state.imageKinds = ['product'];
+    await f.incoming('photo-bad', { text: '', attachments }); await f.process();
+    assert.equal(f.state.geminiCalls, 0, name);
+    assert.deepEqual(await sentTexts(), [HANDOFF_REPLY], name);
+    assert.equal((await savedAnalysis('photo-bad')).imageOutcome, 'handoff', name);
+  }
+});
+
+test('wrong imageKinds from the model fail closed to the handoff template', async () => {
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  for (const kinds of [[], ['product', 'product'], undefined]) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    f.state.imageKinds = kinds;
+    await f.incoming('photo-kinds', { text: '', attachments: [photo] }); await f.process();
+    assert.deepEqual(await sentTexts(), [HANDOFF_REPLY], JSON.stringify(kinds));
+  }
+});
+
+test('stickers, video and mixed attachments keep the old behaviour: held for review, nothing sent', async () => {
+  const cases = { sticker: [{ ...photo, sticker: true }], video: [{ type: 'video', url: 'https://example.com/a.mp4' }], mixed: [photo, { type: 'video', url: 'https://example.com/a.mp4' }] };
+  for (const [name, attachments] of Object.entries(cases)) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    f.state.imageKinds = ['product'];
+    await f.incoming(`att-${name}`, { text: '', attachments }); await f.process();
+    assert.equal(f.state.sends, 0, name);
+    assert.equal(await jobStatus(`att-${name}`), 'review', name);
+    assert.equal(f.state.geminiCalls, 1, `${name}: still analysed as text`);
+  }
+});
+
+test('the re-analyse button reads photos too and never sends', async () => {
+  const f = await aiFixture(true);
+  const care = f.load('app/api/customer-care/route.ts');
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options); };
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('photo-suggest', { text: '', attachments: [photo] });
+  const response = await care.POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
+    body: JSON.stringify({ action: 'suggest', psid: '222', messageId: 'photo-suggest' }) }));
+  assert.equal(response.status, 200);
+  assert.equal(seen[0].images.length, 1);
+  assert.equal(f.state.sends, 0);
+  assert.equal((await response.json()).reply.analysis.imageOutcome, 'handoff');
+});
+
+test('prompt rewording: readable photos are not "unverified files" that must always go to staff', async () => {
+  const f = await aiFixture(false);
+  const { EMOTION_RESPONSE_PROMPT } = f.load('lib/services/aiAnalysis.ts');
+  const care = f.load('lib/services/customerCare.ts');
+  const text = care.buildCustomerCarePrompt(f.knowledge, f.profile, null, undefined, false);
+  const images = care.buildCustomerCarePrompt(f.knowledge, f.profile, null, undefined, true);
+  assert.ok(!EMOTION_RESPONSE_PROMPT.includes('chỉ có tệp đính kèm hoặc'));
+  assert.ok(!images.includes('Tệp chưa được xác minh phải để nhân viên kiểm tra'));
+  assert.ok(images.includes('Tệp không phải ảnh khách gửi thì để nhân viên kiểm tra'));
+  assert.ok(images.includes('analysis.imageKinds') && !text.includes('analysis.imageKinds'), 'the image block only appears when photos are present');
+});
+
+// --- A photo that needs staff keeps the conversation in the unanswered queue until someone else replies ---
+const handoffThread = async (f) => (await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool)).conversations.find(thread => thread.psid === '222');
+
+test('handoff keeps the conversation in the unanswered queue after the template is sent, and any other outbound message closes it', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  const view = f.load('lib/services/messengerView.ts'), count = f.load('lib/services/messengerCount.ts');
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('ho-1', { text: '', attachments: [photo] }); await f.process();
+  assert.deepEqual(await sentTexts(), [HANDOFF_REPLY]);
+  const notice = (await query("SELECT request_id,message_id FROM messenger_outbound_requests WHERE status='sent'")).rows[0];
+  const row = (await query('SELECT handoff_message_id,handoff_request_id,last_out_at FROM messenger_conversations')).rows[0];
+  assert.deepEqual([row.handoff_message_id, row.handoff_request_id], ['ho-1', notice.request_id], 'the request id is stored before sending, so the notice\'s own echo cannot close the handoff');
+  assert.ok(row.last_out_at, 'the notice counts as an outbound message');
+  let thread = await handoffThread(f);
+  assert.deepEqual([thread.handoff, thread.waitingConfirmation], [true, true]);
+  assert.equal(await count.readUnrepliedCount('111', pool), 1);
+  const conversation = view.mergeMessengerThread(thread);
+  assert.deepEqual([conversation.isUnreplied, conversation.waitingConfirmation, conversation.isUrgent], [true, true, true]);
+  assert.equal(conversation.aiSuggestion, undefined, 'the template was already sent, so it is not offered again');
+  // The echo of the notice itself (same message id) does not close it.
+  await f.writer.savePostgresMessages([m(notice.message_id, { direction: 'out', timestamp: Date.now() + 5, text: HANDOFF_REPLY })], pool);
+  assert.equal((await handoffThread(f)).handoff, true);
+  assert.equal(await count.readUnrepliedCount('111', pool), 1);
+  // Any other outbound message (from Tendly or from the Page inbox, which arrives as an echo) closes it.
+  await f.writer.savePostgresMessages([m('staff-reply', { direction: 'out', timestamp: Date.now() + 1000, text: 'Shop xử lý giúp bạn ạ.' })], pool);
+  thread = await handoffThread(f);
+  assert.deepEqual([thread.handoff, thread.waitingConfirmation], [false, false]);
+  assert.equal(await count.readUnrepliedCount('111', pool), 0);
+  assert.equal(view.mergeMessengerThread(thread).isUnreplied, false);
+});
+
+test('the notice never closes its own handoff, even when Meta\'s answer was not recorded on the request (timeout, no message_id, failed save)', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  const count = f.load('lib/services/messengerCount.ts');
+  f.state.imageKinds = ['defect'];
+  await f.incoming('ho-lost', { text: '', attachments: [photo] }); await f.process();
+  assert.deepEqual(await sentTexts(), [HANDOFF_REPLY]);
+  await query('UPDATE messenger_outbound_requests SET message_id=NULL');
+  assert.equal((await handoffThread(f)).handoff, true, 'the notice (and its echo) is recognised by its fixed text');
+  assert.equal(await count.readUnrepliedCount('111', pool), 1);
+  await f.writer.savePostgresMessages([m('staff-late', { direction: 'out', timestamp: Date.now() + 1000, text: 'Shop đã nhận ảnh và đang xử lý ạ.' })], pool);
+  assert.equal((await handoffThread(f)).handoff, false, 'a real reply still closes it');
+  assert.equal(await count.readUnrepliedCount('111', pool), 0);
+});
+
+test('while a handoff is open, AI does not auto-send for later customer messages; after staff replies it sends again', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  f.state.imageKinds = ['defect'];
+  await f.incoming('ho-a', { text: '', attachments: [photo] }); await f.process();
+  assert.equal(f.state.sends, 1);
+  f.state.imageKinds = undefined; f.state.replyText = 'Dạ shop cảm ơn bạn ạ.';
+  await f.incoming('ho-b', { timestamp: Date.now() + 50 }); await f.process();
+  assert.equal(f.state.sends, 1, 'held while the handoff is open');
+  assert.equal(await jobStatus('ho-b'), 'review');
+  await f.incoming('ho-c', { text: '', attachments: [photo], timestamp: Date.now() + 60 });
+  f.state.imageKinds = ['receipt']; await f.process();
+  assert.equal(f.state.sends, 1, 'a second photo does not send a second notice');
+  assert.equal(await jobStatus('ho-c'), 'review');
+  await f.writer.savePostgresMessages([m('staff-reply-2', { direction: 'out', timestamp: Date.now() + 1000, text: 'Shop đã xử lý ạ.' })], pool);
+  f.state.imageKinds = undefined;
+  await f.incoming('ho-d', { timestamp: Date.now() + 2000 }); await f.process();
+  assert.equal(f.state.sends, 2, 'automatic replies resume once staff has answered');
+});
+
+test('an open handoff never lets a model-written reply go out for the same photo, even if a re-run classifies it differently', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  // The conversation switch is off when the photo arrives: the handoff is marked, the job stays "ready", nothing is sent.
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('ho-race', { text: '', attachments: [photo] });
+  await query('UPDATE messenger_conversations SET ai_auto_reply=false');
+  await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT handoff_message_id FROM messenger_conversations')).rows[0].handoff_message_id, 'ho-race');
+  assert.equal(await jobStatus('ho-race'), 'ready');
+  // The shop turns the switch on and the same message is analysed again; this time the model calls the photo a product.
+  await query('UPDATE messenger_conversations SET ai_auto_reply=true');
+  f.state.imageKinds = ['product']; f.state.replyText = 'Mình có Áo thun basic AT-01 ạ.';
+  await f.process();
+  assert.equal(f.state.sends, 0, 'only the fixed template may leave while the handoff is open');
+  assert.equal(await jobStatus('ho-race'), 'review');
+});
+
+test('with the conversation switch off no template is sent, but the handoff flag is still set and the template is only a suggestion', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('ho-off', { text: '', attachments: [photo] });
+  await query('UPDATE messenger_conversations SET ai_auto_reply=false');
+  await f.process();
+  assert.equal(f.state.sends, 0);
+  const thread = await handoffThread(f);
+  assert.equal(thread.handoff, true);
+  const conversation = f.load('lib/services/messengerView.ts').mergeMessengerThread(thread);
+  assert.equal(conversation.isUnreplied, true);
+  assert.equal(conversation.aiSuggestion.text, HANDOFF_REPLY);
+});
+
+test('a product photo never sets the handoff flag, and the re-analyse button marks a handoff without sending', async () => {
+  const product = await aiFixture(true); await enableAutoReply(product);
+  product.state.imageKinds = ['product'];
+  await product.incoming('ho-product', { text: '', attachments: [photo] }); await product.process();
+  assert.equal((await query('SELECT handoff_message_id FROM messenger_conversations')).rows[0].handoff_message_id, null);
+  assert.equal((await handoffThread(product)).handoff, false);
+  const f = await aiFixture(true);
+  const care = f.load('app/api/customer-care/route.ts');
+  f.state.imageKinds = ['defect'];
+  await f.incoming('ho-suggest', { text: '', attachments: [photo] });
+  const response = await care.POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
+    body: JSON.stringify({ action: 'suggest', psid: '222', messageId: 'ho-suggest' }) }));
+  assert.equal(response.status, 200);
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT handoff_message_id FROM messenger_conversations')).rows[0].handoff_message_id, 'ho-suggest');
+  assert.equal((await handoffThread(f)).handoff, true);
 });
 
 async function sourceFixture() {
@@ -933,6 +1293,53 @@ test('Meta rejection keeps conversation awaiting reply; database failure after M
   assert.equal(result.message.messageId, 'already-sent');
 });
 
+const IMAGE_REQUEST = { psid: '222', text: '', requestId: '55555555-5555-4555-8555-555555555555',
+  image: { data: Uint8Array.from([0xff, 0xd8, 0xff, 1, 2]), mime: 'image/jpeg', label: 'img-1' } };
+
+test('image send posts multipart filedata with the message JSON, is idempotent and is saved with an image attachment', async () => {
+  const { load, writer } = await fixture();
+  await writer.savePostgresMessages([m('customer')], pool);
+  const { sendMessengerMessage } = load('lib/services/messengerSend.ts');
+  const calls = [];
+  const transport = async (url, options) => { calls.push({ url, options }); return Response.json({ recipient_id: '222', message_id: 'meta-img' }); };
+  const sent = await sendMessengerMessage(IMAGE_REQUEST, pool, transport);
+  assert.match(calls[0].url, /\/111\/messages$/);
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer test-page-token');
+  assert.equal(calls[0].options.headers['Content-Type'], undefined, 'fetch sets the multipart boundary itself');
+  const form = calls[0].options.body;
+  assert.ok(form instanceof FormData);
+  assert.deepEqual(JSON.parse(form.get('recipient')), { id: '222' });
+  assert.equal(form.get('messaging_type'), 'RESPONSE');
+  assert.deepEqual(JSON.parse(form.get('message')), { attachment: { type: 'image', payload: {} } }, 'no is_reusable');
+  assert.equal(form.get('filedata').type, 'image/jpeg');
+  assert.equal(form.get('filedata').size, 5);
+  assert.equal(sent.message.text, '');
+  assert.deepEqual(sent.message.attachments, [{ type: 'image' }]);
+  const row = (await query('SELECT * FROM messenger_outbound_requests')).rows[0];
+  assert.equal(row.text, '[ảnh] img-1'); assert.equal(row.status, 'sent');
+  assert.deepEqual((await query("SELECT attachments_json FROM messenger_messages WHERE direction='out'")).rows[0].attachments_json, [{ type: 'image' }]);
+  const again = await sendMessengerMessage(IMAGE_REQUEST, pool, transport);
+  assert.equal(calls.length, 1, 'the same request never sends twice');
+  assert.deepEqual(again.message.attachments, [{ type: 'image' }]);
+  await assert.rejects(sendMessengerMessage({ ...IMAGE_REQUEST, image: { ...IMAGE_REQUEST.image, label: 'img-2' } }, pool, transport), /Mã yêu cầu/);
+});
+
+test('image send obeys the 24 hour window and records Meta failures as failed or unknown', async () => {
+  const { load, writer } = await fixture();
+  await writer.savePostgresMessages([m('customer')], pool);
+  const { sendMessengerMessage } = load('lib/services/messengerSend.ts');
+  let calls = 0; const bodies = [];
+  const reject = (status) => async (_url, options) => { calls++; bodies.push(options.body); return new Response('{}', { status }); };
+  await assert.rejects(sendMessengerMessage(IMAGE_REQUEST, pool, reject(400)), /từ chối/);
+  assert.equal((await query('SELECT status FROM messenger_outbound_requests')).rows[0].status, 'failed');
+  await assert.rejects(sendMessengerMessage({ ...IMAGE_REQUEST, requestId: '66666666-6666-4666-8666-666666666666' }, pool, reject(502)), /chưa xác nhận/);
+  assert.deepEqual((await query('SELECT status FROM messenger_outbound_requests ORDER BY created_at, request_id')).rows.map(row => row.status).sort(), ['failed', 'unknown']);
+  await query('UPDATE messenger_conversations SET last_in_at=$1', [Date.now() - 25 * 60 * 60 * 1000]);
+  await assert.rejects(sendMessengerMessage({ ...IMAGE_REQUEST, requestId: '77777777-7777-4777-8777-777777777777' }, pool, reject(200)), /24 giờ/);
+  assert.equal(calls, 2, 'the expired window never reaches Meta');
+  assert.ok(bodies.every(body => body instanceof FormData), 'failures are judged on the multipart image request');
+});
+
 test('dashboard APIs deny missing code, validate send input, and return stored messages with no secret', async () => {
   const { load, writer } = await fixture();
   await writer.savePostgresMessages([m('customer')], pool);
@@ -1092,4 +1499,195 @@ test('profile requests are bounded, leased across simultaneous polls, and unsafe
   assert.equal(first.conversations.filter((thread) => thread.customer.name).length, 3);
   assert.equal(first.conversations[0].customer.avatarUrl, null);
   assert.equal((await read.readMessengerInbox('111', 100, pool)).conversations.filter((thread) => thread.customer.status === 'pending').length, 2);
+});
+
+const PHOTO_PRODUCT = { id: 'p1', sku: 'AT-01', name: 'Áo thun Đen Basic', material: '', category: 'Áo', colors: [], sizes: [], qty: 5, price: 199000 };
+const PHOTOS = [{ productId: 'p1', name: PHOTO_PRODUCT.name, sku: 'AT-01', imageIds: ['img-a', 'img-b'] }, { productId: 'p2', name: 'Đầm hoa', sku: 'DM-02', imageIds: ['img-c'] }];
+async function photoReply(f, photos, options = {}) {
+  const seen = [];
+  f.state.beforeReply = async (request) => { seen.push(request); };
+  const knowledge = { ...f.knowledge, products: [PHOTO_PRODUCT] };
+  const reply = await f.load('lib/services/customerCare.ts').generateCareReply(knowledge, options.profile ?? f.profile, null, 'Cho mình xem ảnh áo thun nhé',
+    [], options.sources, null, undefined, options.images, photos);
+  return { reply, seen };
+}
+
+test('model-picked photos are kept only for products the reply names, rotated and capped at 3 images', async () => {
+  const f = await aiFixture(true);
+  f.state.photoProductIds = ['p1', 'p2'];
+  f.state.replyText = 'Dạ mẫu Áo thun Đen Basic và Đầm hoa đều đang có ạ.';
+  const { reply, seen } = await photoReply(f, PHOTOS);
+  assert.deepEqual(reply.analysis.photoImageIds, ['img-a', 'img-c', 'img-b']);
+  assert.equal(reply.analysis.photoProductIds, undefined, 'the model-facing field never leaves generateCareReply');
+  assert.deepEqual(JSON.parse(seen[0].user).shopPhotos, [{ productId: 'p1', name: 'Áo thun Đen Basic' }, { productId: 'p2', name: 'Đầm hoa' }]);
+  assert.ok(seen[0].system.includes('photoProductIds') && seen[0].system.includes('mặc định KHÔNG chọn'));
+});
+
+test('a reply that does not name the picked product sends no photos, and unknown ids are ignored', async () => {
+  const f = await aiFixture(true);
+  f.state.photoProductIds = ['p1', 'zzz'];
+  f.state.replyText = 'Dạ còn hàng size M ạ.';
+  const { reply } = await photoReply(f, PHOTOS);
+  assert.equal(reply.analysis.photoImageIds, undefined);
+  f.state.photoProductIds = ['zzz']; f.state.replyText = 'Dạ mẫu Áo thun Đen Basic còn ạ.';
+  assert.equal((await photoReply(f, PHOTOS)).reply.analysis.photoImageIds, undefined);
+});
+
+test('without candidates, or with the products source off, nothing about photos reaches the model or the result', async () => {
+  const f = await aiFixture(true);
+  f.state.photoProductIds = ['p1']; f.state.analysisExtra = { photoImageIds: ['evil'] }; f.state.replyText = 'Mẫu Áo thun Đen Basic ạ.';
+  for (const [photos, options] of [[[], {}], [PHOTOS, { profile: { ...f.profile, sources: ['shop', 'faqs', 'conversation'] } }]]) {
+    const { reply, seen } = await photoReply(f, photos, options);
+    assert.ok(!seen[0].user.includes('shopPhotos') && !seen[0].system.includes('photoProductIds'));
+    assert.equal(reply.analysis.photoImageIds, undefined, 'a model-supplied photoImageIds is never copied');
+    assert.equal(reply.analysis.photoProductIds, undefined);
+  }
+});
+
+test('photos are decided on the final reply: the fixed source-blocked template and image handoff carry none', async () => {
+  const f = await aiFixture(true);
+  f.state.photoProductIds = ['p1']; f.state.replyText = 'Mẫu Áo thun Đen Basic ạ.';
+  const blocked = { blocked: true, resolution: 'ambiguous', sources: [], selectedId: null, fingerprint: 'f', issues: [] };
+  const template = await photoReply(f, PHOTOS, { sources: blocked });
+  assert.match(template.reply.reply, /Bạn đang hỏi về bài đăng/);
+  assert.equal(template.reply.analysis.photoImageIds, undefined);
+  f.state.imageKinds = ['receipt'];
+  const images = { images: [{ mimeType: 'image/jpeg', data: 'QUJD' }], count: 1, hasText: false, unreadable: false };
+  const handoff = await photoReply(f, PHOTOS, { images });
+  assert.equal(handoff.reply.analysis.imageOutcome, 'handoff');
+  assert.equal(handoff.reply.analysis.photoImageIds, undefined);
+});
+
+// saveMessengerAiSettings never replaces the approved knowledge snapshot, so the product goes in directly.
+const withPhotoProduct = (f) => query('UPDATE messenger_ai_settings SET knowledge_json=$1::jsonb', [JSON.stringify({ ...f.knowledge, products: [PHOTO_PRODUCT] })]);
+async function photoShop(f) {
+  await enableAutoReply(f); await withPhotoProduct(f);
+  const { addProductImage } = f.load('lib/services/productImages.ts');
+  const ids = [];
+  for (const fill of [1, 2, 3]) ids.push((await addProductImage('111', 'p1', Uint8Array.from([0xff, 0xd8, 0xff, fill, fill]), pool)).id);
+  return ids;
+}
+const asked = (extra = {}) => ({ text: 'Cho mình xem ảnh áo thun Đen Basic nhé', ...extra });
+const outbound = async () => (await query('SELECT request_id,text,status FROM messenger_outbound_requests ORDER BY request_id')).rows;
+const NAMING_REPLY = 'Dạ mẫu Áo thun Đen Basic đây ạ, bạn xem nhé.';
+
+test('after the text the chosen photos follow in order, one request each, and the job reflects only the text', async () => {
+  const f = await aiFixture(true); const ids = await photoShop(f);
+  f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  await f.incoming('ask', asked()); await f.process();
+  assert.equal(f.state.sends, 4);
+  assert.equal(typeof f.state.bodies[0], 'string');
+  assert.ok(f.state.bodies.slice(1).every(body => body instanceof FormData), 'photos are multipart uploads');
+  const rows = await outbound();
+  assert.deepEqual(rows.map(row => row.text), [NAMING_REPLY, ...ids.map(id => '[ảnh] ' + id)]);
+  assert.deepEqual(rows.slice(1).map(row => row.request_id), [1, 2, 3].map(n => `${rows[0].request_id}:img:${n}`));
+  assert.ok(rows.every(row => row.status === 'sent'));
+  assert.equal(await jobStatus('ask'), 'sent');
+  assert.deepEqual((await savedAnalysis('ask')).photoImageIds, ids);
+});
+
+test('a photo already sent in this conversation is not offered or sent again on the next turn', async () => {
+  const f = await aiFixture(true); await photoShop(f);
+  f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  await f.incoming('ask', asked()); await f.process();
+  assert.equal(f.state.sends, 4);
+  const seen = []; f.state.beforeReply = async (options) => { seen.push(options); };
+  await f.incoming('again', asked({ timestamp: Date.now() + 1000 })); await f.process();
+  assert.equal(JSON.parse(seen[0].user).shopPhotos, undefined, 'all images of the product were sent, so none is offered');
+  assert.equal(f.state.sends, 5, 'only the text goes out the second time');
+});
+
+test('a photo failing stops the later photos but the job stays sent and the next customer message is still auto-replied', async () => {
+  const f = await aiFixture(true); await photoShop(f);
+  f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  f.state.respond = (n) => n === 3 ? new Response('{}', { status: 400 }) : undefined;
+  await f.incoming('ask', asked()); await f.process();
+  assert.equal(f.state.sends, 3, 'the third photo is never attempted');
+  assert.deepEqual((await outbound()).map(row => row.status), ['sent', 'sent', 'failed']);
+  assert.equal(await jobStatus('ask'), 'sent');
+  f.state.respond = undefined; f.state.photoProductIds = undefined; f.state.replyText = 'Shop mở cửa lúc 8 giờ.';
+  await f.incoming('next', { text: 'Giờ mở cửa?', timestamp: Date.now() + 1000 }); await f.process();
+  assert.equal(f.state.sends, 4);
+  assert.equal(await jobStatus('next'), 'sent');
+});
+
+test('a customer message arriving after the text stops the remaining photos', async () => {
+  const f = await aiFixture(true); await photoShop(f);
+  f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  let reservations = 0;
+  f.state.beforeTransport = async () => {
+    if (++reservations !== 2) return;
+    await f.writer.savePostgresMessages([m('late', { timestamp: Date.now() + 1000, text: 'Còn size M không?' })], pool);
+    f.state.canAutoReply = false; // the follow-up run for the late message must only hold it for review
+  };
+  await f.incoming('ask', asked()); await f.process();
+  assert.equal(f.state.sends, 2, 'the text and the photo already in flight; no more');
+});
+
+test('auto-reply switched off after the text stops the remaining photos', async () => {
+  const f = await aiFixture(true); await photoShop(f);
+  f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  let reservations = 0;
+  f.state.beforeTransport = async () => { if (++reservations === 2) await query('UPDATE messenger_conversations SET ai_auto_reply=false'); };
+  await f.incoming('ask', asked()); await f.process();
+  assert.equal(f.state.sends, 2);
+});
+
+test('a held reply keeps its photo ids for the inbox and sends nothing, also on replay', async () => {
+  const f = await aiFixture(true); const ids = await photoShop(f);
+  f.state.canAutoReply = false; f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  await f.incoming('held', asked());
+  const first = await f.process();
+  assert.deepEqual(first.reply.analysis.photoImageIds, ids);
+  assert.equal(await jobStatus('held'), 'review');
+  assert.deepEqual((await f.process()).reply.analysis.photoImageIds, ids, 'the replay of a held review reads the saved analysis');
+  assert.equal(f.state.sends, 0);
+});
+
+test('a customer photo that goes to staff gets the fixed template and no product photos', async () => {
+  const f = await aiFixture(true); await photoShop(f);
+  f.state.imageKinds = ['receipt']; f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  await f.incoming('receipt', { text: '', attachments: [photo] }); await f.process();
+  assert.equal(f.state.sends, 1);
+  assert.ok((await outbound()).every(row => !row.text.startsWith('[ảnh]')));
+});
+
+test('with no uploaded photos the AI answers with text only', async () => {
+  const f = await aiFixture(true);
+  await enableAutoReply(f); await withPhotoProduct(f);
+  f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  await f.incoming('ask', asked()); await f.process();
+  assert.equal(f.state.sends, 1);
+  assert.equal((await savedAnalysis('ask')).photoImageIds, undefined);
+});
+
+test('the suggest button returns the photo ids and never sends', async () => {
+  const f = await aiFixture(true); const ids = await photoShop(f);
+  f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
+  await f.incoming('sug', asked());
+  const response = await f.load('app/api/customer-care/route.ts').POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
+    body: JSON.stringify({ action: 'suggest', psid: '222', messageId: 'sug' }) }));
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).reply.analysis.photoImageIds, ids);
+  assert.equal(f.state.sends, 0);
+});
+
+test('unsent photos show up for the inbox: failed and unknown (also stale sending), cleared by a later sent, never device uploads or old ones', async () => {
+  const f = await aiFixture(true);
+  await f.writer.savePostgresMessages([m('customer')], pool);
+  const now = Date.now();
+  const row = (id, text, status, createdAt = now, psid = '222') => query('INSERT INTO messenger_outbound_requests(page_id,request_id,psid,text,status,created_at) VALUES($1,$2,$3,$4,$5,$6)',
+    ['111', crypto.randomUUID(), psid, text, status, createdAt]);
+  await row(0, '[ảnh] img-failed', 'failed'); await row(0, '[ảnh] img-failed', 'failed', now + 1); await row(0, '[ảnh] img-unknown', 'unknown'); await row(0, '[ảnh] img-stale', 'sending', now - 3 * 60 * 1000);
+  await row(0, '[ảnh] img-fresh', 'sending', now - 5 * 1000);
+  await row(0, '[ảnh] img-resent', 'failed'); await row(0, '[ảnh] img-resent', 'sent');
+  await row(0, '[ảnh] upload', 'failed'); await row(0, '[ảnh] img-old', 'failed', now - 25 * 60 * 60 * 1000);
+  await row(0, '[ảnh] img-other-customer', 'failed', now, '999'); await row(0, 'một câu chữ', 'failed');
+  const thread = await handoffThread(f);
+  const byId = Object.fromEntries(thread.failedImages.map(image => [image.imageId, image.status]));
+  assert.equal(thread.failedImages.length, 3, 'two failed attempts of one image show once');
+  assert.deepEqual(byId, { 'img-failed': 'failed', 'img-unknown': 'unknown', 'img-stale': 'unknown' });
+  const view = f.load('lib/services/messengerView.ts').mergeMessengerThread(thread);
+  assert.deepEqual(view.failedImages, thread.failedImages, 'the conversation carries the same list');
+  assert.equal(f.load('lib/services/messengerView.ts').mergeMessengerThread({ ...thread, failedImages: undefined }, view).failedImages, undefined, 'the server list wins: a cleared failure is gone');
 });

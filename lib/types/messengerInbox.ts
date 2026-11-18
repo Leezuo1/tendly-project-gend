@@ -1,6 +1,7 @@
 import type { MessengerMessage } from './messenger';
 import type { ConversationMemoryEntry } from './conversationMemory';
 import type { CareSourceContext } from './customerCare';
+import type { FailedImage, StaffLabels } from './inbox';
 
 export interface MessengerCustomerProfile {
   name: string | null;
@@ -14,6 +15,10 @@ export interface MessengerCustomerProfile {
 
 export interface MessengerThread {
   sourceContext?: CareSourceContext;
+  staffLabels?: StaffLabels;
+  /** Ca ảnh cần nhân viên chưa đóng: vẫn tính là chưa trả lời dù AI đã gửi tin mẫu. */
+  handoff?: boolean;
+  failedImages?: FailedImage[];
   autoReply?: boolean;
   aiUpdatedAt?: number;
   waitingConfirmation?: boolean;

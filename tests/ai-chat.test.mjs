@@ -372,7 +372,10 @@ test('vòng xử lý: tức giận lên đầu hàng chờ, shop trả lời b�
   const result = { reply:'Shop xin lỗi vì giao nhầm. Bạn gửi mã đơn để nhân viên kiểm tra nhé.', analysis:angry, sourceSummary:'Cấu hình AI', model:'test' };
   const classified = f.inbox.applyConversationAnalysis(sample, question.id, result);
   assert.equal(classified.isUrgent, true);
-  assert.equal(classified.threadWho.badgeTag.label, '😠 Tức giận');
+  assert.equal(classified.threadWho.badgeTag, undefined, 'emotion is analysis only, no emotion chip');
+  assert.ok(!classified.tags.some((t) => t.kind === 'emotion') && !classified.profile.tags.some((t) => t.kind === 'emotion'));
+  assert.ok(classified.tags.some((t) => t.kind === 'priority'));
+  assert.equal(classified.aiSuggestion.label, '✨ AI đề xuất');
   assert.match(classified.aiSuggestion.text, /xin lỗi/);
   assert.equal(f.inbox.sortReplyQueue([f.samples[0],classified])[0].id, 'lan');
 
@@ -475,4 +478,20 @@ test('câu trả lời đồng cảm không hứa đã chuyển nhân viên khi 
   assert.match(result.reply,/xin lỗi/);
   assert.match(result.reply,/nhân viên kiểm tra/);
   assert.equal(result.reply.includes('đã chuyển'),false);
+});
+
+test('khay ảnh gồm ảnh AI gợi ý (trừ ảnh đã gỡ) cộng ảnh nhân viên đính kèm, và chỉ khi còn gợi ý', () => {
+  const f = fixture();
+  const c = structuredClone(f.samples[0]);
+  const withSuggestion = { ...c, analysis: { ...defaultAnalysis, messageId: 'm9', photoImageIds: ['a', 'b', 'c'] }, aiSuggestion: { label: 'x', source: 'y', text: 'z' } };
+  const file = { key: 'file-1', kind: 'file', file: {} };
+  assert.deepEqual(f.inbox.draftImages(withSuggestion, new Set([f.inbox.photoRemovalKey(withSuggestion, 'b')]), [file]).map((image) => image.key), ['a', 'c', 'file-1']);
+  assert.deepEqual(f.inbox.draftImages(withSuggestion, new Set(), []).map((image) => [image.kind, image.imageId]), [['product', 'a'], ['product', 'b'], ['product', 'c']]);
+  assert.deepEqual(f.inbox.draftImages({ ...withSuggestion, aiSuggestion: undefined }, new Set(), [file]).map((image) => image.key), ['file-1'], 'no suggestion, no suggested photos');
+});
+
+test('tin chỉ có ảnh hiện "[Ảnh]" ở danh sách', () => {
+  const f = fixture();
+  const answered = f.inbox.markConversationAnswered(structuredClone(f.samples[0]), { id: 'img', sender: 'out', text: '', time: 'Vừa xong', attachments: [{ type: 'image' }] });
+  assert.equal(answered.preview, '[Ảnh]');
 });

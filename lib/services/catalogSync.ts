@@ -3,6 +3,7 @@
 import { createSeed, LEGACY_PRODUCTS } from '@/lib/data/admin';
 import { readDb, subscribeDb, writeDb } from '@/lib/services/mockDb';
 import type { CatalogDb } from '@/lib/services/aiKnowledge';
+import { DEFAULT_CONTEXT_TAG_RULES } from '@/lib/services/contextTagRules';
 
 /**
  * Đồng bộ danh mục (sản phẩm, FAQ, thông tin shop, email) giữa trình duyệt và PostgreSQL.
@@ -12,18 +13,22 @@ import type { CatalogDb } from '@/lib/services/aiKnowledge';
 const REVISION_KEY = 'tendly.catalogRevision';
 const BACKUP_KEY = 'tendly.catalogBackup';
 // Logo shop là ảnh base64 rất nặng và AI không cần; không đồng bộ, mỗi trình duyệt giữ logo của mình.
-const slice = (db: CatalogDb): CatalogDb => ({ shop: { ...db.shop, logo: null }, productSource: db.productSource, products: db.products, faqs: db.faqs, triggers: db.triggers });
+const slice = (db: CatalogDb): CatalogDb => ({ shop: { ...db.shop, logo: null }, productSource: db.productSource, products: db.products, faqs: db.faqs, triggers: db.triggers, contextTagRules: db.contextTagRules });
 // jsonb không giữ thứ tự khóa, nên so sánh phải bỏ qua thứ tự.
 const stable = (value: unknown): string => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
   ? Object.fromEntries(Object.entries(item as Record<string, unknown>).sort(([a], [b]) => a < b ? -1 : 1)) : item);
 const storedRevision = () => { try { return Number(localStorage.getItem(REVISION_KEY)) || 0; } catch { return 0; } };
 const storeRevision = (revision: number) => { try { localStorage.setItem(REVISION_KEY, String(revision)); } catch { /* Bộ nhớ trình duyệt có thể bị chặn. */ } };
 
+/** Dòng máy chủ từ trước khi đồng bộ nhãn chưa có contextTagRules: giữ bộ nhãn của trình duyệt (được đẩy lên sau đó) thay vì xóa về mặc định. */
+export const remoteTagRules = (remote: CatalogDb, local: CatalogDb['contextTagRules']) => remote.contextTagRules ?? local;
+
 /** Danh mục chỉ gồm dữ liệu mẫu của bản demo, chưa có chỉnh sửa nào của shop. */
 export function isPristine(db: CatalogDb): boolean {
   const seed = createSeed(), known = new Set([...seed.products, ...LEGACY_PRODUCTS].map(product => JSON.stringify(product)));
   return db.products.every(product => known.has(JSON.stringify(product))) && stable(db.faqs) === stable(seed.faqs)
-    && stable({ ...db.shop, logo: null }) === stable({ ...seed.shop, logo: null }) && stable(db.triggers) === stable(seed.triggers);
+    && stable({ ...db.shop, logo: null }) === stable({ ...seed.shop, logo: null }) && stable(db.triggers) === stable(seed.triggers)
+    && (!db.contextTagRules || stable(db.contextTagRules) === stable(DEFAULT_CONTEXT_TAG_RULES));
 }
 
 export function startCatalogSync(): () => void {
@@ -36,7 +41,7 @@ export function startCatalogSync(): () => void {
     const local = readDb();
     if (stable(slice(local)) !== stable(remote)) { try { localStorage.setItem(BACKUP_KEY, JSON.stringify(slice(local))); } catch { /* Không cất được thì vẫn dùng bản máy chủ. */ } }
     sent = stable(remote); setRevision(next); // trước khi ghi, để thông báo thay đổi của chính lần ghi này không kích hoạt đẩy lại
-    writeDb(db => { db.shop = { ...remote.shop, logo: db.shop.logo }; db.productSource = remote.productSource; db.products = remote.products; db.faqs = remote.faqs; db.triggers = remote.triggers; });
+    writeDb(db => { db.shop = { ...remote.shop, logo: db.shop.logo }; db.productSource = remote.productSource; db.products = remote.products; db.faqs = remote.faqs; db.triggers = remote.triggers; db.contextTagRules = remoteTagRules(remote, db.contextTagRules); });
   };
   const push = async (expected: number) => {
     const body = slice(readDb()), snapshot = stable(body);

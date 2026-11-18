@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { errorMessage, useToast } from '@/components/shared/ToastProvider';
 import { productApi } from '@/lib/services/api';
+import { ProductImages } from './ProductImages';
 import type { Product } from '@/lib/types/admin';
 import styles from './product-editor.module.css';
 
@@ -57,6 +58,7 @@ export function ProductEditor({ product, products, onClose, onSaved }: {
             <label className="field" htmlFor="product-qty">Tồn kho của shop<input id="product-qty" type="number" min="0" step="1" placeholder="Chưa nhập" value={stockText} onChange={e => setStockText(e.target.value)} /><span className="field-hint">Để trống khi chưa xác nhận số lượng; nhập 0 nếu hết hàng.</span></label>
             <label className="field" htmlFor="product-colors">Màu sắc<input id="product-colors" value={draft.colors.join(',')} onChange={e => update({ colors: e.target.value.split(',') })} /><span className="field-hint">Ngăn cách bằng dấu phẩy.</span></label>
             <label className="field" htmlFor="product-sizes">Size<input id="product-sizes" value={draft.sizes.join(',')} onChange={e => update({ sizes: e.target.value.split(',') })} /></label>
+            <div className={styles.full}><ProductImages productId={product.id} /></div>
             {product.id.startsWith('shopee:') && <p className={`${styles.full} field-hint`}>Giá, phân loại và tồn kho theo Shopee sẽ cập nhật ở lần đồng bộ tiếp theo. Nội dung tư vấn được giữ lại.</p>}
           </div>
         </section>

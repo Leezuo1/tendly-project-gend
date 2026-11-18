@@ -3,6 +3,7 @@ import { inboxAccessError } from '@/lib/services/inboxAccess';
 import { hideConversation, pendingHistoricalAnalysis, saveConversationMemory } from '@/lib/services/conversationMemory';
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
 import { refreshCustomerPersonality } from '@/lib/services/customerPersonality';
+import { saveStaffLabels, StaffLabelsError } from '@/lib/services/staffLabels';
 
 export const runtime = 'nodejs';
 async function handle(request: Request) {
@@ -19,6 +20,10 @@ async function handle(request: Request) {
     }
     if (request.method === 'GET') return Response.json({ jobs: await pendingHistoricalAnalysis(pageId, body.psid) }, { headers: { 'Cache-Control': 'no-store' } });
     if (body.action === 'summarize') return Response.json(await refreshCustomerPersonality(pageId, body.psid));
+    if (body.action === 'labels') {
+      try { return Response.json({ staffLabels: await saveStaffLabels(pageId, body.psid, body.change) }); }
+      catch (error) { if (error instanceof StaffLabelsError) return Response.json({ error: error.message }, { status: error.status }); throw error; }
+    }
     if (typeof body.messageId !== 'string' || !body.messageId || body.messageId.length > 1024
       || typeof body.reply !== 'string' || !body.reply.trim() || body.reply.length > 8000
       || typeof body.model !== 'string' || body.model.length > 200

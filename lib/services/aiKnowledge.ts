@@ -40,7 +40,7 @@ function list(value: unknown, max: number): unknown[] {
 const strings = (value: unknown) => list(value, 100).map((v) => text(v, 200));
 
 /** Dữ liệu FAQ & sản phẩm của shop (phần của mock DB mà AI được đọc). */
-export type CatalogDb = Pick<MockDb, 'shop' | 'productSource' | 'products' | 'faqs' | 'triggers'>;
+export type CatalogDb = Pick<MockDb, 'shop' | 'productSource' | 'products' | 'faqs' | 'triggers' | 'contextTagRules'>;
 
 /** Dựng nguồn tri thức từ danh mục; dùng chung cho trình duyệt và máy chủ để hai bên luôn cho cùng kết quả. */
 export function buildKnowledge(db: CatalogDb): AiKnowledge {

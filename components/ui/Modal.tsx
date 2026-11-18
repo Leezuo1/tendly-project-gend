@@ -48,7 +48,7 @@ export function Modal({ open, title, onClose, children, footer, width = 520 }: M
       <div className="modal" ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} style={{ maxWidth: width }}>
         <div className="modal-head">
           <h3 id={titleId}>{title}</h3>
-          <button className="btn-icon" onClick={onClose} aria-label="Đóng"><IconClose /></button>
+          <button type="button" className="btn-icon" onClick={onClose} aria-label="Đóng"><IconClose /></button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
@@ -76,8 +76,8 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Xác nhậ
       width={420}
       footer={
         <>
-          <button className="btn btn-outline btn-sm" onClick={onClose} disabled={busy}>Huỷ</button>
-          <button className="btn btn-danger btn-sm" onClick={onConfirm} disabled={busy}>
+          <button type="button" className="btn btn-outline btn-sm" onClick={onClose} disabled={busy}>Huỷ</button>
+          <button type="button" className="btn btn-danger btn-sm" onClick={onConfirm} disabled={busy}>
             {busy && <span className="spinner" />}
             {confirmLabel}
           </button>

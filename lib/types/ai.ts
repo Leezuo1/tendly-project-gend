@@ -31,7 +31,20 @@ export interface AiMessageAnalysis {
   needsHuman: boolean;
   canAutoReply?: boolean;
   communicationStyle?: string;
+  /** id nhãn ngữ cảnh AI chọn từ bộ nhãn của shop (tối đa 3). */
+  labels?: string[];
+  /** Loại của từng ảnh khách gửi (model điền, theo thứ tự ảnh). */
+  imageKinds?: ImageKind[];
+  /** Do mã tính, không lấy từ model: tin gửi khách là mẫu cố định vì ảnh cần nhân viên (handoff) hoặc không liên quan (decline). */
+  imageOutcome?: 'handoff' | 'decline';
+  /** Mã sản phẩm model chọn để gửi ảnh (chỉ dùng nội bộ trong generateCareReply, không lưu). */
+  photoProductIds?: string[];
+  /** Do mã tính, không lấy từ model: ảnh sản phẩm (tối đa 3) tự gửi/gợi ý kèm câu trả lời. */
+  photoImageIds?: string[];
 }
+
+export const IMAGE_KINDS = ['product', 'defect', 'receipt', 'other_support', 'unrelated'] as const;
+export type ImageKind = (typeof IMAGE_KINDS)[number];
 
 /** Ngữ cảnh đang có trong phiên hiện tại; không lưu thêm lịch sử vào database. */
 export interface AiSessionMessage {
