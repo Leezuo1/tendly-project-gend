@@ -15,7 +15,7 @@ const load = (file) => {
   return loaded.exports;
 };
 const { saveShopCatalog, readShopCatalog, liveKnowledge, ShopCatalogError } = load('lib/services/shopCatalog.ts');
-const { createSeed } = load('lib/data/admin.ts');
+const { createSeed, LEGACY_PRODUCTS } = load('lib/data/admin.ts');
 const wrap = (db) => ({ query: async (sql, values) => { const result = await db.query(sql, values); return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length }; } });
 const bare = new PGlite(), full = new PGlite();
 const ready = full.exec(readFileSync('db/migrations/024-shop-catalog.sql', 'utf8'));
@@ -32,16 +32,16 @@ test('before migration 024 the server falls back to the old snapshot instead of 
   assert.equal(await liveKnowledge('111', null, db), null);
 });
 
-test('live catalog replaces the snapshot, keeps real products and leaves out untouched demo products', async () => {
+test('live catalog replaces the snapshot, keeps real products (the Coolmate set included) and leaves out the old untouched demo products', async () => {
   await ready;
   const db = wrap(full);
   assert.equal(await readShopCatalog('111', db), null);
   assert.equal((await liveKnowledge('111', snapshot, db)).shop.name, 'Cũ', 'no catalog row yet: snapshot');
-  assert.deepEqual(await saveShopCatalog('111', catalog([seed.products[0], custom]), 0, db), { revision: 1 });
+  assert.deepEqual(await saveShopCatalog('111', catalog([LEGACY_PRODUCTS[0], seed.products[0], custom]), 0, db), { revision: 1 });
   const knowledge = await liveKnowledge('111', snapshot, db);
-  assert.deepEqual(knowledge.products.map(product => product.sku), ['X-1']);
+  assert.deepEqual(knowledge.products.map(product => product.sku), [seed.products[0].sku, 'X-1'], 'the current Coolmate set reaches the AI, the legacy mock set does not');
   assert.equal(knowledge.shop.name, seed.shop.name);
-  assert.equal((await readShopCatalog('111', db)).catalog.products.length, 2, 'the full catalog is kept for restoring a browser');
+  assert.equal((await readShopCatalog('111', db)).catalog.products.length, 3, 'the full catalog is kept for restoring a browser');
 });
 
 test('a stale writer gets 409 instead of overwriting the catalog', async () => {
@@ -65,7 +65,7 @@ test('a catalog read back from the database still recognizes demo products (key 
   await ready;
   const db = wrap(full);
   const { revision, catalog: stored } = await readShopCatalog('111', db);
-  await saveShopCatalog('111', { ...stored, products: [...seed.products.slice(0, 2), custom] }, revision, db);
+  await saveShopCatalog('111', { ...stored, products: [...LEGACY_PRODUCTS.slice(0, 2), custom] }, revision, db);
   const again = await readShopCatalog('111', db);
   await saveShopCatalog('111', again.catalog, again.revision, db);
   assert.deepEqual((await liveKnowledge('111', null, db)).products.map(product => product.sku), ['X-1']);

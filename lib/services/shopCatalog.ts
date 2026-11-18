@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { createSeed, LEGACY_PRODUCTS } from '@/lib/data/admin';
+import { LEGACY_PRODUCTS } from '@/lib/data/admin';
 import { buildKnowledge, InvalidAiKnowledge, parseAiKnowledge, type CatalogDb } from '@/lib/services/aiKnowledge';
 import { DEFAULT_CONTEXT_TAG_RULES, validateContextTagRules } from '@/lib/services/contextTagRules';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
@@ -13,8 +13,8 @@ type Db = Pick<Pool, 'query'>;
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const noTable = (error: unknown) => (error as { code?: string })?.code === '42P01';
 
-/** Sản phẩm mẫu chưa chỉnh sửa (dữ liệu giả của bản demo) không được tới khách thật. */
-const samples = () => new Set([...createSeed().products, ...LEGACY_PRODUCTS].map(product => JSON.stringify(product)));
+/** Bộ sản phẩm mẫu cũ (dữ liệu giả, có icon) chưa chỉnh sửa không được tới khách thật. Bộ Coolmate hiện tại là danh mục shop dùng nên không bị loại. */
+const samples = () => new Set(LEGACY_PRODUCTS.map(product => JSON.stringify(product)));
 
 function parseCatalog(value: unknown): CatalogDb {
   if (!isRecord(value) || !isRecord(value.shop) || !isRecord(value.productSource) || !Array.isArray(value.products) || !Array.isArray(value.faqs) || !Array.isArray(value.triggers)) throw new ShopCatalogError('Dữ liệu danh mục không hợp lệ.');
