@@ -5,6 +5,8 @@ import type { CustomerCareSettings } from '@/lib/types/customerCare';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { liveKnowledge, readShopTagRules } from '@/lib/services/shopCatalog';
 import { staffLabelNotes } from '@/lib/services/staffLabels';
+import { buildImageInput } from '@/lib/services/imageIntake';
+import { handoffOpenSql, markHandoff, setHandoffRequest } from '@/lib/services/handoff';
 import { careRules, CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
 import { readConversationSources } from '@/lib/services/conversationSources';
 import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
@@ -54,7 +56,7 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
   const source = settings?.profile_json ? await liveKnowledge(pageId, settings.knowledge_json, db) ?? undefined : undefined;
   if (!source) return {};
   const profile = parseCareProfile(settings.profile_json);
-  const readLatest = async () => (await db.query(`SELECT m.*,c.ai_auto_reply,c.ai_updated_at,c.ai_enabled_at,c.staff_labels FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
+  const readLatest = async () => (await db.query(`SELECT m.*,c.ai_auto_reply,c.ai_updated_at,c.ai_enabled_at,c.staff_labels,c.handoff_message_id,${handoffOpenSql('c')} AS handoff_open FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
     WHERE m.page_id=$1 AND m.conversation_id=$2 AND c.hidden_at IS NULL
     ORDER BY m.sent_at DESC,m.message_id DESC LIMIT 1`, [pageId, id])).rows[0];
   const latest = await readLatest();
@@ -91,20 +93,28 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
       && Number(latest.sent_at) - Number(recent[start - 1].sent_at) <= 300000) start--;
     const batch = recent.slice(start);
     const customerText = batch.map((m) => m.text.trim()).filter(Boolean).join('\n');
+    // Chỉ khi mọi tệp trong lượt là ảnh khách gửi thì AI xem ảnh; sticker, video, tệp khác giữ chờ nhân viên như cũ.
+    const attachments = batch.flatMap((m) => m.attachments_json);
+    const imageInput = await buildImageInput(attachments, customerText);
     const context = recent.slice(Math.max(0, start - 10), start)
       .filter((m) => m.text.trim()).map((m) => ({ role: m.direction === 'in' ? 'user' as const : 'model' as const, text: m.text.slice(0, 2000) }));
     const sources = await readConversationSources(pageId, psid, latest.message_id, db);
     if (!sources) throw new CustomerCareError('Hội thoại không còn hiển thị.', 409);
     const history = await readCustomerOrderHistory(pageId, psid, db);
     const rules = await readShopTagRules(pageId, db);
-    const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history,
-      { rules, staff: staffLabelNotes(latest.staff_labels, rules) });
+    const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || (imageInput ? `[Khách gửi ${attachments.length} ảnh]` : '[Tệp đính kèm chưa được đọc]'), context, sources, history,
+      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updated_at}`;
     // Hard check on what the model wrote: masked data echoed back, links or amounts that the shop's own data (or the customer) never gave.
-    const unsupported = unsupportedReplyReason(reply.reply, JSON.stringify([source.products, source.faqs, source.shop, history, customerText, sources, careRules(profile, settings.page_profile_json), settings.page_profile_json]));
+    const unsupported = unsupportedReplyReason(reply.reply, JSON.stringify([source.products, source.faqs, source.shop, history, customerText, sources, careRules(profile, settings.page_profile_json), settings.page_profile_json]), { longNumbers: !!imageInput });
     if (unsupported) reply.analysis.reason = `${unsupported} ${reply.analysis.reason}`.trim();
-    const blocked = !reply.analysis.canAutoReply || reply.analysis.needsHuman || !customerText || !!unsupported
-      || batch.some((m) => m.attachments_json.length > 0) || Array.from(reply.reply).length > 2000;
+    // Mẫu cố định cho ảnh (chuyển shop/từ chối) an toàn để tự gửi; câu do model viết thì giữ các điều kiện chặn cũ.
+    // Đang có ca chờ nhân viên cho tin khác: không tự gửi tiếp (kể cả ảnh thứ hai), chỉ để gợi ý chờ duyệt.
+    // Chỉ tin mẫu cố định của chính ca này được đi qua; câu do model viết (kể cả khi chạy lại và model phân loại khác) thì không.
+    const isHandoffNotice = reply.analysis.imageOutcome === 'handoff' && latest.handoff_message_id === latest.message_id;
+    const handoffHeld = latest.handoff_open === true && !isHandoffNotice;
+    const blocked = handoffHeld || (reply.analysis.imageOutcome ? false : !reply.analysis.canAutoReply || reply.analysis.needsHuman || (!customerText && !imageInput) || !!unsupported
+      || (attachments.length > 0 && !imageInput) || Array.from(reply.reply).length > 2000);
     if (blocked) reply.analysis.canAutoReply = false;
     const current = (await db.query('SELECT updated_at FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
     if (!current || Number(current.updated_at) !== Number(settings.updated_at)) {
@@ -116,6 +126,7 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
       return {};
     }
     await saveConversationMemory(pageId, psid, latest.message_id, reply, db);
+    if (reply.analysis.imageOutcome === 'handoff') await markHandoff(db, pageId, id, latest.message_id);
     await db.query(`UPDATE messenger_ai_jobs SET status=$3,updated_at=$4 WHERE page_id=$1 AND message_id=$2 AND status='processing'`,
       [pageId, latest.message_id, blocked ? 'review' : 'ready', Date.now()]);
     if (blocked || !settings.auto_reply || !latest.ai_auto_reply || Number(latest.sent_at) <= Number(settings.enabled_at)
@@ -128,13 +139,16 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
       AND c.ai_auto_reply AND c.ai_updated_at=$5 AND j.sent_at>c.ai_enabled_at AND j.sent_at>s.enabled_at
       AND COALESCE(c.last_out_at,0)<j.sent_at AND $3::bigint-j.sent_at<86400000
       AND j.message_id=(SELECT message_id FROM messenger_messages WHERE conversation_id=c.id ORDER BY sent_at DESC,message_id DESC LIMIT 1)
+      AND (NOT ${handoffOpenSql('c')} OR (c.handoff_message_id=j.message_id AND $6::boolean))
       AND NOT EXISTS(SELECT 1 FROM messenger_ai_jobs other WHERE other.conversation_id=c.id
         AND (other.status IN ('review','sending','unknown') OR (other.status='processing' AND other.updated_at>=$3::bigint-120000))
         AND other.message_id<>j.message_id AND other.sent_at>COALESCE(c.last_out_at,0))
-      RETURNING j.message_id`, [pageId, latest.message_id, Date.now(), settings.updated_at, latest.ai_updated_at]);
+      RETURNING j.message_id`, [pageId, latest.message_id, Date.now(), settings.updated_at, latest.ai_updated_at, reply.analysis.imageOutcome === 'handoff']);
     if (!send.rowCount) return { reply, messageId: latest.message_id };
+    const requestId = randomUUID();
+    if (reply.analysis.imageOutcome === 'handoff') await setHandoffRequest(db, pageId, id, latest.message_id, requestId);
     try {
-      const sent = await runAutomaticAccess(Number(latest.sent_at), () => sendMessengerMessage({ psid, text: reply.reply, requestId: randomUUID(),
+      const sent = await runAutomaticAccess(Number(latest.sent_at), () => sendMessengerMessage({ psid, text: reply.reply, requestId,
         automation: { messageId: latest.message_id, settingsVersion: Number(settings.updated_at), conversationVersion: Number(latest.ai_updated_at), sourceFingerprint: sources.fingerprint } }, db));
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
         [pageId, latest.message_id, Date.now(), sent.persisted ? 'sent' : 'unknown']);

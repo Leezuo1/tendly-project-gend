@@ -16,6 +16,8 @@ export interface MessengerCustomerProfile {
 export interface MessengerThread {
   sourceContext?: CareSourceContext;
   staffLabels?: StaffLabels;
+  /** Ca ảnh cần nhân viên chưa đóng: vẫn tính là chưa trả lời dù AI đã gửi tin mẫu. */
+  handoff?: boolean;
   autoReply?: boolean;
   aiUpdatedAt?: number;
   waitingConfirmation?: boolean;

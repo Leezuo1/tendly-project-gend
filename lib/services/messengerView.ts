@@ -17,7 +17,7 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
   const latest = messages.at(-1);
   const latestIn = [...messages].reverse().find((m) => m.sender === 'in');
   const latestOut = [...messages].reverse().find((m) => m.sender === 'out');
-  const unanswered = latestIn !== undefined && (!latestOut || (latestIn.timestamp || 0) > (latestOut.timestamp || 0));
+  const unanswered = latestIn !== undefined && (!latestOut || (latestIn.timestamp || 0) > (latestOut.timestamp || 0) || thread.handoff === true);
   const sameQuestion = previous?.analysis?.messageId === latestIn?.id;
   const previousIn = previous && [...previous.messages].reverse().find((m) => m.sender === 'in');
   // Only a newer customer message creates an unread marker; echoes and loaded history do not.
@@ -78,6 +78,8 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     merged = unanswered ? restored : { ...restored, isUnreplied: false, isUrgent: false, aiSuggestion: undefined,
       tags: restored.tags.filter((t) => t.kind !== 'priority') };
   }
+  // Tin mẫu báo khách đã gửi rồi: không gợi ý lại để nhân viên khỏi gửi trùng.
+  if (merged.analysis?.imageOutcome && latestIn && latestOut && (latestOut.timestamp || 0) > (latestIn.timestamp || 0)) merged = { ...merged, aiSuggestion: undefined };
   if (merged.aiSuggestion && thread.sourceContext && (merged.aiSuggestion.sourceFingerprint || thread.sourceContext.sources.length)
     && merged.aiSuggestion.sourceFingerprint !== thread.sourceContext.fingerprint) {
     return { ...merged, aiSuggestion: undefined, aiStatus: 'error', aiError: 'Nguồn hoặc ưu đãi đã thay đổi. Tạo lại gợi ý trước khi gửi.' };

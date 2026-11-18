@@ -14,8 +14,15 @@ export function vndAmounts(text: string): number[] {
   });
 }
 
-/** Why a reply must not be auto-sent, or null. `known` is the data the shop supplied (catalog, FAQ, offers, order summary). */
-export function unsupportedReplyReason(reply: string, known: string): string | null {
+// Dãy số từ 8 chữ số (số tài khoản, CCCD, điện thoại); bỏ dấu cách, chấm, gạch nối giữa hai nhóm ≥3 chữ số để "0123 456 789 0" không lọt mà "size 38 39 40 41" không bị gộp.
+// shortcut: số viết tách từng cặp ("01 23 45 67 89") vẫn lọt, nâng cấp nếu gặp thực tế.
+const digitRuns = (text: string) => text.replace(/(?<=\d{3})[\s.\-](?=\d{3})/g, '').match(/\d{8,}/g) ?? [];
+
+/**
+ * Why a reply must not be auto-sent, or null. `known` is the data the shop supplied (catalog, FAQ, offers, order summary).
+ * `longNumbers`: bật khi tin khách có ảnh. Số đọc từ ảnh biên lai/giấy tờ không được lặp lại trừ khi shop đã có số đó (lời nhắc chỉ dặn, đây là chặn cứng).
+ */
+export function unsupportedReplyReason(reply: string, known: string, options: { longNumbers?: boolean } = {}): string | null {
   if (/\[(?:SĐT|email)\]/i.test(reply)) return 'Câu trả lời chứa dữ liệu cá nhân đã bị che; cần nhân viên kiểm tra.';
   const urls = (text: string) => (text.match(/(?:https?:\/\/|www\.)[^\s"')]+/gi) ?? []).map(url => url.replace(/[.,;:!?]+$/, '').toLowerCase());
   const allowedUrls = new Set(urls(known));
@@ -23,5 +30,9 @@ export function unsupportedReplyReason(reply: string, known: string): string | n
   // Structured data (JSON prices, flashPrice, order totals) has no unit, so every number the shop supplied counts as an allowed amount.
   const allowed = new Set([...vndAmounts(known), ...(known.match(/(?<![\p{L}\p{N}])\d[\d.,]*(?![\p{L}\p{N}])/gu) ?? []).map(n => Number(n.replace(/[.,]/g, '')))]);
   if (vndAmounts(reply).some(amount => !allowed.has(amount))) return 'Câu trả lời nêu số tiền không có trong danh mục, FAQ hoặc đơn của khách.';
+  if (options.longNumbers) {
+    const knownRuns = new Set(digitRuns(known));
+    if (digitRuns(reply).some(run => !knownRuns.has(run))) return 'Câu trả lời có dãy số dài (số tài khoản, giấy tờ, điện thoại) không có trong dữ liệu của shop.';
+  }
   return null;
 }

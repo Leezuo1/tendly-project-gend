@@ -1,6 +1,8 @@
 export interface MessengerAttachment {
   type: string;
   url?: string;
+  /** Sticker hoặc nút Like (Meta gửi như ảnh kèm sticker_id). */
+  sticker?: boolean;
 }
 
 export interface MessengerMessage {

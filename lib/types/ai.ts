@@ -33,7 +33,14 @@ export interface AiMessageAnalysis {
   communicationStyle?: string;
   /** id nhãn ngữ cảnh AI chọn từ bộ nhãn của shop (tối đa 3). */
   labels?: string[];
+  /** Loại của từng ảnh khách gửi (model điền, theo thứ tự ảnh). */
+  imageKinds?: ImageKind[];
+  /** Do mã tính, không lấy từ model: tin gửi khách là mẫu cố định vì ảnh cần nhân viên (handoff) hoặc không liên quan (decline). */
+  imageOutcome?: 'handoff' | 'decline';
 }
+
+export const IMAGE_KINDS = ['product', 'defect', 'receipt', 'other_support', 'unrelated'] as const;
+export type ImageKind = (typeof IMAGE_KINDS)[number];
 
 /** Ngữ cảnh đang có trong phiên hiện tại; không lưu thêm lịch sử vào database. */
 export interface AiSessionMessage {

@@ -18,7 +18,7 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/015-marketing-workspace.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
-  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql', '024-shop-catalog.sql', '025-conversation-staff-labels.sql']) {
+  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql', '024-shop-catalog.sql', '025-conversation-staff-labels.sql', '026-conversation-handoff.sql']) {
     await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
   }
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
@@ -72,19 +72,23 @@ after(() => { for (const [key, value] of Object.entries(original)) {
 
 async function aiFixture(enabled = true) {
   const { load, writer } = await fixture();
-  const state = { canAutoReply: true, priority: 'normal', sends: 0, beforeReply: async () => {}, beforeTransport: async () => {}, failSend: false, failAi: false, replyText: 'Shop mở cửa lúc 8 giờ.' };
+  const state = { canAutoReply: true, priority: 'normal', sends: 0, beforeReply: async () => {}, beforeTransport: async () => {}, failSend: false, failAi: false, replyText: 'Shop mở cửa lúc 8 giờ.', geminiCalls: 0,
+    imageTransport: async () => new Response(new Uint8Array([65, 66, 67]), { headers: { 'content-type': 'image/jpeg' } }) };
   const knowledge = { shop: { name: 'Shop', email: '', phone: '' },
     productSource: { name: 'Catalog', connected: true, lastSyncedAt: 1 }, products: [],
     faqs: [{ id: 'f1', question: 'Giờ mở cửa?', answer: '8 giờ', tag: '', keywords: [], active: true }], emailTriggers: [] };
   const aiLoad = loader({
     'lib/services/messengerPostgres.ts': { ...load('lib/services/messengerPostgres.ts'), getMessengerPool: () => pool },
+    // Photos are downloaded through state.imageTransport so no test touches the network.
+    'lib/services/imageIntake.ts': { ...load('lib/services/imageIntake.ts'), buildImageInput: (attachments, text) => load('lib/services/imageIntake.ts').buildImageInput(attachments, text, state.imageTransport) },
     'lib/services/gemini.ts': { generateGeminiJson: async (options) => {
+      state.geminiCalls++;
       await state.beforeReply(options);
       if (state.failAi) throw new Error('AI unavailable');
       return { model: 'test', result: options.parse(JSON.stringify({ reply: state.replyText, analysis: {
         sentiment: 'neutral', emotion: 'neutral', priority: state.priority, needsHuman: false,
         reason: state.canAutoReply ? 'Dựa vào FAQ giờ mở cửa.' : 'Thiếu dữ liệu đơn hàng.',
-        canAutoReply: state.canAutoReply, ...(state.labels ? { labels: state.labels } : {}),
+        canAutoReply: state.canAutoReply, ...(state.labels ? { labels: state.labels } : {}), ...(state.imageKinds ? { imageKinds: state.imageKinds } : {}),
       } })) };
     } },
     'lib/services/messengerSend.ts': { ...load('lib/services/messengerSend.ts'), sendMessengerMessage: (input) => load('lib/services/messengerSend.ts').sendMessengerMessage(input, { ...pool, query: async (sql, values) => {
@@ -314,7 +318,8 @@ test('missing evidence flag, unread attachments and AI errors fail closed with p
     const f = await aiFixture();
     if (mode === 'missing-flag') f.state.canAutoReply = undefined;
     if (mode === 'ai-error') f.state.failAi = true;
-    await f.incoming(mode, mode === 'attachment' ? { attachments: [{ type: 'image', url: 'https://example.com/a.jpg' }] } : {});
+    // Not a photo: readable photos now go through the image path (see the photo tests below).
+    await f.incoming(mode, mode === 'attachment' ? { attachments: [{ type: 'video', url: 'https://example.com/a.mp4' }] } : {});
     if (mode === 'ai-error') await assert.rejects(f.process(), /căn cứ/);
     else await f.process();
     assert.equal(f.state.sends, 0);
@@ -596,6 +601,257 @@ test('AI reads staff labels by name (masked) and picks up to 3 labels from the s
   const { parseAiAnalysis } = f.load('lib/services/aiAnalysis.ts');
   assert.deepEqual(parseAiAnalysis({ sentiment: 'neutral', emotion: 'neutral', priority: 'normal', needsHuman: false, reason: 'x',
     labels: ['a', 'b', 'a', 'c', 'd', ''] }).labels, ['a', 'b', 'c']);
+});
+
+// --- Photos the customer sends (design: 2026-11-17-ai-chat-image-understanding) ---
+const photo = { type: 'image', url: 'https://scontent.xx.fbcdn.net/v/p.jpg' };
+const enableAutoReply = async (f) => {
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+};
+const sentTexts = async () => (await query("SELECT text FROM messenger_outbound_requests WHERE status='sent' ORDER BY created_at")).rows.map(row => row.text);
+const jobStatus = async (id) => (await query('SELECT status FROM messenger_ai_jobs WHERE message_id=$1', [id])).rows[0]?.status;
+const savedAnalysis = async (id) => (await query('SELECT analysis FROM messenger_analysis_history WHERE message_id=$1', [id])).rows[0]?.analysis;
+
+test('a product photo is answered like text and may be sent automatically', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options); };
+  f.state.imageKinds = ['product'];
+  f.state.replyText = 'Mình có Áo thun basic AT-01 ạ, bạn muốn xem size nào?';
+  await f.incoming('photo-product', { text: '', attachments: [photo] }); await f.process();
+  assert.equal(f.state.sends, 1);
+  assert.deepEqual(await sentTexts(), [f.state.replyText]);
+  assert.equal(seen[0].images.length, 1);
+  assert.deepEqual(seen[0].images[0], { mimeType: 'image/jpeg', data: 'QUJD' });
+  assert.ok(seen[0].system.includes('Khách có gửi ảnh') && seen[0].system.includes('analysis.imageKinds'));
+  assert.match(seen[0].user, /"imageCount":1/);
+  const analysis = await savedAnalysis('photo-product');
+  assert.deepEqual(analysis.imageKinds, ['product']);
+  assert.equal(analysis.imageOutcome, undefined);
+  assert.equal(await jobStatus('photo-product'), 'sent');
+});
+
+test('a product-photo reply that repeats a long number read from the image is held for review, not sent', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  f.state.imageKinds = ['product'];
+  f.state.replyText = 'Số tài khoản trên ảnh là 0123456789, đúng không ạ?';
+  await f.incoming('photo-number', { text: '', attachments: [photo] }); await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal(await jobStatus('photo-number'), 'review');
+  assert.match((await savedAnalysis('photo-number')).reason, /dãy số/);
+  // The same words typed by the customer themselves (a text message with no photo) keep the old rules.
+  const text = await aiFixture(true); await enableAutoReply(text);
+  text.state.replyText = 'Mình đã nhận số 0123456789 bạn gửi ạ.';
+  await text.incoming('typed-number', { text: 'Số của mình là 0123456789' }); await text.process();
+  assert.equal(text.state.sends, 1);
+});
+
+test('defect, receipt and other_support photos send the handoff template', async () => {
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  for (const kind of ['defect', 'receipt', 'other_support']) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    f.state.imageKinds = [kind];
+    f.state.replyText = 'Câu do model viết: shop hoàn tiền 100% ngay.';
+    await f.incoming(`photo-${kind}`, { text: '', attachments: [photo] }); await f.process();
+    assert.deepEqual(await sentTexts(), [HANDOFF_REPLY], kind);
+    const analysis = await savedAnalysis(`photo-${kind}`);
+    assert.deepEqual([analysis.imageOutcome, analysis.needsHuman, analysis.priority], ['handoff', true, 'high'], kind);
+    assert.equal(await jobStatus(`photo-${kind}`), 'sent', kind);
+  }
+});
+
+test('an unrelated photo alone gets the one-line decline; with a text question it is answered normally', async () => {
+  const { DECLINE_REPLY } = loader()('lib/services/imageIntake.ts');
+  const alone = await aiFixture(true); await enableAutoReply(alone);
+  alone.state.imageKinds = ['unrelated'];
+  await alone.incoming('photo-meme', { text: '', attachments: [photo] }); await alone.process();
+  assert.deepEqual(await sentTexts(), [DECLINE_REPLY]);
+  assert.equal((await savedAnalysis('photo-meme')).imageOutcome, 'decline');
+  const withText = await aiFixture(true); await enableAutoReply(withText);
+  withText.state.imageKinds = ['unrelated'];
+  await withText.incoming('photo-text', { text: 'Shop mở cửa mấy giờ?', attachments: [photo] }); await withText.process();
+  assert.deepEqual(await sentTexts(), ['Shop mở cửa lúc 8 giờ.']);
+});
+
+test('an unreadable photo (foreign host, download error, more than 3) hands off without calling Gemini', async () => {
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  const cases = { 'foreign host': [{ type: 'image', url: 'https://evilfbcdn.net/p.jpg' }], 'download error': [photo], 'four photos': [photo, photo, photo, photo] };
+  for (const [name, attachments] of Object.entries(cases)) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    if (name === 'download error') f.state.imageTransport = async () => { throw new Error('network'); };
+    f.state.imageKinds = ['product'];
+    await f.incoming('photo-bad', { text: '', attachments }); await f.process();
+    assert.equal(f.state.geminiCalls, 0, name);
+    assert.deepEqual(await sentTexts(), [HANDOFF_REPLY], name);
+    assert.equal((await savedAnalysis('photo-bad')).imageOutcome, 'handoff', name);
+  }
+});
+
+test('wrong imageKinds from the model fail closed to the handoff template', async () => {
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  for (const kinds of [[], ['product', 'product'], undefined]) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    f.state.imageKinds = kinds;
+    await f.incoming('photo-kinds', { text: '', attachments: [photo] }); await f.process();
+    assert.deepEqual(await sentTexts(), [HANDOFF_REPLY], JSON.stringify(kinds));
+  }
+});
+
+test('stickers, video and mixed attachments keep the old behaviour: held for review, nothing sent', async () => {
+  const cases = { sticker: [{ ...photo, sticker: true }], video: [{ type: 'video', url: 'https://example.com/a.mp4' }], mixed: [photo, { type: 'video', url: 'https://example.com/a.mp4' }] };
+  for (const [name, attachments] of Object.entries(cases)) {
+    const f = await aiFixture(true); await enableAutoReply(f);
+    f.state.imageKinds = ['product'];
+    await f.incoming(`att-${name}`, { text: '', attachments }); await f.process();
+    assert.equal(f.state.sends, 0, name);
+    assert.equal(await jobStatus(`att-${name}`), 'review', name);
+    assert.equal(f.state.geminiCalls, 1, `${name}: still analysed as text`);
+  }
+});
+
+test('the re-analyse button reads photos too and never sends', async () => {
+  const f = await aiFixture(true);
+  const care = f.load('app/api/customer-care/route.ts');
+  const seen = [];
+  f.state.beforeReply = async (options) => { seen.push(options); };
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('photo-suggest', { text: '', attachments: [photo] });
+  const response = await care.POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
+    body: JSON.stringify({ action: 'suggest', psid: '222', messageId: 'photo-suggest' }) }));
+  assert.equal(response.status, 200);
+  assert.equal(seen[0].images.length, 1);
+  assert.equal(f.state.sends, 0);
+  assert.equal((await response.json()).reply.analysis.imageOutcome, 'handoff');
+});
+
+test('prompt rewording: readable photos are not "unverified files" that must always go to staff', async () => {
+  const f = await aiFixture(false);
+  const { EMOTION_RESPONSE_PROMPT } = f.load('lib/services/aiAnalysis.ts');
+  const care = f.load('lib/services/customerCare.ts');
+  const text = care.buildCustomerCarePrompt(f.knowledge, f.profile, null, undefined, false);
+  const images = care.buildCustomerCarePrompt(f.knowledge, f.profile, null, undefined, true);
+  assert.ok(!EMOTION_RESPONSE_PROMPT.includes('chỉ có tệp đính kèm hoặc'));
+  assert.ok(!images.includes('Tệp chưa được xác minh phải để nhân viên kiểm tra'));
+  assert.ok(images.includes('Tệp không phải ảnh khách gửi thì để nhân viên kiểm tra'));
+  assert.ok(images.includes('analysis.imageKinds') && !text.includes('analysis.imageKinds'), 'the image block only appears when photos are present');
+});
+
+// --- A photo that needs staff keeps the conversation in the unanswered queue until someone else replies ---
+const handoffThread = async (f) => (await f.load('lib/services/messengerInboxDb.ts').readMessengerInbox('111', 100, pool)).conversations.find(thread => thread.psid === '222');
+
+test('handoff keeps the conversation in the unanswered queue after the template is sent, and any other outbound message closes it', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  const view = f.load('lib/services/messengerView.ts'), count = f.load('lib/services/messengerCount.ts');
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('ho-1', { text: '', attachments: [photo] }); await f.process();
+  assert.deepEqual(await sentTexts(), [HANDOFF_REPLY]);
+  const notice = (await query("SELECT request_id,message_id FROM messenger_outbound_requests WHERE status='sent'")).rows[0];
+  const row = (await query('SELECT handoff_message_id,handoff_request_id,last_out_at FROM messenger_conversations')).rows[0];
+  assert.deepEqual([row.handoff_message_id, row.handoff_request_id], ['ho-1', notice.request_id], 'the request id is stored before sending, so the notice\'s own echo cannot close the handoff');
+  assert.ok(row.last_out_at, 'the notice counts as an outbound message');
+  let thread = await handoffThread(f);
+  assert.deepEqual([thread.handoff, thread.waitingConfirmation], [true, true]);
+  assert.equal(await count.readUnrepliedCount('111', pool), 1);
+  const conversation = view.mergeMessengerThread(thread);
+  assert.deepEqual([conversation.isUnreplied, conversation.waitingConfirmation, conversation.isUrgent], [true, true, true]);
+  assert.equal(conversation.aiSuggestion, undefined, 'the template was already sent, so it is not offered again');
+  // The echo of the notice itself (same message id) does not close it.
+  await f.writer.savePostgresMessages([m(notice.message_id, { direction: 'out', timestamp: Date.now() + 5, text: HANDOFF_REPLY })], pool);
+  assert.equal((await handoffThread(f)).handoff, true);
+  assert.equal(await count.readUnrepliedCount('111', pool), 1);
+  // Any other outbound message (from Tendly or from the Page inbox, which arrives as an echo) closes it.
+  await f.writer.savePostgresMessages([m('staff-reply', { direction: 'out', timestamp: Date.now() + 1000, text: 'Shop xử lý giúp bạn ạ.' })], pool);
+  thread = await handoffThread(f);
+  assert.deepEqual([thread.handoff, thread.waitingConfirmation], [false, false]);
+  assert.equal(await count.readUnrepliedCount('111', pool), 0);
+  assert.equal(view.mergeMessengerThread(thread).isUnreplied, false);
+});
+
+test('the notice never closes its own handoff, even when Meta\'s answer was not recorded on the request (timeout, no message_id, failed save)', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  const count = f.load('lib/services/messengerCount.ts');
+  f.state.imageKinds = ['defect'];
+  await f.incoming('ho-lost', { text: '', attachments: [photo] }); await f.process();
+  assert.deepEqual(await sentTexts(), [HANDOFF_REPLY]);
+  await query('UPDATE messenger_outbound_requests SET message_id=NULL');
+  assert.equal((await handoffThread(f)).handoff, true, 'the notice (and its echo) is recognised by its fixed text');
+  assert.equal(await count.readUnrepliedCount('111', pool), 1);
+  await f.writer.savePostgresMessages([m('staff-late', { direction: 'out', timestamp: Date.now() + 1000, text: 'Shop đã nhận ảnh và đang xử lý ạ.' })], pool);
+  assert.equal((await handoffThread(f)).handoff, false, 'a real reply still closes it');
+  assert.equal(await count.readUnrepliedCount('111', pool), 0);
+});
+
+test('while a handoff is open, AI does not auto-send for later customer messages; after staff replies it sends again', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  f.state.imageKinds = ['defect'];
+  await f.incoming('ho-a', { text: '', attachments: [photo] }); await f.process();
+  assert.equal(f.state.sends, 1);
+  f.state.imageKinds = undefined; f.state.replyText = 'Dạ shop cảm ơn bạn ạ.';
+  await f.incoming('ho-b', { timestamp: Date.now() + 50 }); await f.process();
+  assert.equal(f.state.sends, 1, 'held while the handoff is open');
+  assert.equal(await jobStatus('ho-b'), 'review');
+  await f.incoming('ho-c', { text: '', attachments: [photo], timestamp: Date.now() + 60 });
+  f.state.imageKinds = ['receipt']; await f.process();
+  assert.equal(f.state.sends, 1, 'a second photo does not send a second notice');
+  assert.equal(await jobStatus('ho-c'), 'review');
+  await f.writer.savePostgresMessages([m('staff-reply-2', { direction: 'out', timestamp: Date.now() + 1000, text: 'Shop đã xử lý ạ.' })], pool);
+  f.state.imageKinds = undefined;
+  await f.incoming('ho-d', { timestamp: Date.now() + 2000 }); await f.process();
+  assert.equal(f.state.sends, 2, 'automatic replies resume once staff has answered');
+});
+
+test('an open handoff never lets a model-written reply go out for the same photo, even if a re-run classifies it differently', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  // The conversation switch is off when the photo arrives: the handoff is marked, the job stays "ready", nothing is sent.
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('ho-race', { text: '', attachments: [photo] });
+  await query('UPDATE messenger_conversations SET ai_auto_reply=false');
+  await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT handoff_message_id FROM messenger_conversations')).rows[0].handoff_message_id, 'ho-race');
+  assert.equal(await jobStatus('ho-race'), 'ready');
+  // The shop turns the switch on and the same message is analysed again; this time the model calls the photo a product.
+  await query('UPDATE messenger_conversations SET ai_auto_reply=true');
+  f.state.imageKinds = ['product']; f.state.replyText = 'Mình có Áo thun basic AT-01 ạ.';
+  await f.process();
+  assert.equal(f.state.sends, 0, 'only the fixed template may leave while the handoff is open');
+  assert.equal(await jobStatus('ho-race'), 'review');
+});
+
+test('with the conversation switch off no template is sent, but the handoff flag is still set and the template is only a suggestion', async () => {
+  const f = await aiFixture(true); await enableAutoReply(f);
+  const { HANDOFF_REPLY } = loader()('lib/services/imageIntake.ts');
+  f.state.imageKinds = ['receipt'];
+  await f.incoming('ho-off', { text: '', attachments: [photo] });
+  await query('UPDATE messenger_conversations SET ai_auto_reply=false');
+  await f.process();
+  assert.equal(f.state.sends, 0);
+  const thread = await handoffThread(f);
+  assert.equal(thread.handoff, true);
+  const conversation = f.load('lib/services/messengerView.ts').mergeMessengerThread(thread);
+  assert.equal(conversation.isUnreplied, true);
+  assert.equal(conversation.aiSuggestion.text, HANDOFF_REPLY);
+});
+
+test('a product photo never sets the handoff flag, and the re-analyse button marks a handoff without sending', async () => {
+  const product = await aiFixture(true); await enableAutoReply(product);
+  product.state.imageKinds = ['product'];
+  await product.incoming('ho-product', { text: '', attachments: [photo] }); await product.process();
+  assert.equal((await query('SELECT handoff_message_id FROM messenger_conversations')).rows[0].handoff_message_id, null);
+  assert.equal((await handoffThread(product)).handoff, false);
+  const f = await aiFixture(true);
+  const care = f.load('app/api/customer-care/route.ts');
+  f.state.imageKinds = ['defect'];
+  await f.incoming('ho-suggest', { text: '', attachments: [photo] });
+  const response = await care.POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
+    body: JSON.stringify({ action: 'suggest', psid: '222', messageId: 'ho-suggest' }) }));
+  assert.equal(response.status, 200);
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query('SELECT handoff_message_id FROM messenger_conversations')).rows[0].handoff_message_id, 'ho-suggest');
+  assert.equal((await handoffThread(f)).handoff, true);
 });
 
 async function sourceFixture() {
