@@ -44,6 +44,8 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     memory: thread.memory || previous?.memory || [],
     // Server copy wins so a removed label never comes back; previous only covers threads built without the field.
     staffLabels: thread.staffLabels ?? previous?.staffLabels,
+    // Danh sách từ máy chủ luôn thắng: một ảnh đã gửi bù thì không còn trong danh sách.
+    failedImages: thread.failedImages,
     personalitySummary: thread.personalitySummary || '',
     id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid, viewStartAt: thread.viewStartAt,
       hasOlder: previous?.messenger?.viewStartAt === thread.viewStartAt && previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)

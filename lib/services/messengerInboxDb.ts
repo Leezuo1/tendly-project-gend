@@ -42,6 +42,13 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
   // A bounded, single-query message fetch for every thread shown in the list.
   const ids = rows.rows.slice(0, limit).map((r) => r.id);
   const memories = await readConversationMemories(pageId, ids, db);
+  // Ảnh sản phẩm gửi lỗi/chưa rõ (sending quá 2 phút = hàm bị cắt giữa chừng) trong 24 giờ và chưa có bản gửi thành công cùng ảnh.
+  const failedRows = ids.length ? (await db.query(`SELECT r.psid,substring(r.text from 7) AS image_id,
+    CASE WHEN r.status='failed' THEN 'failed' ELSE 'unknown' END AS status FROM messenger_outbound_requests r
+    WHERE r.page_id=$1 AND r.psid=ANY($2::text[]) AND r.text LIKE '[ảnh] %' AND r.text<>'[ảnh] upload' AND r.created_at>$3::bigint
+    AND (r.status IN ('failed','unknown') OR (r.status='sending' AND r.created_at<$4::bigint))
+    AND NOT EXISTS(SELECT 1 FROM messenger_outbound_requests s WHERE s.page_id=r.page_id AND s.psid=r.psid AND s.text=r.text AND s.status='sent')
+    ORDER BY r.created_at,r.request_id`, [pageId, rows.rows.slice(0, limit).map((r) => r.psid), Date.now() - 24 * 60 * 60 * 1000, Date.now() - 2 * 60 * 1000])).rows : [];
   const recent = ids.length ? await db.query(`SELECT * FROM (
     SELECT m.*, ROW_NUMBER() OVER(PARTITION BY conversation_id ORDER BY sent_at DESC, message_id DESC) AS rn
     FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
@@ -52,6 +59,8 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
     conversations.push({ id: row.id, pageId, psid: row.psid, createdAt: Number(row.created_at), memory: memories.get(row.id) || [],
       viewStartAt: row.view_start_at == null ? undefined : Number(row.view_start_at), personalitySummary: row.personality_summary || '',
       waitingConfirmation: row.waiting_confirmation === true, handoff: row.handoff_open === true,
+      // Mỗi ảnh một dòng, theo lần thử mới nhất (hàng đã xếp theo thời gian).
+      failedImages: [...new Map(failedRows.filter((r) => r.psid === row.psid).map((r) => [r.image_id as string, { imageId: r.image_id as string, status: r.status as 'failed' | 'unknown' }])).values()],
       autoReply: row.ai_auto_reply === true, aiUpdatedAt: Number(row.ai_updated_at), staffLabels: storedStaffLabels(row.staff_labels),
       lastInAt: row.last_in_at === null ? null : Number(row.last_in_at),
       lastOutAt: row.last_out_at === null ? null : Number(row.last_out_at),

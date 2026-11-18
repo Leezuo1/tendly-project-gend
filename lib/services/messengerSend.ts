@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { MessengerMessage } from '@/lib/types/messenger';
+import type { PostImageMime } from '@/lib/types/posts';
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
 import { assertOperationAllowed } from '@/lib/services/appSecurity';
 import { readConversationSources } from '@/lib/services/conversationSources';
@@ -12,6 +13,8 @@ export class AutomationStoppedError extends MessengerSendError {
 }
 export interface SendMessengerInput {
   psid: string; text: string; requestId: string;
+  /** Ảnh gửi thay cho chữ (text phải là ''); `label` là mã ảnh sản phẩm hoặc 'upload', ghi vào cột text để chống gửi trùng. */
+  image?: { data: Uint8Array; mime: PostImageMime; label: string };
   automation?: { messageId: string; settingsVersion: number; conversationVersion: number; sourceFingerprint: string };
 }
 
@@ -31,19 +34,21 @@ export async function sendMessengerMessage(input: SendMessengerInput,
     throw new MessengerSendError('Chỉ gửi phản hồi tiêu chuẩn trong 24 giờ từ tin khách gần nhất. Hãy chờ khách nhắn lại.', 409);
   }
   const createdAt = Date.now();
+  const storedText = input.image ? `[ảnh] ${input.image.label}` : input.text;
+  const attachments = input.image ? [{ type: 'image' }] : [];
   const reservation = await db.query(`INSERT INTO messenger_outbound_requests
     (page_id,request_id,psid,text,status,created_at) VALUES($1,$2,$3,$4,'sending',$5)
     ON CONFLICT(page_id,request_id) DO NOTHING RETURNING request_id`,
-  [pageId, input.requestId, input.psid, input.text, createdAt]);
+  [pageId, input.requestId, input.psid, storedText, createdAt]);
   if (!reservation.rowCount) {
     const existing = (await db.query(`SELECT * FROM messenger_outbound_requests WHERE page_id=$1 AND request_id=$2`,
       [pageId, input.requestId])).rows[0];
-    if (!existing || existing.psid !== input.psid || existing.text !== input.text) {
+    if (!existing || existing.psid !== input.psid || existing.text !== storedText) {
       throw new MessengerSendError('Mã yêu cầu đã được dùng cho tin khác.', 409);
     }
     if (existing.status === 'sent' && existing.message_id) {
       const message: MessengerMessage = { pageId, psid: input.psid, messageId: existing.message_id, direction: 'out',
-        timestamp: Number(existing.created_at), text: input.text, attachments: [] };
+        timestamp: Number(existing.created_at), text: input.text, attachments };
       try { await savePostgresMessages([message], db); return { message, persisted: true }; }
       catch { return { message, persisted: false }; }
     }
@@ -78,10 +83,18 @@ export async function sendMessengerMessage(input: SendMessengerInput,
     throw error;
   }
   try {
+    // Ảnh: một lệnh multipart (tải và gửi cùng lúc), không dùng is_reusable; fetch tự đặt Content-Type kèm boundary.
+    const form = new FormData();
+    if (input.image) {
+      form.append('recipient', JSON.stringify({ id: input.psid }));
+      form.append('messaging_type', 'RESPONSE');
+      form.append('message', JSON.stringify({ attachment: { type: 'image', payload: {} } }));
+      form.append('filedata', new Blob([input.image.data as BlobPart], { type: input.image.mime }), 'image');
+    }
     response = await transport(`https://graph.facebook.com/${version}/${encodeURIComponent(pageId)}/messages`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(12_000),
-      body: JSON.stringify({ recipient: { id: input.psid }, messaging_type: 'RESPONSE', message: { text: input.text } }),
+      method: 'POST', headers: input.image ? { Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(input.image ? 15_000 : 12_000),
+      body: input.image ? form : JSON.stringify({ recipient: { id: input.psid }, messaging_type: 'RESPONSE', message: { text: input.text } }),
     });
   } catch {
     await db.query(`UPDATE messenger_outbound_requests SET status='unknown' WHERE page_id=$1 AND request_id=$2`, [pageId, input.requestId]);
@@ -101,7 +114,7 @@ export async function sendMessengerMessage(input: SendMessengerInput,
     throw new MessengerSendError('Meta chưa trả mã tin nhắn. Kiểm tra Messenger trước khi gửi lại.', 409);
   }
   const message: MessengerMessage = { pageId, psid: input.psid, messageId: result.message_id,
-    direction: 'out', timestamp: createdAt, text: input.text, attachments: [] };
+    direction: 'out', timestamp: createdAt, text: input.text, attachments };
   try {
     await db.query(`UPDATE messenger_outbound_requests SET status='sent',message_id=$3 WHERE page_id=$1 AND request_id=$2`,
       [pageId, input.requestId, message.messageId]);

@@ -6,6 +6,7 @@ import { readMessengerAiSettings } from '@/lib/services/messengerAi';
 import { readShopCatalog, readShopTagRules } from '@/lib/services/shopCatalog';
 import { staffLabelNotes } from '@/lib/services/staffLabels';
 import { buildImageInput } from '@/lib/services/imageIntake';
+import { readPhotoCandidates } from '@/lib/services/productImages';
 import { markHandoff } from '@/lib/services/handoff';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { saveConversationMemory } from '@/lib/services/conversationMemory';
@@ -60,9 +61,10 @@ async function handle(request: Request) {
     const history = await readCustomerOrderHistory(pageId, body.psid, db);
     const rules = await readShopTagRules(pageId, db);
     const imageInput = await buildImageInput(latest.attachments_json, latest.text);
+    const photos = await readPhotoCandidates(pageId, body.psid, settings.knowledge.products, db);
     const reply = await generateCareReply(settings.knowledge, settings.profile, settings.pageProfile,
       latest.text.slice(0, 8000) || (imageInput ? '[Khách gửi ảnh]' : '[Tệp đính kèm chưa được đọc]'), context, sources, history,
-      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput);
+      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput, photos);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updatedAt}`;
     if (!latest.text.trim() || latest.attachments_json.length || reply.reply.length > 2000) reply.analysis.canAutoReply = false;
     await assertOperationAllowed();

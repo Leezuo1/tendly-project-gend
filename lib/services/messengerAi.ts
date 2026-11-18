@@ -6,6 +6,7 @@ import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { liveKnowledge, readShopTagRules } from '@/lib/services/shopCatalog';
 import { staffLabelNotes } from '@/lib/services/staffLabels';
 import { buildImageInput } from '@/lib/services/imageIntake';
+import { readPhotoCandidates, readProductImage } from '@/lib/services/productImages';
 import { handoffOpenSql, markHandoff, setHandoffRequest } from '@/lib/services/handoff';
 import { careRules, CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
 import { readConversationSources } from '@/lib/services/conversationSources';
@@ -102,8 +103,9 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     if (!sources) throw new CustomerCareError('Hội thoại không còn hiển thị.', 409);
     const history = await readCustomerOrderHistory(pageId, psid, db);
     const rules = await readShopTagRules(pageId, db);
+    const photos = await readPhotoCandidates(pageId, psid, source.products, db);
     const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || (imageInput ? `[Khách gửi ${attachments.length} ảnh]` : '[Tệp đính kèm chưa được đọc]'), context, sources, history,
-      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput);
+      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput, photos);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updated_at}`;
     // Hard check on what the model wrote: masked data echoed back, links or amounts that the shop's own data (or the customer) never gave.
     const unsupported = unsupportedReplyReason(reply.reply, JSON.stringify([source.products, source.faqs, source.shop, history, customerText, sources, careRules(profile, settings.page_profile_json), settings.page_profile_json]), { longNumbers: !!imageInput });
@@ -152,6 +154,8 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
         automation: { messageId: latest.message_id, settingsVersion: Number(settings.updated_at), conversationVersion: Number(latest.ai_updated_at), sourceFingerprint: sources.fingerprint } }, db));
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
         [pageId, latest.message_id, Date.now(), sent.persisted ? 'sent' : 'unknown']);
+      // Ảnh đi sau chữ và không bao giờ đổi trạng thái job: trạng thái cuối của job chỉ phản ánh phần chữ.
+      if (sent.persisted && reply.analysis.photoImageIds?.length) await sendPhotosAfterText(db, pageId, psid, requestId, latest.sent_at, reply.analysis.photoImageIds);
       return { reply, sent, messageId: latest.message_id };
     } catch (error) {
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
@@ -171,5 +175,26 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     if (newer && newer.message_id !== latest.message_id && (debounceMs === 0 || Date.now() - Number(newer.sent_at) >= debounceMs)) {
       await processMessengerAi(pageId, psid, knowledge, db);
     }
+  }
+}
+
+/**
+ * Gửi ảnh sản phẩm sau câu trả lời tự động, mỗi ảnh một yêu cầu `<requestId>:img:<n>`. Không ném lỗi và không đụng messenger_ai_jobs:
+ * một ảnh lỗi chỉ để lại dòng failed/unknown ở messenger_outbound_requests (hiện thành "Ảnh chưa gửi" trong hộp thoại) và dừng các ảnh sau.
+ * Trước mỗi ảnh kiểm tra khách chưa nhắn thêm và công tắc tự trả lời còn bật; ảnh là phần còn lại của câu trả lời cũ.
+ */
+async function sendPhotosAfterText(db: Pool, pageId: string, psid: string, requestId: string, sentAt: string | number, imageIds: string[]) {
+  const conversationId = JSON.stringify([pageId, psid]);
+  for (const [index, imageId] of imageIds.entries()) {
+    try {
+      const open = await db.query(`SELECT 1 FROM messenger_conversations c JOIN messenger_ai_settings s ON s.page_id=c.page_id
+        WHERE c.page_id=$1 AND c.id=$2 AND c.ai_auto_reply AND s.auto_reply AND c.hidden_at IS NULL
+        AND NOT EXISTS(SELECT 1 FROM messenger_messages m WHERE m.conversation_id=c.id AND m.direction='in' AND m.sent_at>$3::bigint)`, [pageId, conversationId, sentAt]);
+      if (!open.rows.length) return;
+      const image = await readProductImage(pageId, imageId, db);
+      if (!image) continue;
+      await runAutomaticAccess(Number(sentAt), () => sendMessengerMessage({ psid, text: '', requestId: `${requestId}:img:${index + 1}`,
+        image: { data: image.data, mime: image.mime, label: imageId } }, db));
+    } catch { return; }
   }
 }

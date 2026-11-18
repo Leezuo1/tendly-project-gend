@@ -7,6 +7,11 @@ import type { MessengerAttachment } from './messenger';
 import type { ConversationMemoryEntry } from './conversationMemory';
 import type { CareSourceContext } from './customerCare';
 
+/** Ảnh trong khay trên ô soạn: ảnh sản phẩm do AI gợi ý hoặc file nhân viên chọn từ máy. */
+export type DraftImage = { key: string } & ({ kind: 'product'; imageId: string } | { kind: 'file'; file: File; previewUrl: string });
+
+export interface FailedImage { imageId: string; status: 'failed' | 'unknown' }
+
 export type InboxFilter = 'all' | 'urgent' | 'unreplied';
 
 export type Channel = 'facebook' | 'zalo';
@@ -78,6 +83,8 @@ export interface Conversation {
   messenger?: { pageId: string; psid: string; hasOlder: boolean; viewStartAt?: number };
   /** Nhãn nhân viên dán/gỡ, lấy từ máy chủ; không trộn vào `tags` (tags được dựng lại sau mỗi lần phân tích). */
   staffLabels?: StaffLabels;
+  /** Ảnh sản phẩm gửi lỗi hoặc chưa rõ kết quả trong 24 giờ qua (từ máy chủ); hiện thanh "Ảnh chưa gửi" kèm nút gửi lại. */
+  failedImages?: FailedImage[];
   id: string;
   name: string;
   avatar: string;

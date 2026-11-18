@@ -37,6 +37,10 @@ export interface AiMessageAnalysis {
   imageKinds?: ImageKind[];
   /** Do mã tính, không lấy từ model: tin gửi khách là mẫu cố định vì ảnh cần nhân viên (handoff) hoặc không liên quan (decline). */
   imageOutcome?: 'handoff' | 'decline';
+  /** Mã sản phẩm model chọn để gửi ảnh (chỉ dùng nội bộ trong generateCareReply, không lưu). */
+  photoProductIds?: string[];
+  /** Do mã tính, không lấy từ model: ảnh sản phẩm (tối đa 3) tự gửi/gợi ý kèm câu trả lời. */
+  photoImageIds?: string[];
 }
 
 export const IMAGE_KINDS = ['product', 'defect', 'receipt', 'other_support', 'unrelated'] as const;
