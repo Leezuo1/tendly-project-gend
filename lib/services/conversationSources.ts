@@ -61,7 +61,8 @@ export async function readConversationSourceContexts(pageId: string, targets: So
       : !sources.length ? 'none' : target.reply_mid ? 'unresolved' : 'ambiguous';
     const visible = selected ? [selected, ...sources.filter(source => source !== selected).slice(0, 4)] : sources.slice(0, 5);
     const context = { resolution, selectedId: selected?.id ?? null, sources: visible,
-      blocked: resolution === 'ambiguous' || resolution === 'unresolved' || !!selected?.issues.length };
+      // Nguồn mơ hồ không chặn: customerCare không đưa nội dung nguồn nào cho model, nên AI chỉ trả lời từ danh mục và FAQ.
+      blocked: !!selected?.issues.length };
     result.set(target.id, { ...context, fingerprint: createHash('sha256').update(JSON.stringify(context)).digest('hex') });
   }
   return result;

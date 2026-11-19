@@ -787,6 +787,8 @@ test('prompt rewording: readable photos are not "unverified files" that must alw
   assert.ok(!images.includes('Tệp chưa được xác minh phải để nhân viên kiểm tra'));
   assert.ok(images.includes('Tệp không phải ảnh khách gửi thì để nhân viên kiểm tra'));
   assert.ok(images.includes('analysis.imageKinds') && !text.includes('analysis.imageKinds'), 'the image block only appears when photos are present');
+  assert.ok(care.buildCustomerCarePrompt(f.knowledge, f.profile, null, undefined, false, true).includes('khung chat CÓ gửi được ảnh'), 'with shopPhotos the model is told it can send photos and must not claim otherwise');
+  assert.ok(!text.includes('khung chat CÓ gửi được ảnh'), 'no photo rule when no shop photos are offered');
 });
 
 // --- A photo that needs staff keeps the conversation in the unanswered queue until someone else replies ---
@@ -974,11 +976,13 @@ test('source links use exact Page/message/recipient evidence, not commenter IDs 
 test('multiple sources never select the newest implicitly; a direct reply resolves only its own source and history keeps the evidence', async () => {
   const f = await sourceFixture(); await f.linkPost(); await f.linkLive(); await f.incoming('ambiguous');
   let context = await f.readSources('222', 'ambiguous');
-  assert.equal(context.resolution, 'ambiguous'); assert.equal(context.selectedId, null); assert.equal(context.blocked, true);
-  await f.process(); assert.equal(f.state.sends, 1, 'only the fixed handoff template goes out');
+  assert.equal(context.resolution, 'ambiguous'); assert.equal(context.selectedId, null); assert.equal(context.blocked, false, 'an unclear source no longer blocks the AI');
+  let system = ''; f.state.beforeReply = async (options) => { system = options.system; };
+  await f.process(); assert.equal(f.state.sends, 1, 'the AI answers from the catalog');
+  assert.ok(system.includes('"sources":[]') && !system.includes('Giảm 10%'), 'the model gets no content of any candidate source, not even the offer');
   const saved = (await query("SELECT * FROM messenger_analysis_history WHERE message_id='ambiguous'")).rows[0];
   assert.equal(saved.source_context_json.resolution, 'ambiguous');
-  assert.equal(saved.reply, f.load('lib/services/handoff.ts').UNKNOWN_REPLY);
+  assert.notEqual(saved.reply, f.load('lib/services/handoff.ts').UNKNOWN_REPLY, 'a normal answer, not the handoff template');
   await f.incoming('explicit', { replyToMessageId: 'private-post', timestamp: Date.now() + 1 });
   context = await f.readSources('222', 'explicit');
   assert.equal(context.resolution, 'reply'); assert.equal(context.selectedId, 'private-post'); assert.equal(context.blocked, false);
@@ -1598,9 +1602,9 @@ test('without candidates, or with the products source off, nothing about photos 
 test('photos are decided on the final reply: the fixed source-blocked template and image handoff carry none', async () => {
   const f = await aiFixture(true);
   f.state.photoProductIds = ['p1']; f.state.replyText = 'Mẫu Áo thun Đen Basic ạ.';
-  const blocked = { blocked: true, resolution: 'ambiguous', sources: [], selectedId: null, fingerprint: 'f', issues: [] };
+  const blocked = { blocked: true, resolution: 'linked', selectedId: 's1', fingerprint: 'f', sources: [{ id: 's1', kind: 'post', products: [], issues: ['Ưu đãi đã hết hạn.'] }] };
   const template = await photoReply(f, PHOTOS, { sources: blocked });
-  assert.match(template.reply.reply, /Bạn đang hỏi về bài đăng/);
+  assert.match(template.reply.reply, /Bạn gửi giúp shop mã sản phẩm/);
   assert.equal(template.reply.analysis.photoImageIds, undefined);
   f.state.imageKinds = ['receipt'];
   const images = { images: [{ mimeType: 'image/jpeg', data: 'QUJD' }], count: 1, hasText: false, unreadable: false };
