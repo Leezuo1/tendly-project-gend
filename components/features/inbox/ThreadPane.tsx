@@ -7,6 +7,8 @@ import type { ContextTagRule } from '@/lib/types/contextTags';
 import { CustomerAvatar } from './CustomerAvatar';
 import { LabelBar } from './LabelBar';
 import { PhotoTray } from './PhotoTray';
+import { MessageImage } from './MessageImage';
+import { inlineImageUrl } from '@/lib/services/inboxAi';
 import { IconChevrons } from '@/components/ui/Icons';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/Switch';
@@ -213,7 +215,9 @@ export function ThreadPane({
           return (
             <div key={msg.id} className={`msg-row ${msg.sender}`}>
               <div className="msg-bubble">{msg.text}
-                {msg.attachments?.map((attachment, index) => attachment.url && /^https:\/\//i.test(attachment.url) ? (
+                {msg.attachments?.map((attachment, index) => inlineImageUrl(attachment) ? (
+                  <div key={index}><MessageImage url={inlineImageUrl(attachment)!} /></div>
+                ) : attachment.url && /^https:\/\//i.test(attachment.url) ? (
                   <div key={index}><a href={attachment.url} target="_blank" rel="noopener noreferrer">Mở {attachment.type}</a></div>
                 ) : <div key={index}>[{attachment.type === 'image' ? 'Ảnh' : attachment.type}]</div>)}
               </div>

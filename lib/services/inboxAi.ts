@@ -103,3 +103,8 @@ export function draftImages(conversation: Conversation, removed: ReadonlySet<str
   const suggested = conversation.aiSuggestion ? conversation.analysis?.photoImageIds ?? [] : [];
   return [...suggested.filter((id) => !removed.has(photoRemovalKey(conversation, id))).map((id): DraftImage => ({ key: id, kind: 'product', imageId: id })), ...files];
 }
+
+/** Đường dẫn để hiện ảnh trực tiếp trong luồng tin: chỉ ảnh có URL https (ảnh shop đã gửi không lưu URL nên chỉ hiện nhãn). */
+export function inlineImageUrl(attachment: { type: string; url?: string }): string | null {
+  return attachment.type === 'image' && attachment.url && /^https:\/\//i.test(attachment.url) ? attachment.url : null;
+}

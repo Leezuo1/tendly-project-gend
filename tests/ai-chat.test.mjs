@@ -495,3 +495,12 @@ test('tin chỉ có ảnh hiện "[Ảnh]" ở danh sách', () => {
   const answered = f.inbox.markConversationAnswered(structuredClone(f.samples[0]), { id: 'img', sender: 'out', text: '', time: 'Vừa xong', attachments: [{ type: 'image' }] });
   assert.equal(answered.preview, '[Ảnh]');
 });
+
+test('ảnh trong tin nhắn chỉ hiện trực tiếp khi là ảnh có đường dẫn https', () => {
+  const f = fixture();
+  assert.equal(f.inbox.inlineImageUrl({ type: 'image', url: 'https://scontent.xx.fbcdn.net/v/a.jpg' }), 'https://scontent.xx.fbcdn.net/v/a.jpg');
+  assert.equal(f.inbox.inlineImageUrl({ type: 'image', url: 'http://scontent.xx.fbcdn.net/a.jpg' }), null, 'http is never loaded');
+  assert.equal(f.inbox.inlineImageUrl({ type: 'image' }), null, 'a photo we sent has no stored URL');
+  assert.equal(f.inbox.inlineImageUrl({ type: 'video', url: 'https://example.com/v.mp4' }), null);
+  assert.equal(f.inbox.inlineImageUrl({ type: 'image', url: 'javascript:alert(1)' }), null);
+});
