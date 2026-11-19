@@ -33,3 +33,13 @@ AI Content Agent đi theo flow từ thông tin chung -> yêu cầu chung về he
 Xây dựng AI đi seeding dựa theo keyword, tệp data phù hợp với keyword đó
 
 Tìm được cách lách luật giữa các nền tảng (facebook, zalo chặn nhắn tin sau khi tin nhắn đã gửi quá 24h) => tùy chọn, nếu làm được sẽ được đánh giá cao
+
+AI chat có thể đọc và hiểu hình ảnh (gửi hình ảnh tư vấn luôn)
+Smart Sourcing cần tìm nhiều nguồn thông tin, tổng quan hơn để các AI khác có thể sử dụng (ví dụ với các shop thông tin liên quan đến hoa thì có thể tìm hiểu về xu hướng hoa, sắp tới sẽ là gì để AI Marketing Content có thể viết và lên bài marketing, tìm hiểu về đối thủ,...)
+Smart Sourcing sẽ là nguồn cung cấp input chính cho AI Marketing (chiến dịch, brief,... để đẩy thông tin tìm được đó qua marketing)
+Thêm module về đơn hàng, khách hàng (tổng quan)
+Build api trình bày cho bgk là sẽ trả lại cái output cho hệ thống doanh nghiệp như thế nào
+Viết một api chuẩn để trình bày
+Gắn thẻ cho từng khách hàng (thủ công)
+Ngoài ra thêm vào profile của khách hàng phần nhu cầu 
+Làm 2 chế độ: cơ bản và nâng cao cho từng nhóm người dùng
