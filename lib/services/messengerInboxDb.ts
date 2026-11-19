@@ -47,7 +47,7 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
     CASE WHEN r.status='failed' THEN 'failed' ELSE 'unknown' END AS status FROM messenger_outbound_requests r
     WHERE r.page_id=$1 AND r.psid=ANY($2::text[]) AND r.text LIKE '[ảnh] %' AND r.text<>'[ảnh] upload' AND r.created_at>$3::bigint
     AND (r.status IN ('failed','unknown') OR (r.status='sending' AND r.created_at<$4::bigint))
-    AND NOT EXISTS(SELECT 1 FROM messenger_outbound_requests s WHERE s.page_id=r.page_id AND s.psid=r.psid AND s.text=r.text AND s.status='sent')
+    AND NOT EXISTS(SELECT 1 FROM messenger_outbound_requests s WHERE s.page_id=r.page_id AND s.psid=r.psid AND s.text=r.text AND s.status='sent' AND s.created_at>=r.created_at)
     ORDER BY r.created_at,r.request_id`, [pageId, rows.rows.slice(0, limit).map((r) => r.psid), Date.now() - 24 * 60 * 60 * 1000, Date.now() - 2 * 60 * 1000])).rows : [];
   const recent = ids.length ? await db.query(`SELECT * FROM (
     SELECT m.*, ROW_NUMBER() OVER(PARTITION BY conversation_id ORDER BY sent_at DESC, message_id DESC) AS rn

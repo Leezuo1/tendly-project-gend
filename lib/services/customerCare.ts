@@ -18,7 +18,7 @@ const IMAGE_RULES = `
 import { maskPersonalData } from '@/lib/services/piiMask';
 
 const PHOTO_RULES = `
-- shopPhotos là các sản phẩm của shop có ảnh để gửi cho khách. Ảnh chỉ đi kèm khi thật sự cần: mặc định KHÔNG chọn (analysis.photoProductIds là mảng rỗng). Chỉ điền tối đa 3 productId trong shopPhotos khi khách muốn xem (hỏi ảnh, hình, mẫu, màu thật, trông thế nào, "cho xem") hoặc nhờ gợi ý sản phẩm. Hỏi giá, tồn kho, size, vận chuyển, đơn hàng, chính sách thì để mảng rỗng. Khi chọn ảnh cho sản phẩm nào, câu trả lời phải nhắc đúng tên sản phẩm đó như trong danh mục. Không hứa "gửi ảnh" khi không chọn ảnh nào.`;
+- shopPhotos là các sản phẩm của shop có ảnh để gửi cho khách. Ảnh chỉ đi kèm khi thật sự cần: mặc định KHÔNG chọn (analysis.photoProductIds là mảng rỗng). Chỉ điền productId trong shopPhotos khi khách muốn xem (hỏi ảnh, hình, mẫu, màu thật, trông thế nào, "cho xem") hoặc nhờ gợi ý sản phẩm. Hỏi giá, tồn kho, size, vận chuyển, đơn hàng, chính sách thì để mảng rỗng. Khi chọn ảnh cho sản phẩm nào, câu trả lời phải nhắc đúng tên sản phẩm đó như trong danh mục. Không hứa "gửi ảnh" khi không chọn ảnh nào.`;
 
 export class CustomerCareError extends Error {
   constructor(message: string, public status = 400) { super(message); }

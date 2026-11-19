@@ -16,7 +16,7 @@ export const AI_RESPONSE_SCHEMA = {
         communicationStyle: { type: 'string', description: 'Phong cách giao tiếp quan sát được trong tin khách và ngữ cảnh, tối đa 200 ký tự. Không đủ căn cứ thì để chuỗi trống; không gán tính cách cố định hay chẩn đoán.' },
         labels: { type: 'array', items: { type: 'string' }, description: 'Tối đa 3 id trong labelOptions phù hợp tình huống; không có thì mảng rỗng.' },
         imageKinds: { type: 'array', items: { type: 'string', enum: [...IMAGE_KINDS] }, description: 'Chỉ khi khách gửi ảnh: mỗi ảnh một phần tử, theo thứ tự ảnh.' },
-        photoProductIds: { type: 'array', items: { type: 'string' }, description: 'Chỉ khi có shopPhotos và khách thực sự cần xem ảnh: tối đa 3 productId trong shopPhotos; còn lại để mảng rỗng.' },
+        photoProductIds: { type: 'array', items: { type: 'string' }, description: 'Chỉ khi có shopPhotos và khách thực sự cần xem ảnh: các productId trong shopPhotos; còn lại để mảng rỗng.' },
       },
       required: ['sentiment', 'emotion', 'priority', 'reason', 'needsHuman', 'communicationStyle', 'canAutoReply'],
       additionalProperties: false,
@@ -60,7 +60,7 @@ export function parseAiAnalysis(value: unknown): AiMessageAnalysis {
       ? { communicationStyle: a.communicationStyle.trim().slice(0, 200) } : {}),
     ...(Array.isArray(a.labels) ? { labels: [...new Set(a.labels.filter((id): id is string => typeof id === 'string' && !!id && id.length <= 100))].slice(0, 3) } : {}),
     // photoImageIds cũng không bao giờ lấy từ model; photoProductIds chỉ được generateCareReply lọc rồi đổi sang mã ảnh.
-    ...(Array.isArray(a.photoProductIds) && a.photoProductIds.length <= 3 && a.photoProductIds.every((id): id is string => typeof id === 'string' && !!id && id.length <= 200)
+    ...(Array.isArray(a.photoProductIds) && a.photoProductIds.every((id): id is string => typeof id === 'string' && !!id && id.length <= 200)
       ? { photoProductIds: a.photoProductIds as string[] } : {}),
     // imageOutcome không bao giờ lấy từ đầu ra của model: chỉ mã (applyImageOutcome) được đặt.
     // Tất cả hoặc không: một giá trị sai hay quá 3 ảnh thì bỏ cả danh sách (imageOutcome sẽ chuyển shop), không cắt gọt rồi trả lời tiếp.

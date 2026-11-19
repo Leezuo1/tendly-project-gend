@@ -192,7 +192,7 @@ export function ThreadPane({
         <div><strong>AI tự động trả lời</strong><p role="status">{savingAi ? 'Đang lưu…'
           : !aiEnabled ? 'AI đang tắt trong cấu hình chung'
           : !conversation.autoReply ? 'Đang tắt cho hội thoại này'
-          : conversation.waitingConfirmation || conversation.sourceContext?.blocked ? 'Tạm dừng · Chờ nhân viên xác nhận'
+          : conversation.waitingConfirmation ? 'Chờ nhân viên trả lời · AI không tự gửi'
           : 'Đang bật · Chỉ trả lời tin mới đủ căn cứ'}</p></div>
         <Switch checked={conversation.autoReply === true} disabled={savingAi} label="AI tự động trả lời cho hội thoại này" onChange={enabled => void onToggleAutoReply(enabled)} />
         {!aiEnabled && <Link href="/cau-hinh-ai?tab=settings&ai=chat">Mở cấu hình AI</Link>}

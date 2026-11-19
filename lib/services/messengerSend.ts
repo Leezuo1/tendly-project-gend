@@ -15,7 +15,7 @@ export interface SendMessengerInput {
   psid: string; text: string; requestId: string;
   /** Ảnh gửi thay cho chữ (text phải là ''); `label` là mã ảnh sản phẩm hoặc 'upload', ghi vào cột text để chống gửi trùng. */
   image?: { data: Uint8Array; mime: PostImageMime; label: string };
-  automation?: { messageId: string; settingsVersion: number; conversationVersion: number; sourceFingerprint: string };
+  automation?: { messageId: string; settingsVersion: number; conversationVersion: number; sourceFingerprint: string; /** Mẫu cố định không hứa gì nên đi được cả khi nguồn tin chưa rõ. */ fixedTemplate?: boolean };
 }
 
 export async function sendMessengerMessage(input: SendMessengerInput,
@@ -74,8 +74,10 @@ export async function sendMessengerMessage(input: SendMessengerInput,
           AND (other.status IN ('review','sending','unknown') OR (other.status='processing' AND other.updated_at>=$6::bigint-120000)))`,
       [pageId, JSON.stringify([pageId, input.psid]), messageId, settingsVersion, conversationVersion, Date.now()]);
       if (!allowed.rows.length) throw new AutomationStoppedError();
-      const sources = await readConversationSources(pageId, input.psid, messageId, db);
-      if (!sources || sources.blocked || sources.fingerprint !== input.automation.sourceFingerprint) throw new AutomationStoppedError();
+      if (!input.automation.fixedTemplate) {
+        const sources = await readConversationSources(pageId, input.psid, messageId, db);
+        if (!sources || sources.blocked || sources.fingerprint !== input.automation.sourceFingerprint) throw new AutomationStoppedError();
+      }
     }
   }
   catch (error) {

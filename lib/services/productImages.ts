@@ -47,7 +47,8 @@ export async function readProductImage(pageId: string, id: string, db: Db = getM
 export interface PhotoCandidate { productId: string; name: string; sku: string; imageIds: string[] }
 
 /**
- * Sản phẩm (trong danh sách đưa vào) còn ảnh chưa gửi cho khách này. Ảnh `unknown`/`sending` (đang gửi hoặc hàm bị cắt giữa chừng) coi như đã gửi vì có thể đã đến khách.
+ * Sản phẩm (trong danh sách đưa vào) có ảnh để gửi cho khách này, ảnh chưa gửi xếp trước và ảnh đã gửi vẫn được đưa lại (khách xin xem lại thì gửi lại, không giới hạn).
+ * Ảnh `unknown`/`sending` (đang gửi hoặc hàm bị cắt giữa chừng) coi như đã gửi vì có thể đã đến khách.
  * Bảng chưa có (chưa chạy migration 027) → [] để AI Chat vẫn trả lời như cũ.
  */
 export async function readPhotoCandidates(pageId: string, psid: string, products: { id: string; name: string; sku: string }[],
@@ -55,15 +56,16 @@ export async function readPhotoCandidates(pageId: string, psid: string, products
   if (!products.length) return [];
   let rows;
   try {
-    rows = (await db.query(`SELECT i.id,i.product_id FROM shop_product_images i WHERE i.page_id=$1 AND i.product_id=ANY($2::text[])
-      AND NOT EXISTS(SELECT 1 FROM messenger_outbound_requests r WHERE r.page_id=i.page_id AND r.psid=$3
-        AND r.status IN ('sent','unknown','sending') AND r.text='[ảnh] '||i.id) ORDER BY i.created_at`, [pageId, products.map((product) => product.id), psid])).rows;
+    rows = (await db.query(`SELECT i.id,i.product_id,EXISTS(SELECT 1 FROM messenger_outbound_requests r WHERE r.page_id=i.page_id AND r.psid=$3
+        AND r.status IN ('sent','unknown','sending') AND r.text='[ảnh] '||i.id) AS sent
+      FROM shop_product_images i WHERE i.page_id=$1 AND i.product_id=ANY($2::text[]) ORDER BY i.created_at`, [pageId, products.map((product) => product.id), psid])).rows;
   } catch (error) {
     if ((error as { code?: string }).code === '42P01') return [];
     throw error;
   }
   return products.flatMap((product) => {
-    const imageIds = rows.filter((row) => row.product_id === product.id).map((row) => row.id as string);
+    const own = rows.filter((row) => row.product_id === product.id);
+    const imageIds = [...own.filter((row) => !row.sent), ...own.filter((row) => row.sent)].map((row) => row.id as string);
     return imageIds.length ? [{ productId: product.id, name: product.name, sku: product.sku, imageIds }] : [];
   });
 }

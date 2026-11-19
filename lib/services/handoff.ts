@@ -1,8 +1,10 @@
 import type { Pool } from 'pg';
 import { HANDOFF_REPLY } from '@/lib/services/imageIntake';
 
+/** Mẫu cố định khi AI không trả lời được (khách ngoài chủ đề, nguồn tin chưa rõ…); không do model viết nên không thể lỡ hứa điều gì. */
+export const UNKNOWN_REPLY = 'Shop đã nhận được tin nhắn của bạn. Nhân viên sẽ xem và phản hồi bạn sớm nhất có thể nhé.';
 // Hằng của mã (không có đầu vào người dùng); nhân đôi dấu nháy cho chắc.
-const NOTICE_TEXT = HANDOFF_REPLY.replace(/'/g, "''");
+const NOTICE_TEXT = [HANDOFF_REPLY, UNKNOWN_REPLY].map(text => `'${text.replace(/'/g, "''")}'`).join(',');
 
 /**
  * Ca "đang chờ nhân viên": AI chuyển shop một ảnh cần người xem (hàng lỗi, biên lai…). Hội thoại ở lại hàng "Chưa trả lời"
@@ -15,7 +17,7 @@ export const handoffOpenSql = (alias: string) => `(${alias}.handoff_message_id I
   SELECT 1 FROM messenger_messages hm
   JOIN messenger_messages o ON o.page_id=hm.page_id AND o.conversation_id=hm.conversation_id AND o.direction='out' AND o.sent_at>hm.sent_at
   WHERE hm.page_id=${alias}.page_id AND hm.message_id=${alias}.handoff_message_id
-  AND o.text<>'${NOTICE_TEXT}'
+  AND o.text NOT IN (${NOTICE_TEXT})
   AND NOT EXISTS (SELECT 1 FROM messenger_outbound_requests r WHERE r.page_id=o.page_id AND r.message_id=o.message_id AND r.request_id=${alias}.handoff_request_id)))`;
 
 /** Đánh dấu tin khách này cần nhân viên; bỏ qua nếu hội thoại đang có một ca chưa đóng (giữ ca cũ). */
