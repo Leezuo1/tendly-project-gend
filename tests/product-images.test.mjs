@@ -112,7 +112,7 @@ test('photoImageIds takes the first image of each product before any second imag
   assert.deepEqual(photoImageIds([]), []);
 });
 
-test('readPhotoCandidates offers only unsent images of the given products', async () => {
+test('readPhotoCandidates offers unsent images first and still offers the sent ones again', async () => {
   await ready; const db = wrap(full);
   const products = [{ id: 'p-c1', name: 'A', sku: 'A' }, { id: 'p-c2', name: 'B', sku: 'B' }, { id: 'p-c3', name: 'C', sku: 'C' }];
   const one = await addProductImage('111', 'p-c1', jpeg(1), db), two = await addProductImage('111', 'p-c1', jpeg(2), db);
@@ -122,10 +122,10 @@ test('readPhotoCandidates offers only unsent images of the given products', asyn
   const sent = (id, status, psid = '900') => db.query("INSERT INTO messenger_outbound_requests(page_id,request_id,psid,text,status,created_at) VALUES('111',$1,$2,$3,$4,1)",
     [crypto.randomUUID(), psid, '[ảnh] ' + id, status]);
   await sent(one.id, 'sent'); await sent(solo.id, 'unknown'); await sent(two.id, 'failed'); await sent(two.id, 'sent', '901');
-  assert.deepEqual(await readPhotoCandidates('111', '900', products, db), [{ productId: 'p-c1', name: 'A', sku: 'A', imageIds: [two.id] }],
-    'sent and unknown images are not offered again; failed ones and other customers do not count');
+  assert.deepEqual(await readPhotoCandidates('111', '900', products, db), [{ productId: 'p-c1', name: 'A', sku: 'A', imageIds: [two.id, one.id] }, { productId: 'p-c2', name: 'B', sku: 'B', imageIds: [solo.id] }],
+    'unsent images come first, sent and unknown ones follow so they can be sent again; failed ones and other customers do not count as sent');
   await sent(two.id, 'sending');
-  assert.deepEqual(await readPhotoCandidates('111', '900', products, db), [], 'an image whose send is in flight or was cut off is not offered again either');
+  assert.deepEqual(await readPhotoCandidates('111', '900', products, db), [{ productId: 'p-c1', name: 'A', sku: 'A', imageIds: [one.id, two.id] }, { productId: 'p-c2', name: 'B', sku: 'B', imageIds: [solo.id] }], 'in-flight or cut-off sends count as sent, so they keep their place at the end');
 });
 
 test('before migration 027 readPhotoCandidates returns [] instead of failing', async () => {

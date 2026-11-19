@@ -134,31 +134,79 @@ test('Messenger AI defaults off, analyzes without sending, and sends one grounde
   assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='on'")).rows[0].status, 'sent');
 });
 
-test('a reply with a price or link the shop never gave is held for review instead of being auto-sent', async () => {
+test('a reply with a price or link the shop never gave is never sent; the fixed handoff template goes out instead and AI switches off for the conversation', async () => {
   const f = await aiFixture(true);
   await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
   await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  const { UNKNOWN_REPLY } = f.load('lib/services/handoff.ts');
   f.state.replyText = 'Áo đang giảm còn 99.000đ, xem tại https://shop-la.example/sale nhé.';
   await f.incoming('invented'); await f.process();
-  assert.equal(f.state.sends, 0);
-  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='invented'")).rows[0].status, 'review');
+  assert.equal(f.state.sends, 1);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='invented'")).rows[0].status, 'sent');
+  assert.deepEqual((await query("SELECT text FROM messenger_outbound_requests WHERE status='sent'")).rows.map(row => row.text), [UNKNOWN_REPLY]);
   const saved = (await query("SELECT analysis,reply FROM messenger_analysis_history WHERE message_id='invented'")).rows[0];
   assert.match(saved.analysis.reason, /số tiền|đường dẫn/);
-  // A run that loses the claim hands back the saved analysis, so the inbox shows it instead of "Cần phân tích lại".
-  const again = await f.process();
-  assert.equal(again.messageId, 'invented'); assert.equal(again.reply.reply, saved.reply);
-  assert.equal(f.state.sends, 0);
+  assert.equal(saved.reply, UNKNOWN_REPLY);
+  assert.equal((await query('SELECT ai_auto_reply FROM messenger_conversations')).rows[0].ai_auto_reply, false);
+  await f.process();
+  assert.equal(f.state.sends, 1, 'a replay never sends a second template');
 });
 
-test('an invented amount alone (no link) also holds the reply', async () => {
+test('an invented amount alone (no link) also hands off with the template', async () => {
   const f = await aiFixture(true);
   await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
   await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
   f.state.replyText = 'Áo đang giảm còn 99.000đ nhé.';
   await f.incoming('amount-only'); await f.process();
-  assert.equal(f.state.sends, 0);
-  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='amount-only'")).rows[0].status, 'review');
+  assert.equal(f.state.sends, 1);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='amount-only'")).rows[0].status, 'sent');
   assert.match((await query("SELECT analysis FROM messenger_analysis_history WHERE message_id='amount-only'")).rows[0].analysis.reason, /số tiền/);
+});
+
+test('after the handoff template AI stays off for that conversation until staff turn the switch back on', async () => {
+  const f = await aiFixture(true);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  f.state.canAutoReply = false;
+  await f.incoming('q1', { text: 'Bạn bán xe máy không?' }); await f.process();
+  assert.equal(f.state.sends, 1, 'the template');
+  f.state.canAutoReply = true; f.state.replyText = 'Shop mở cửa lúc 8 giờ.';
+  await f.incoming('q2', { text: 'Giờ mở cửa?', timestamp: Date.now() + 1000 }); await f.process();
+  assert.equal(f.state.sends, 1, 'AI is off for this conversation while staff handle it');
+  await f.writer.savePostgresMessages([m('staff', { direction: 'out', timestamp: Date.now() + 2000, text: 'Shop xử lý giúp bạn ạ.' })], pool);
+  const { ai_updated_at } = (await query('SELECT ai_updated_at FROM messenger_conversations')).rows[0];
+  await f.service.saveConversationAutoReply('111', '222', true, Number(ai_updated_at), pool);
+  await f.incoming('q3', { text: 'Giờ mở cửa?', timestamp: Date.now() + 3000 }); await f.process();
+  assert.equal(f.state.sends, 2, 'after staff turn the switch back on AI answers again');
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='q3'")).rows[0].status, 'sent');
+});
+
+test('turning the switch back on closes the open handoff even before staff reply, so AI is not silently held', async () => {
+  const f = await aiFixture(true);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  f.state.canAutoReply = false;
+  await f.incoming('q1', { text: 'Bạn bán xe máy không?' }); await f.process();
+  assert.equal(f.state.sends, 1, 'the template');
+  const { ai_updated_at } = (await query('SELECT ai_updated_at FROM messenger_conversations')).rows[0];
+  await f.service.saveConversationAutoReply('111', '222', true, Number(ai_updated_at), pool);
+  assert.equal((await query('SELECT handoff_message_id FROM messenger_conversations')).rows[0].handoff_message_id, null);
+  f.state.canAutoReply = true; f.state.replyText = 'Shop mở cửa lúc 8 giờ.';
+  await f.incoming('q2', { text: 'Giờ mở cửa?', timestamp: Date.now() + 3000 }); await f.process();
+  assert.equal(f.state.sends, 2, 'the next question gets a real answer');
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='q2'")).rows[0].status, 'sent');
+});
+
+test('with the conversation switch off an unanswerable reply is held as a suggestion for staff and nothing is sent', async () => {
+  const f = await aiFixture(true);
+  await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
+  await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
+  f.state.replyText = 'Áo đang giảm còn 99.000đ nhé.';
+  await f.incoming('off-held'); await query('UPDATE messenger_conversations SET ai_auto_reply=false');
+  const result = await f.process();
+  assert.equal(f.state.sends, 0);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='off-held'")).rows[0].status, 'review');
+  assert.equal(result.reply.reply, 'Áo đang giảm còn 99.000đ nhé.', 'staff still see the AI draft');
 });
 
 test('a burst of messages waits for the customer to stop typing and gets one reply covering all of them', async () => {
@@ -315,7 +363,7 @@ test('insufficient evidence stays pending above unread/urgent threads, survives 
   assert.equal(f.state.sends, 1);
 });
 
-test('missing evidence flag, unread attachments and AI errors fail closed with persistent review', async () => {
+test('missing evidence flag and unread attachments hand off with the template; AI errors still fail closed with persistent review', async () => {
   for (const mode of ['missing-flag', 'attachment', 'ai-error']) {
     const f = await aiFixture();
     if (mode === 'missing-flag') f.state.canAutoReply = undefined;
@@ -324,8 +372,8 @@ test('missing evidence flag, unread attachments and AI errors fail closed with p
     await f.incoming(mode, mode === 'attachment' ? { attachments: [{ type: 'video', url: 'https://example.com/a.mp4' }] } : {});
     if (mode === 'ai-error') await assert.rejects(f.process(), /căn cứ/);
     else await f.process();
-    assert.equal(f.state.sends, 0);
-    assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'review');
+    assert.equal(f.state.sends, mode === 'ai-error' ? 0 : 1, mode);
+    assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, mode === 'ai-error' ? 'review' : 'sent', mode);
   }
 });
 
@@ -448,11 +496,12 @@ test('turning a conversation off or off/on during generation blocks that job; fi
   }
 });
 
-test('urgent requests are held for review even if the model marks them safe to send', async () => {
+test('urgent requests are never answered by the model even if it marks them safe to send; the handoff template goes out', async () => {
   const f = await aiFixture(); f.state.priority = 'high';
   await f.incoming('urgent'); await f.process();
-  assert.equal(f.state.sends, 0);
-  assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'review');
+  assert.equal(f.state.sends, 1);
+  assert.deepEqual((await query("SELECT text FROM messenger_outbound_requests WHERE status='sent'")).rows.map(row => row.text), [f.load('lib/services/handoff.ts').UNKNOWN_REPLY]);
+  assert.equal((await query('SELECT status FROM messenger_ai_jobs')).rows[0].status, 'sent');
 });
 
 test('confirmed server rules and Page voice reach every generation; a configuration change during generation blocks the old output', async () => {
@@ -553,7 +602,7 @@ test('staff labels: changes are applied on the server against the shop set, no c
   assert.equal((await change('add', 'buy')).status, 404, 'hidden conversation');
 });
 
-test('a reply that names a staff label is held for review, never auto-sent', async () => {
+test('a reply that names a staff label is never auto-sent; the handoff template goes out instead', async () => {
   const f = await aiFixture(true);
   await f.service.saveMessengerAiSettings('111', true, f.knowledge, pool);
   await query('UPDATE messenger_ai_settings SET enabled_at=$1', [Date.now() - 1000]);
@@ -566,8 +615,9 @@ test('a reply that names a staff label is held for review, never auto-sent', asy
   assert.equal(f.state.sends, 1, 'a reply that does not name the label still sends');
   f.state.replyText = 'Dạ vì bạn là khach bom hang nên shop xin phép từ chối.';
   await f.incoming('label-leak', { timestamp: Date.now() + 5 }); await f.process();
-  assert.equal(f.state.sends, 1, 'a reply naming the label is not sent');
-  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='label-leak'")).rows[0].status, 'review');
+  assert.equal(f.state.sends, 2, 'the reply naming the label is not sent; the fixed template is');
+  assert.deepEqual((await query("SELECT text FROM messenger_outbound_requests WHERE status='sent' ORDER BY created_at")).rows.map(row => row.text), ['Shop mở cửa lúc 8 giờ.', f.load('lib/services/handoff.ts').UNKNOWN_REPLY]);
+  assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='label-leak'")).rows[0].status, 'sent');
 });
 
 test('AI reads staff labels by name (masked) and picks up to 3 labels from the shop set, on the webhook run and the re-analyse button', async () => {
@@ -634,13 +684,13 @@ test('a product photo is answered like text and may be sent automatically', asyn
   assert.equal(await jobStatus('photo-product'), 'sent');
 });
 
-test('a product-photo reply that repeats a long number read from the image is held for review, not sent', async () => {
+test('a product-photo reply that repeats a long number read from the image is never sent; the handoff template goes out', async () => {
   const f = await aiFixture(true); await enableAutoReply(f);
   f.state.imageKinds = ['product'];
   f.state.replyText = 'Số tài khoản trên ảnh là 0123456789, đúng không ạ?';
   await f.incoming('photo-number', { text: '', attachments: [photo] }); await f.process();
-  assert.equal(f.state.sends, 0);
-  assert.equal(await jobStatus('photo-number'), 'review');
+  assert.deepEqual(await sentTexts(), [f.load('lib/services/handoff.ts').UNKNOWN_REPLY]);
+  assert.equal(await jobStatus('photo-number'), 'sent');
   assert.match((await savedAnalysis('photo-number')).reason, /dãy số/);
   // The same words typed by the customer themselves (a text message with no photo) keep the old rules.
   const text = await aiFixture(true); await enableAutoReply(text);
@@ -700,14 +750,14 @@ test('wrong imageKinds from the model fail closed to the handoff template', asyn
   }
 });
 
-test('stickers, video and mixed attachments keep the old behaviour: held for review, nothing sent', async () => {
+test('stickers, video and mixed attachments hand off with the template', async () => {
   const cases = { sticker: [{ ...photo, sticker: true }], video: [{ type: 'video', url: 'https://example.com/a.mp4' }], mixed: [photo, { type: 'video', url: 'https://example.com/a.mp4' }] };
   for (const [name, attachments] of Object.entries(cases)) {
     const f = await aiFixture(true); await enableAutoReply(f);
     f.state.imageKinds = ['product'];
     await f.incoming(`att-${name}`, { text: '', attachments }); await f.process();
-    assert.equal(f.state.sends, 0, name);
-    assert.equal(await jobStatus(`att-${name}`), 'review', name);
+    assert.deepEqual(await sentTexts(), [f.load('lib/services/handoff.ts').UNKNOWN_REPLY], name);
+    assert.equal(await jobStatus(`att-${name}`), 'sent', name);
     assert.equal(f.state.geminiCalls, 1, `${name}: still analysed as text`);
   }
 });
@@ -925,10 +975,10 @@ test('multiple sources never select the newest implicitly; a direct reply resolv
   const f = await sourceFixture(); await f.linkPost(); await f.linkLive(); await f.incoming('ambiguous');
   let context = await f.readSources('222', 'ambiguous');
   assert.equal(context.resolution, 'ambiguous'); assert.equal(context.selectedId, null); assert.equal(context.blocked, true);
-  await f.process(); assert.equal(f.state.sends, 0);
+  await f.process(); assert.equal(f.state.sends, 1, 'only the fixed handoff template goes out');
   const saved = (await query("SELECT * FROM messenger_analysis_history WHERE message_id='ambiguous'")).rows[0];
   assert.equal(saved.source_context_json.resolution, 'ambiguous');
-  assert.match(saved.reply, /bài đăng hoặc phiên nào/);
+  assert.equal(saved.reply, f.load('lib/services/handoff.ts').UNKNOWN_REPLY);
   await f.incoming('explicit', { replyToMessageId: 'private-post', timestamp: Date.now() + 1 });
   context = await f.readSources('222', 'explicit');
   assert.equal(context.resolution, 'reply'); assert.equal(context.selectedId, 'private-post'); assert.equal(context.blocked, false);
@@ -938,7 +988,7 @@ test('multiple sources never select the newest implicitly; a direct reply resolv
   assert.equal(memory.get('["111","222"]')[0].sourceContext.sources.length, 2);
 });
 
-test('campaign boundaries, changed approvals and edited comments block sending while preserving the original offer and comment', async () => {
+test('campaign boundaries, changed approvals and edited comments block model answers (only the handoff template goes out) while preserving the original offer and comment', async () => {
   const f = await sourceFixture(); await f.linkPost(); await f.incoming('offer');
   const active = await f.readSources('222', 'offer');
   const expired = await f.readSources('222', 'offer', Date.parse(f.campaign.offer.endsAt));
@@ -951,7 +1001,8 @@ test('campaign boundaries, changed approvals and edited comments block sending w
   const changed = await f.readSources('222', 'offer');
   assert.equal(changed.sources[0].commentText, 'Áo AT01 có ưu đãi không?');
   assert.ok(changed.sources[0].issues.some(issue => issue.includes('Bình luận đã thay đổi')));
-  await f.process(); assert.equal(f.state.sends, 0);
+  await f.process(); assert.equal(f.state.sends, 1, 'blocked sources never get a model answer, only the fixed handoff template');
+  assert.equal((await query("SELECT text FROM messenger_outbound_requests WHERE status='sent'")).rows[0].text, f.load('lib/services/handoff.ts').UNKNOWN_REPLY);
 });
 
 test('Live carries the exact SKU and flash snapshot, deduplicates shared post replies and expires when the session ends or price changes', async () => {
@@ -1586,15 +1637,15 @@ test('after the text the chosen photos follow in order, one request each, and th
   assert.deepEqual((await savedAnalysis('ask')).photoImageIds, ids);
 });
 
-test('a photo already sent in this conversation is not offered or sent again on the next turn', async () => {
+test('photos already sent in this conversation are offered again and go out again when the customer asks and the model picks them', async () => {
   const f = await aiFixture(true); await photoShop(f);
   f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
   await f.incoming('ask', asked()); await f.process();
   assert.equal(f.state.sends, 4);
   const seen = []; f.state.beforeReply = async (options) => { seen.push(options); };
   await f.incoming('again', asked({ timestamp: Date.now() + 1000 })); await f.process();
-  assert.equal(JSON.parse(seen[0].user).shopPhotos, undefined, 'all images of the product were sent, so none is offered');
-  assert.equal(f.state.sends, 5, 'only the text goes out the second time');
+  assert.deepEqual(JSON.parse(seen[0].user).shopPhotos.map(({ productId }) => productId), ['p1'], 'the product is still offered although all its images were sent');
+  assert.equal(f.state.sends, 8, 'the text and the 3 photos go out again');
 });
 
 test('a photo failing stops the later photos but the job stays sent and the next customer message is still auto-replied', async () => {
@@ -1618,10 +1669,11 @@ test('a customer message arriving after the text stops the remaining photos', as
   f.state.beforeTransport = async () => {
     if (++reservations !== 2) return;
     await f.writer.savePostgresMessages([m('late', { timestamp: Date.now() + 1000, text: 'Còn size M không?' })], pool);
-    f.state.canAutoReply = false; // the follow-up run for the late message must only hold it for review
+    f.state.canAutoReply = false; // the follow-up run for the late message cannot answer, so it sends the handoff template
   };
   await f.incoming('ask', asked()); await f.process();
-  assert.equal(f.state.sends, 2, 'the text and the photo already in flight; no more');
+  assert.equal(f.state.sends, 3, 'the text, the photo already in flight and the template for the late message');
+  assert.equal((await outbound()).filter(row => row.text.startsWith('[ảnh]')).length, 1, 'the remaining photos are not sent');
 });
 
 test('auto-reply switched off after the text stops the remaining photos', async () => {
@@ -1633,10 +1685,10 @@ test('auto-reply switched off after the text stops the remaining photos', async 
   assert.equal(f.state.sends, 2);
 });
 
-test('a held reply keeps its photo ids for the inbox and sends nothing, also on replay', async () => {
+test('a held reply (conversation switch off) keeps its photo ids for the inbox and sends nothing, also on replay', async () => {
   const f = await aiFixture(true); const ids = await photoShop(f);
   f.state.canAutoReply = false; f.state.photoProductIds = ['p1']; f.state.replyText = NAMING_REPLY;
-  await f.incoming('held', asked());
+  await f.incoming('held', asked()); await query('UPDATE messenger_conversations SET ai_auto_reply=false');
   const first = await f.process();
   assert.deepEqual(first.reply.analysis.photoImageIds, ids);
   assert.equal(await jobStatus('held'), 'review');
@@ -1681,12 +1733,13 @@ test('unsent photos show up for the inbox: failed and unknown (also stale sendin
   await row(0, '[ảnh] img-failed', 'failed'); await row(0, '[ảnh] img-failed', 'failed', now + 1); await row(0, '[ảnh] img-unknown', 'unknown'); await row(0, '[ảnh] img-stale', 'sending', now - 3 * 60 * 1000);
   await row(0, '[ảnh] img-fresh', 'sending', now - 5 * 1000);
   await row(0, '[ảnh] img-resent', 'failed'); await row(0, '[ảnh] img-resent', 'sent');
+  await row(0, '[ảnh] img-resend-failed', 'sent', now - 1000); await row(0, '[ảnh] img-resend-failed', 'failed'); // an older success must not hide a newer failed resend
   await row(0, '[ảnh] upload', 'failed'); await row(0, '[ảnh] img-old', 'failed', now - 25 * 60 * 60 * 1000);
   await row(0, '[ảnh] img-other-customer', 'failed', now, '999'); await row(0, 'một câu chữ', 'failed');
   const thread = await handoffThread(f);
   const byId = Object.fromEntries(thread.failedImages.map(image => [image.imageId, image.status]));
-  assert.equal(thread.failedImages.length, 3, 'two failed attempts of one image show once');
-  assert.deepEqual(byId, { 'img-failed': 'failed', 'img-unknown': 'unknown', 'img-stale': 'unknown' });
+  assert.equal(thread.failedImages.length, 4, 'two failed attempts of one image show once');
+  assert.deepEqual(byId, { 'img-failed': 'failed', 'img-unknown': 'unknown', 'img-stale': 'unknown', 'img-resend-failed': 'failed' });
   const view = f.load('lib/services/messengerView.ts').mergeMessengerThread(thread);
   assert.deepEqual(view.failedImages, thread.failedImages, 'the conversation carries the same list');
   assert.equal(f.load('lib/services/messengerView.ts').mergeMessengerThread({ ...thread, failedImages: undefined }, view).failedImages, undefined, 'the server list wins: a cleared failure is gone');

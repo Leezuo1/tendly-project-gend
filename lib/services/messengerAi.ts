@@ -7,7 +7,7 @@ import { liveKnowledge, readShopTagRules } from '@/lib/services/shopCatalog';
 import { staffLabelNotes } from '@/lib/services/staffLabels';
 import { buildImageInput } from '@/lib/services/imageIntake';
 import { readPhotoCandidates, readProductImage } from '@/lib/services/productImages';
-import { handoffOpenSql, markHandoff, setHandoffRequest } from '@/lib/services/handoff';
+import { handoffOpenSql, markHandoff, setHandoffRequest, UNKNOWN_REPLY } from '@/lib/services/handoff';
 import { careRules, CustomerCareError, generateCareReply, parseCareProfile } from '@/lib/services/customerCare';
 import { readConversationSources } from '@/lib/services/conversationSources';
 import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
@@ -41,7 +41,10 @@ export async function saveConversationAutoReply(pageId: string, psid: string, en
   db: Pick<Pool, 'query'> = getMessengerPool()) {
   const row = (await db.query(`UPDATE messenger_conversations SET ai_auto_reply=$3,
     ai_enabled_at=CASE WHEN $3::boolean AND NOT ai_auto_reply THEN $4 ELSE ai_enabled_at END,
-    ai_updated_at=GREATEST(ai_updated_at+1,$4) WHERE page_id=$1 AND id=$2 AND hidden_at IS NULL AND ai_updated_at=$5
+    ai_updated_at=GREATEST(ai_updated_at+1,$4),
+    handoff_message_id=CASE WHEN $3::boolean THEN NULL ELSE handoff_message_id END,
+    handoff_request_id=CASE WHEN $3::boolean THEN NULL ELSE handoff_request_id END
+    WHERE page_id=$1 AND id=$2 AND hidden_at IS NULL AND ai_updated_at=$5
     RETURNING ai_auto_reply,ai_updated_at`, [pageId, JSON.stringify([pageId, psid]), enabled, Date.now(), updatedAt])).rows[0];
   if (!row) throw new CustomerCareError('Hội thoại đã thay đổi hoặc không còn hiển thị. Tải lại trước khi thử lại.', 409);
   return { autoReply: row.ai_auto_reply, updatedAt: Number(row.ai_updated_at) };
@@ -115,8 +118,18 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     // Chỉ tin mẫu cố định của chính ca này được đi qua; câu do model viết (kể cả khi chạy lại và model phân loại khác) thì không.
     const isHandoffNotice = reply.analysis.imageOutcome === 'handoff' && latest.handoff_message_id === latest.message_id;
     const handoffHeld = latest.handoff_open === true && !isHandoffNotice;
-    const blocked = handoffHeld || (reply.analysis.imageOutcome ? false : !reply.analysis.canAutoReply || reply.analysis.needsHuman || (!customerText && !imageInput) || !!unsupported
+    const cannotAnswer = handoffHeld || (reply.analysis.imageOutcome ? false : !reply.analysis.canAutoReply || reply.analysis.needsHuman || (!customerText && !imageInput) || !!unsupported
       || (attachments.length > 0 && !imageInput) || Array.from(reply.reply).length > 2000);
+    // AI sắp tự gửi mà không trả lời được: gửi mẫu cố định, chuyển nhân viên rồi tắt AI của hội thoại (nhân viên xong thì bật lại bằng công tắc).
+    // Công tắc đang tắt thì giữ gợi ý của AI cho nhân viên như cũ; ca đang chờ (handoffHeld) cũng chỉ giữ, không gửi mẫu lần hai.
+    const willSend = settings.auto_reply === true && latest.ai_auto_reply === true && Number(latest.sent_at) > Number(settings.enabled_at) && Number(latest.sent_at) > Number(latest.ai_enabled_at);
+    const unknownHandoff = cannotAnswer && !handoffHeld && willSend;
+    const blocked = cannotAnswer && !unknownHandoff;
+    if (unknownHandoff) {
+      reply.reply = UNKNOWN_REPLY;
+      // photoImageIds bỏ đi: ảnh sản phẩm thuộc câu trả lời cũ, không gửi kèm mẫu chuyển nhân viên.
+      reply.analysis = { ...reply.analysis, imageOutcome: 'handoff', canAutoReply: true, needsHuman: true, priority: 'high', priorityScore: Math.max(80, reply.analysis.priorityScore), photoImageIds: undefined };
+    }
     if (blocked) reply.analysis.canAutoReply = false;
     const current = (await db.query('SELECT updated_at FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
     if (!current || Number(current.updated_at) !== Number(settings.updated_at)) {
@@ -151,9 +164,10 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     if (reply.analysis.imageOutcome === 'handoff') await setHandoffRequest(db, pageId, id, latest.message_id, requestId);
     try {
       const sent = await runAutomaticAccess(Number(latest.sent_at), () => sendMessengerMessage({ psid, text: reply.reply, requestId,
-        automation: { messageId: latest.message_id, settingsVersion: Number(settings.updated_at), conversationVersion: Number(latest.ai_updated_at), sourceFingerprint: sources.fingerprint } }, db));
+        automation: { messageId: latest.message_id, settingsVersion: Number(settings.updated_at), conversationVersion: Number(latest.ai_updated_at), sourceFingerprint: sources.fingerprint, fixedTemplate: unknownHandoff } }, db));
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
         [pageId, latest.message_id, Date.now(), sent.persisted ? 'sent' : 'unknown']);
+      if (unknownHandoff) await db.query('UPDATE messenger_conversations SET ai_auto_reply=false,ai_updated_at=GREATEST(ai_updated_at+1,$3) WHERE page_id=$1 AND id=$2', [pageId, id, Date.now()]);
       // Ảnh đi sau chữ và không bao giờ đổi trạng thái job: trạng thái cuối của job chỉ phản ánh phần chữ.
       if (sent.persisted && reply.analysis.photoImageIds?.length) await sendPhotosAfterText(db, pageId, psid, requestId, latest.sent_at, reply.analysis.photoImageIds);
       return { reply, sent, messageId: latest.message_id };
