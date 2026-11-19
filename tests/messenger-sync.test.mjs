@@ -258,7 +258,7 @@ test('phone numbers and emails are masked before text reaches the AI, and the de
   const { messengerDebounceMs } = loader()('lib/services/messengerDebounce.ts');
   const old = process.env.MESSENGER_AI_DEBOUNCE_MS;
   try {
-    delete process.env.MESSENGER_AI_DEBOUNCE_MS; assert.equal(messengerDebounceMs(), 15000);
+    delete process.env.MESSENGER_AI_DEBOUNCE_MS; assert.equal(messengerDebounceMs(), 5000);
     process.env.MESSENGER_AI_DEBOUNCE_MS = '99999'; assert.equal(messengerDebounceMs(), 15000);
     process.env.MESSENGER_AI_DEBOUNCE_MS = '0'; assert.equal(messengerDebounceMs(), 0);
     process.env.MESSENGER_AI_DEBOUNCE_MS = 'abc'; assert.equal(messengerDebounceMs(), 0);
