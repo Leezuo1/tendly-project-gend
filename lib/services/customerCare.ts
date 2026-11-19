@@ -83,7 +83,9 @@ export async function generateCareReply(knowledge: AiKnowledge, profile: AiProfi
       ...(labels.staff.length && profile.sources.includes('conversation') ? { staffLabels: labels.staff.map(note) } : {}),
       ...(options.length ? { labelOptions: options } : {}), ...(images ? { imageCount: images.count } : {}),
       ...(offered.length ? { shopPhotos: offered.map(({ productId, name }) => ({ productId, name })) } : {}), latestCustomerMessage: maskPersonalData(message) }),
-    schema: AI_RESPONSE_SCHEMA, temperature: 0.1, maxOutputTokens: 1500, signal: AbortSignal.timeout(30_000), parse: parseAiChatOutput });
+    schema: AI_RESPONSE_SCHEMA, temperature: 0.1, maxOutputTokens: 1500, signal: AbortSignal.timeout(30_000), parse: parseAiChatOutput,
+    // Lượt có ảnh thường mất ~11 s; một model bị treo không được ăn hết 30 s mà không để model kế tiếp thử.
+    ...(images ? { attemptTimeoutMs: 15_000 } : {}) });
   // AI chỉ được chọn nhãn có trong bộ nhãn đang bật của shop.
   const picked = (result.analysis.labels ?? []).filter(id => options.some(option => option.id === id));
   if (picked.length) result.analysis.labels = picked; else delete result.analysis.labels;
