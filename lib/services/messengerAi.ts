@@ -170,7 +170,7 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
         [pageId, latest.message_id, Date.now(), sent.persisted ? 'sent' : 'unknown']);
       if (unknownHandoff) await db.query('UPDATE messenger_conversations SET ai_auto_reply=false,ai_updated_at=GREATEST(ai_updated_at+1,$3) WHERE page_id=$1 AND id=$2', [pageId, id, Date.now()]);
       // Ảnh đi sau chữ và không bao giờ đổi trạng thái job: trạng thái cuối của job chỉ phản ánh phần chữ.
-      if (sent.persisted && reply.analysis.photoImageIds?.length) await sendPhotosAfterText(db, pageId, psid, requestId, latest.sent_at, reply.analysis.photoImageIds, startedAt + 50_000);
+      if (sent.persisted && reply.analysis.photoImageIds?.length) await sendPhotosAfterText(db, pageId, psid, requestId, latest.sent_at, reply.analysis.photoImageIds, startedAt + 55_000);
       return { reply, sent, messageId: latest.message_id };
     } catch (error) {
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
@@ -201,8 +201,8 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
 async function sendPhotosAfterText(db: Pool, pageId: string, psid: string, requestId: string, sentAt: string | number, imageIds: string[], deadline: number) {
   const conversationId = JSON.stringify([pageId, psid]);
   for (const [index, imageId] of imageIds.entries()) {
-    // shortcut: không giới hạn số ảnh nhưng ngừng gửi khi gần hết maxDuration của hàm; ảnh chưa gửi sẽ được đưa lại cho AI ở lượt sau (ảnh chưa gửi xếp trước).
-    if (Date.now() > deadline) return;
+    // shortcut: không giới hạn số ảnh nhưng ngừng gửi khi gần hết maxDuration của hàm; ảnh chưa gửi sẽ được đưa lại cho AI ở lượt sau (ảnh chưa gửi xếp trước). Giới hạn: lượt chạy lại ở finally đặt startedAt mới trong cùng một lần gọi hàm.
+    if (Date.now() + 15_000 > deadline) return; // một ảnh có thể mất tới 15 giây (hạn chờ của messengerSend)
     try {
       const open = await db.query(`SELECT 1 FROM messenger_conversations c JOIN messenger_ai_settings s ON s.page_id=c.page_id
         WHERE c.page_id=$1 AND c.id=$2 AND c.ai_auto_reply AND s.auto_reply AND c.hidden_at IS NULL
