@@ -144,3 +144,28 @@ test('generateGeminiJson sends images as inline_data parts and leaves text-only 
   assert.deepEqual(bodies[1].contents[0].parts, [{ text: 'u' }]);
   assert.deepEqual(bodies[2].contents[0].parts, [{ text: 'u' }]);
 });
+
+test('a model that stalls is cut off after attemptTimeoutMs so the next model can still answer inside the overall budget', async () => {
+  const { generateGeminiJson, GEMINI_CANDIDATE_MODELS } = load('lib/services/gemini.ts');
+  const originalFetch = globalThis.fetch, keys = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.env.GEMINI_MODEL };
+  process.env.GEMINI_API_KEY = 'test-key'; delete process.env.GEMINI_MODEL;
+  const urls = [];
+  globalThis.fetch = (url, init) => {
+    urls.push(url);
+    if (urls.length === 1) return new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+    return Promise.resolve(Response.json({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }));
+  };
+  const started = Date.now();
+  const keepAlive = setTimeout(() => {}, 5000); // AbortSignal timers do not keep the event loop alive; a real fetch would
+  let result;
+  try {
+    result = await generateGeminiJson({ role: 'sourcing', system: 's', user: 'u', schema: {}, parse: (text) => JSON.parse(text), attemptTimeoutMs: 80, signal: AbortSignal.timeout(3000) });
+  } finally {
+    clearTimeout(keepAlive);
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(keys)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+  assert.equal(urls.length, 2, 'the stalled first model was abandoned');
+  assert.equal(result.model, GEMINI_CANDIDATE_MODELS[1]);
+  assert.ok(Date.now() - started < 2000, 'well before the overall 3 s budget');
+});
