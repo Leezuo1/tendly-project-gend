@@ -89,8 +89,10 @@ export function parseMetaMessages(payload: unknown, pageId: string): MessengerMe
         attachments: attachments.flatMap((value) => {
           const attachment = record(value);
           if (typeof attachment?.type !== 'string') return [];
-          const url = record(attachment.payload)?.url;
-          return [{ type: attachment.type, ...(typeof url === 'string' ? { url } : {}) }];
+          const payload = record(attachment.payload);
+          // Sticker và nút Like đến dưới dạng ảnh; cờ này để AI không coi chúng là ảnh khách gửi.
+          return [{ type: attachment.type, ...(typeof payload?.url === 'string' ? { url: payload.url } : {}),
+            ...(payload?.sticker_id !== undefined ? { sticker: true } : {}) }];
         }),
       });
     }

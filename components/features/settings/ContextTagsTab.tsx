@@ -33,7 +33,7 @@ export function ContextTagsTab() {
   const matches = matchContextTags(sample, rules);
   return <>
     <section className="card context-tags">
-      <div className="card-head"><div><h2>Gắn thẻ theo ngữ cảnh</h2><p className="card-desc">Tự gắn thẻ vào hội thoại khi tin nhắn mới nhất của khách chứa một trong các từ khóa đã đặt.</p></div>
+      <div className="card-head"><div><h2>Gắn thẻ theo ngữ cảnh</h2><p className="card-desc">Bộ thẻ của shop: tự gắn khi tin nhắn mới nhất của khách chứa một trong các từ khóa đã đặt, AI chọn theo ngữ cảnh, và nhân viên gắn hoặc gỡ ngay trên ô nhập tin nhắn.</p></div>
         <button className="btn btn-primary btn-sm" disabled={!!editing || version < 0 || rules.length >= 50} onClick={() => edit({ id: crypto.randomUUID(), label: '', keywords: [], type: 'neutral', enabled: true })}>Thêm quy tắc</button></div>
       <p className="card-desc">{rules.filter(rule => rule.enabled).length} quy tắc đang bật · Không phân biệt chữ hoa và dấu tiếng Việt.</p>
       {error && !editing && <p className="field-error" role="alert">{error}</p>}
@@ -43,7 +43,8 @@ export function ContextTagsTab() {
           <div className="field"><label htmlFor="tag-name">Tên thẻ</label><input id="tag-name" autoFocus required maxLength={50} value={editing.label} onChange={event => setEditing({ ...editing, label: event.target.value })} /></div>
           <div className="field"><label htmlFor="tag-color">Màu thẻ</label><select id="tag-color" value={editing.type} onChange={event => setEditing({ ...editing, type: event.target.value as ContextTagRule['type'] })}>{Object.entries(CONTEXT_TAG_COLORS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div>
         </div>
-        <div className="field"><label htmlFor="tag-keywords">Từ khóa / cụm từ</label><textarea id="tag-keywords" rows={3} required maxLength={2019} value={keywords} onChange={event => setKeywords(event.target.value)} placeholder="Ví dụ: đổi trả, hoàn tiền, hàng lỗi" /><span className="field-hint">Ngăn cách bằng dấu phẩy. Tối đa 20 từ khóa; chỉ khớp từ hoặc cụm từ đầy đủ.</span></div>
+        <div className="field"><label htmlFor="tag-keywords">Từ khóa / cụm từ</label><textarea id="tag-keywords" rows={3} maxLength={2019} value={keywords} onChange={event => setKeywords(event.target.value)} placeholder="Ví dụ: đổi trả, hoàn tiền, hàng lỗi" /><span className="field-hint">Ngăn cách bằng dấu phẩy. Tối đa 20 từ khóa; chỉ khớp từ hoặc cụm từ đầy đủ. Để trống nếu chỉ muốn nhân viên hoặc AI tự gắn thẻ này.</span></div>
+        <div className="field"><label htmlFor="tag-context">Ngữ cảnh cho AI (không bắt buộc)</label><textarea id="tag-context" rows={3} maxLength={500} value={editing.context ?? ''} onChange={event => setEditing({ ...editing, context: event.target.value })} placeholder="Ví dụ: Khách mua sỉ từ 10 cái. Ưu tiên báo giá sỉ theo FAQ, không áp giá lẻ." /><span className="field-hint">Khi nhãn này được gắn vào một hội thoại, AI đọc đoạn này để hiểu tình huống của khách. Tối đa 500 ký tự; không ghi dữ liệu cá nhân của khách.</span></div>
         {error && <p className="field-error" role="alert">{error}</p>}
         <div className="context-tag-actions"><button type="button" className="btn btn-outline btn-sm" onClick={() => { setEditing(null); setError(''); }}>Hủy</button><button className="btn btn-primary btn-sm" type="submit">Lưu quy tắc</button></div>
       </form>}
@@ -51,7 +52,7 @@ export function ContextTagsTab() {
         {version < 0 && <p className="card-desc">Đang tải quy tắc…</p>}
         {version >= 0 && !rules.length && <p className="empty-state">Chưa có quy tắc. Thêm thẻ để phân loại nhu cầu khách hàng.</p>}
         {rules.map(rule => <div className="context-tag-rule" key={rule.id}>
-          <div><span className={`tag ${rule.type}`}>{rule.label}</span><p>{rule.keywords.join(' · ')}</p></div>
+          <div><span className={`tag ${rule.type}`}>{rule.label}</span><p>{rule.keywords.join(' · ') || 'Không có từ khóa: chỉ nhân viên hoặc AI gắn.'}</p>{rule.context && <p className="card-desc">{rule.context}</p>}</div>
           <div className="context-tag-actions"><Switch checked={rule.enabled} label={`Bật thẻ ${rule.label}`} disabled={!!editing} onChange={enabled => { setError(''); persist(rules.map(item => item.id === rule.id ? { ...item, enabled } : item)); }} />
             <button className="btn btn-outline btn-sm" disabled={!!editing} onClick={() => edit(rule)} aria-label={`Sửa thẻ ${rule.label}`}>Sửa</button>
             <button className="btn btn-text btn-sm" disabled={!!editing} onClick={() => setDeleting(rule)} aria-label={`Xóa thẻ ${rule.label}`}>Xóa</button></div>

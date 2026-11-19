@@ -1,5 +1,5 @@
 import type { AiChatReply, AiSessionMessage, CustomerEmotion, ReplyPriority } from '@/lib/types/ai';
-import type { ChatMessage, Conversation, ConversationTag } from '@/lib/types/inbox';
+import type { ChatMessage, Conversation, ConversationTag, DraftImage } from '@/lib/types/inbox';
 
 export const EMOTION_LABELS: Record<CustomerEmotion, string> = {
   happy: '😊 Tích cực', neutral: '😐 Trung lập', worried: '😟 Lo lắng',
@@ -58,11 +58,7 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
     return { ...conversation, aiSuggestion: undefined, aiStatus: 'error', aiError: 'Nguồn hoặc ưu đãi đã thay đổi. Tạo lại gợi ý trước khi gửi.' };
   }
   const a = result.analysis;
-  const emotionTag: ConversationTag = {
-    label: EMOTION_LABELS[a.emotion],
-    type: a.sentiment === 'negative' ? 'high' : a.sentiment === 'positive' ? 'positive' : 'neutral',
-    source: 'ai', kind: 'emotion',
-  };
+  // Cảm xúc chỉ dùng để xếp ưu tiên và chọn giọng trả lời; không hiện thành chip.
   const priorityTag: ConversationTag = {
     label: PRIORITY_LABELS[a.priority], type: a.priority === 'high' ? 'high' : 'neutral',
     source: 'ai', kind: 'priority',
@@ -72,15 +68,15 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
     waitingConfirmation: conversation.waitingConfirmation || a.canAutoReply === false,
     analysis: { ...a, messageId }, aiStatus: 'ready', aiError: undefined,
     isUrgent: a.priority === 'high',
-    // Thay các nhãn cảm xúc demo/cũ; giữ nhãn khách VIP trong danh sách.
-    tags: [...conversation.tags.filter((t) => t.type === 'vip'), emotionTag, priorityTag],
-    threadWho: { ...conversation.threadWho, badgeTag: emotionTag },
+    // Bỏ nhãn cảm xúc demo/cũ; giữ nhãn khách VIP trong danh sách.
+    tags: [...conversation.tags.filter((t) => t.type === 'vip'), priorityTag],
+    threadWho: { ...conversation.threadWho, badgeTag: undefined },
     profile: { ...conversation.profile,
-      tags: [...conversation.profile.tags.filter((t) => t.type === 'vip' || (t.type === 'loop' && t.source !== 'ai')), emotionTag],
+      tags: conversation.profile.tags.filter((t) => t.type === 'vip' || (t.type === 'loop' && t.source !== 'ai')),
     },
     aiSuggestion: {
       sourceFingerprint: result.sourceContext?.fingerprint,
-      label: `✨ AI đề xuất · ${EMOTION_LABELS[a.emotion]}`,
+      label: '✨ AI đề xuất',
       source: result.sourceSummary, text: result.reply,
     },
   };
@@ -88,10 +84,27 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
 
 export function markConversationAnswered(conversation: Conversation, message: ChatMessage): Conversation {
   return {
-    ...conversation, time: 'Vừa xong', preview: message.text,
+    ...conversation, time: 'Vừa xong', preview: message.text || '[Ảnh]',
     isUnreplied: false, isUrgent: false, aiSuggestion: undefined, waitingConfirmation: false,
     aiStatus: conversation.analysis ? 'ready' : undefined, aiError: undefined, pendingSince: undefined,
     tags: conversation.tags.filter((t) => t.kind !== 'priority'),
     messages: [...conversation.messages, message],
   };
+}
+
+/** Khóa để nhớ ảnh gợi ý mà nhân viên đã gỡ khỏi khay (theo tin khách đang trả lời, ảnh mới của lượt sau không bị che). */
+export const photoRemovalKey = (conversation: Conversation, imageId: string) => `${conversation.analysis?.messageId ?? ''}:${imageId}`;
+
+/**
+ * Khay ảnh trên ô soạn: ảnh sản phẩm AI gợi ý (chỉ khi gợi ý còn đó, trừ ảnh đã gỡ) rồi tới file nhân viên đính kèm.
+ * Dựng từ dữ liệu có sẵn thay vì lưu thêm trạng thái, để gợi ý mới hay đã gửi tự làm khay đúng theo.
+ */
+export function draftImages(conversation: Conversation, removed: ReadonlySet<string>, files: DraftImage[]): DraftImage[] {
+  const suggested = conversation.aiSuggestion ? conversation.analysis?.photoImageIds ?? [] : [];
+  return [...suggested.filter((id) => !removed.has(photoRemovalKey(conversation, id))).map((id): DraftImage => ({ key: id, kind: 'product', imageId: id })), ...files];
+}
+
+/** Đường dẫn để hiện ảnh trực tiếp trong luồng tin: chỉ ảnh có URL https (ảnh shop đã gửi không lưu URL nên chỉ hiện nhãn). */
+export function inlineImageUrl(attachment: { type: string; url?: string }): string | null {
+  return attachment.type === 'image' && attachment.url && /^https:\/\//i.test(attachment.url) ? attachment.url : null;
 }

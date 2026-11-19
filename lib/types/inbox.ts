@@ -7,6 +7,11 @@ import type { MessengerAttachment } from './messenger';
 import type { ConversationMemoryEntry } from './conversationMemory';
 import type { CareSourceContext } from './customerCare';
 
+/** Ảnh trong khay trên ô soạn: ảnh sản phẩm do AI gợi ý hoặc file nhân viên chọn từ máy. */
+export type DraftImage = { key: string } & ({ kind: 'product'; imageId: string } | { kind: 'file'; file: File; previewUrl: string });
+
+export interface FailedImage { imageId: string; status: 'failed' | 'unknown' }
+
 export type InboxFilter = 'all' | 'urgent' | 'unreplied';
 
 export type Channel = 'facebook' | 'zalo';
@@ -14,10 +19,18 @@ export type Channel = 'facebook' | 'zalo';
 export type TagType = 'high' | 'vip' | 'risk' | 'loop' | 'positive' | 'neutral';
 
 export interface ConversationTag {
+  /** id nhãn trong bộ nhãn ngữ cảnh của shop (chỉ nhãn ngữ cảnh). */
+  id?: string;
   label: string;
   type: TagType;
-  source?: 'ai' | 'rule';
+  source?: 'ai' | 'rule' | 'staff';
   kind?: 'emotion' | 'priority' | 'context';
+}
+
+/** Nhãn nhân viên dán (`added`) và nhãn tự động nhân viên đã gỡ (`hidden`) của một hội thoại, theo id nhãn. */
+export interface StaffLabels {
+  added: string[];
+  hidden: string[];
 }
 
 export interface ChatMessage {
@@ -68,6 +81,10 @@ export interface Conversation {
   memory?: ConversationMemoryEntry[];
   personalitySummary?: string;
   messenger?: { pageId: string; psid: string; hasOlder: boolean; viewStartAt?: number };
+  /** Nhãn nhân viên dán/gỡ, lấy từ máy chủ; không trộn vào `tags` (tags được dựng lại sau mỗi lần phân tích). */
+  staffLabels?: StaffLabels;
+  /** Ảnh sản phẩm gửi lỗi hoặc chưa rõ kết quả trong 24 giờ qua (từ máy chủ); hiện thanh "Ảnh chưa gửi" kèm nút gửi lại. */
+  failedImages?: FailedImage[];
   id: string;
   name: string;
   avatar: string;

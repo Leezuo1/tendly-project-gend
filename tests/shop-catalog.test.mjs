@@ -15,7 +15,7 @@ const load = (file) => {
   return loaded.exports;
 };
 const { saveShopCatalog, readShopCatalog, liveKnowledge, ShopCatalogError } = load('lib/services/shopCatalog.ts');
-const { createSeed } = load('lib/data/admin.ts');
+const { createSeed, LEGACY_PRODUCTS } = load('lib/data/admin.ts');
 const wrap = (db) => ({ query: async (sql, values) => { const result = await db.query(sql, values); return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length }; } });
 const bare = new PGlite(), full = new PGlite();
 const ready = full.exec(readFileSync('db/migrations/024-shop-catalog.sql', 'utf8'));
@@ -32,16 +32,16 @@ test('before migration 024 the server falls back to the old snapshot instead of 
   assert.equal(await liveKnowledge('111', null, db), null);
 });
 
-test('live catalog replaces the snapshot, keeps real products and leaves out untouched demo products', async () => {
+test('live catalog replaces the snapshot, keeps real products (the Coolmate set included) and leaves out the old untouched demo products', async () => {
   await ready;
   const db = wrap(full);
   assert.equal(await readShopCatalog('111', db), null);
   assert.equal((await liveKnowledge('111', snapshot, db)).shop.name, 'Cũ', 'no catalog row yet: snapshot');
-  assert.deepEqual(await saveShopCatalog('111', catalog([seed.products[0], custom]), 0, db), { revision: 1 });
+  assert.deepEqual(await saveShopCatalog('111', catalog([LEGACY_PRODUCTS[0], seed.products[0], custom]), 0, db), { revision: 1 });
   const knowledge = await liveKnowledge('111', snapshot, db);
-  assert.deepEqual(knowledge.products.map(product => product.sku), ['X-1']);
+  assert.deepEqual(knowledge.products.map(product => product.sku), [seed.products[0].sku, 'X-1'], 'the current Coolmate set reaches the AI, the legacy mock set does not');
   assert.equal(knowledge.shop.name, seed.shop.name);
-  assert.equal((await readShopCatalog('111', db)).catalog.products.length, 2, 'the full catalog is kept for restoring a browser');
+  assert.equal((await readShopCatalog('111', db)).catalog.products.length, 3, 'the full catalog is kept for restoring a browser');
 });
 
 test('a stale writer gets 409 instead of overwriting the catalog', async () => {
@@ -65,8 +65,45 @@ test('a catalog read back from the database still recognizes demo products (key 
   await ready;
   const db = wrap(full);
   const { revision, catalog: stored } = await readShopCatalog('111', db);
-  await saveShopCatalog('111', { ...stored, products: [...seed.products.slice(0, 2), custom] }, revision, db);
+  await saveShopCatalog('111', { ...stored, products: [...LEGACY_PRODUCTS.slice(0, 2), custom] }, revision, db);
   const again = await readShopCatalog('111', db);
   await saveShopCatalog('111', again.catalog, again.revision, db);
   assert.deepEqual((await liveKnowledge('111', null, db)).products.map(product => product.sku), ['X-1']);
+});
+
+test('tag rules ride the catalog: validated on save, read per Page, defaults when missing', async () => {
+  const { readShopTagRules } = load('lib/services/shopCatalog.ts');
+  const { DEFAULT_CONTEXT_TAG_RULES } = load('lib/services/contextTagRules.ts');
+  assert.deepEqual(await readShopTagRules('111', wrap(bare)), DEFAULT_CONTEXT_TAG_RULES, 'no table yet: defaults');
+  await ready;
+  const db = wrap(full);
+  assert.deepEqual(await readShopTagRules('222', db), DEFAULT_CONTEXT_TAG_RULES, 'no row: defaults');
+  const wholesale = { id: 'si', label: 'Khách sỉ', keywords: [], type: 'vip', enabled: true };
+  await saveShopCatalog('222', { ...catalog([]), contextTagRules: [wholesale] }, 0, db);
+  assert.deepEqual(await readShopTagRules('222', db), [wholesale]);
+  assert.deepEqual(await readShopTagRules('333', db), DEFAULT_CONTEXT_TAG_RULES, 'another Page never sees it');
+  await saveShopCatalog('333', catalog([]), 0, db);
+  assert.deepEqual(await readShopTagRules('333', db), DEFAULT_CONTEXT_TAG_RULES, 'row without rules: defaults');
+  const many = Array.from({ length: 51 }, (_, i) => ({ ...wholesale, id: `r${i}`, label: `Nhãn ${i}` }));
+  for (const contextTagRules of [[{ ...wholesale, type: 'bad' }], many, [wholesale, { ...wholesale, id: 'si2' }]]) {
+    await assert.rejects(saveShopCatalog('444', { ...catalog([]), contextTagRules }, 0, db), error => error instanceof ShopCatalogError && error.status === 400);
+  }
+});
+
+test('custom tag rules alone make the browser catalog worth pushing', () => {
+  const { isPristine } = load('lib/services/catalogSync.ts');
+  const { DEFAULT_CONTEXT_TAG_RULES } = load('lib/services/contextTagRules.ts');
+  assert.equal(isPristine(catalog(seed.products)), true);
+  assert.equal(isPristine({ ...catalog(seed.products), contextTagRules: DEFAULT_CONTEXT_TAG_RULES }), true);
+  assert.equal(isPristine({ ...catalog(seed.products), contextTagRules: [{ id: 'si', label: 'Khách sỉ', keywords: [], type: 'vip', enabled: true }] }), false);
+});
+
+test('a server row from before label sync never wipes the browser\'s custom label set', () => {
+  const { remoteTagRules } = load('lib/services/catalogSync.ts');
+  const custom = [{ id: 'si', label: 'Khách sỉ', keywords: [], type: 'vip', enabled: true }];
+  assert.equal(remoteTagRules({ ...catalog([]) }, custom), custom, 'server row without rules: keep the local set so it gets pushed');
+  assert.deepEqual(remoteTagRules({ ...catalog([]), contextTagRules: [] }, custom), [], 'an explicit empty set from the server wins');
+  const other = [{ ...custom[0], id: 'b2b' }];
+  assert.equal(remoteTagRules({ ...catalog([]), contextTagRules: other }, custom), other, 'a stored set wins over the local one');
+  assert.equal(remoteTagRules(catalog([]), undefined), undefined);
 });

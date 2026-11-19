@@ -3,7 +3,11 @@ import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
 import { CustomerCareError, generateCareReply, parseCareProfile, readCarePageProfile, saveCustomerCareSettings } from '@/lib/services/customerCare';
 import { InvalidAiKnowledge, parseAiKnowledge } from '@/lib/services/aiKnowledge';
 import { readMessengerAiSettings } from '@/lib/services/messengerAi';
-import { readShopCatalog } from '@/lib/services/shopCatalog';
+import { readShopCatalog, readShopTagRules } from '@/lib/services/shopCatalog';
+import { staffLabelNotes } from '@/lib/services/staffLabels';
+import { buildImageInput } from '@/lib/services/imageIntake';
+import { readPhotoCandidates } from '@/lib/services/productImages';
+import { markHandoff } from '@/lib/services/handoff';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { saveConversationMemory } from '@/lib/services/conversationMemory';
 import { readConversationSources } from '@/lib/services/conversationSources';
@@ -44,7 +48,7 @@ async function handle(request: Request) {
     if (!settings.profile || !settings.knowledge) throw new CustomerCareError('Xác nhận tri thức và quy tắc Chat trong Cấu hình AI trước khi tạo gợi ý.', 409);
     const db = getMessengerPool();
     const id = JSON.stringify([pageId, body.psid]);
-    const latest = (await db.query(`SELECT m.* FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
+    const latest = (await db.query(`SELECT m.*,c.staff_labels FROM messenger_messages m JOIN messenger_conversations c ON c.id=m.conversation_id
       WHERE m.page_id=$1 AND m.conversation_id=$2 AND c.hidden_at IS NULL
       AND ($3::text IS NULL OR m.message_id=$3) ORDER BY m.sent_at DESC,m.message_id DESC LIMIT 1`, [pageId, id, body.messageId ?? null])).rows[0];
     if (!latest || latest.direction !== 'in') throw new CustomerCareError('Không có tin khách cần phân tích.', 409);
@@ -55,13 +59,20 @@ async function handle(request: Request) {
     const sources = await readConversationSources(pageId, body.psid, latest.message_id, db);
     if (!sources) throw new CustomerCareError('Hội thoại không còn hiển thị.', 409);
     const history = await readCustomerOrderHistory(pageId, body.psid, db);
-    const reply = await generateCareReply(settings.knowledge, settings.profile, settings.pageProfile, latest.text.slice(0, 8000) || '[Tệp đính kèm chưa được đọc]', context, sources, history);
+    const rules = await readShopTagRules(pageId, db);
+    const imageInput = await buildImageInput(latest.attachments_json, latest.text);
+    const photos = await readPhotoCandidates(pageId, body.psid, settings.knowledge.products, db);
+    const reply = await generateCareReply(settings.knowledge, settings.profile, settings.pageProfile,
+      latest.text.slice(0, 8000) || (imageInput ? '[Khách gửi ảnh]' : '[Tệp đính kèm chưa được đọc]'), context, sources, history,
+      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput, photos);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updatedAt}`;
     if (!latest.text.trim() || latest.attachments_json.length || reply.reply.length > 2000) reply.analysis.canAutoReply = false;
     await assertOperationAllowed();
     if ((await readMessengerAiSettings(pageId)).updatedAt !== settings.updatedAt) throw new CustomerCareError('Quy tắc Chat đã thay đổi. Tạo lại gợi ý theo cấu hình mới.', 409);
     if ((await readConversationSources(pageId, body.psid, latest.message_id, db))?.fingerprint !== sources.fingerprint) throw new CustomerCareError('Nguồn hoặc ưu đãi đã thay đổi. Tạo lại gợi ý trước khi gửi.', 409);
     if (!await saveConversationMemory(pageId, body.psid, latest.message_id, reply)) throw new CustomerCareError('Hội thoại không còn hiển thị. Tải lại trước khi thử lại.', 409);
+    // Nút này không bao giờ gửi tin, nhưng ca chuyển shop vẫn phải ở lại hàng chờ.
+    if (reply.analysis.imageOutcome === 'handoff') await markHandoff(db, pageId, id, latest.message_id);
     return Response.json({ reply, messageId: latest.message_id }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     if (error instanceof CustomerCareError || error instanceof InvalidAiKnowledge) return Response.json({ error: error.message }, { status: error instanceof CustomerCareError ? error.status : 400 });

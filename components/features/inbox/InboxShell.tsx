@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Conversation, InboxFilter } from '@/lib/types/inbox';
+import { Conversation, DraftImage, InboxFilter } from '@/lib/types/inbox';
+import type { StaffLabelAction } from '@/lib/services/contextTagRules';
 import { Sidebar } from '@/components/features/dashboard/Sidebar';
 import { ConversationList } from './ConversationList';
 import { useMobileViewport } from '@/lib/hooks/useMobileViewport';
@@ -10,7 +11,7 @@ import { ThreadPane } from './ThreadPane';
 import { CustomerProfilePane } from './CustomerProfilePane';
 import { Toast } from '@/components/shared/Toast';
 import { askShopAi } from '@/lib/services/aiChat';
-import { applyConversationAnalysis, automaticAnalysisCandidates, latestCustomerMessage, markConversationAnswered, sessionContext, sortReplyQueue } from '@/lib/services/inboxAi';
+import { applyConversationAnalysis, automaticAnalysisCandidates, draftImages, latestCustomerMessage, markConversationAnswered, photoRemovalKey, sessionContext, sortReplyQueue } from '@/lib/services/inboxAi';
 import { mergeMessengerThread, messengerChatMessage } from '@/lib/services/messengerView';
 import type { MessengerInboxSnapshot } from '@/lib/types/messengerInbox';
 import type { MessengerMessage } from '@/lib/types/messenger';
@@ -32,6 +33,9 @@ export function InboxShell() {
   const viewingThread = useRef(false);
   useEffect(() => { viewingThread.current = mobile === false || mobileThreadOpen; }, [mobile, mobileThreadOpen]);
   const [draftText, setDraftText] = useState<string>('');
+  // Khay ảnh = ảnh AI gợi ý (trừ ảnh đã gỡ) + file nhân viên chọn từ máy; dựng bằng draftImages().
+  const [removedPhotos, setRemovedPhotos] = useState<Set<string>>(new Set());
+  const [attachedFiles, setAttachedFiles] = useState<DraftImage[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const pendingRequests = useRef(new Set<string>());
   const attemptedAnalysis = useRef(new Map<string, string>());
@@ -126,10 +130,18 @@ export function InboxShell() {
     };
   }, [conversations]);
 
-  const taggedConversations = useMemo(() => {
-    const rules = dbVersion < 0 ? [] : readContextTagRules();
-    return conversations.map(conversation => applyContextTags(conversation, rules));
-  }, [conversations, dbVersion]);
+  const tagRules = useMemo(() => dbVersion < 0 ? [] : readContextTagRules(), [dbVersion]);
+  const taggedConversations = useMemo(() => conversations.map(conversation => applyContextTags(conversation, tagRules)), [conversations, tagRules]);
+  const saveStaffLabels = async (target: Conversation, change: StaffLabelAction) => {
+    if (!target.messenger) return;
+    try {
+      const response = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ psid: target.messenger.psid, action: 'labels', change }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error);
+      setConversations(previous => previous.map(c => c.id === target.id ? { ...c, staffLabels: body.staffLabels } : c));
+    } catch (error) { showToast(error instanceof Error && error.message ? error.message : 'Không lưu được nhãn.'); }
+  };
   const filteredConversations = useMemo(() => {
     return sortReplyQueue(taggedConversations.filter((conv) => {
       if (filter === 'urgent' && (!conv.isUnreplied || !conv.isUrgent)) return false;
@@ -155,51 +167,129 @@ export function InboxShell() {
     return taggedConversations.find((c) => c.id === selectedId) || taggedConversations[0];
   }, [taggedConversations, selectedId]);
 
+  // Ảnh xem trước của file đính kèm là object URL tạo một lần lúc thêm; thu hồi khi gỡ, gửi xong hoặc đổi hội thoại.
+  const revoke = (image: DraftImage) => { if (image.kind === 'file') URL.revokeObjectURL(image.previewUrl); };
+  const dropAttached = (match: (image: DraftImage) => boolean) => setAttachedFiles((current) => { current.filter(match).forEach(revoke); return current.filter((image) => !match(image)); });
+  const clearAttached = () => dropAttached(() => true);
+
   const handleSelectConv = (id: string) => {
     const changed = id !== selectedIdRef.current;
     selectedIdRef.current = id;
     setSelectedId(id);
     setConversations((previous) => previous.map((c) => c.id === id ? { ...c, hasNewMessage: false, unreadMessageIds: [] } : c));
-    if (changed) setDraftText('');
+    if (changed) { setDraftText(''); setRemovedPhotos(new Set()); clearAttached(); }
     setMobileThreadOpen(true);
   };
 
-  const sendLiveMessage = async (text: string): Promise<boolean> => {
-    const target = selectedConv;
-    if (!target?.messenger || sendLocks.current.has(target.id)) return false;
+  const applySentMessage = (target: Conversation, result: { message: MessengerMessage; persisted: boolean }) => {
+    const message = messengerChatMessage(result.message);
+    setConversations((previous) => previous.map((c) => {
+      if (c.id !== target.id) return c;
+      const messages = c.messages.some((m) => m.id === message.id) ? c.messages : [...c.messages, message];
+      const latestIn = [...messages].reverse().find((m) => m.sender === 'in');
+      if (latestIn && (latestIn.timestamp || 0) > (message.timestamp || 0)) return { ...c, messages };
+      return { ...markConversationAnswered(c, message), messages };
+    }));
+    showToast(result.persisted ? 'Meta đã xác nhận gửi tin.' : 'Meta đã nhận tin; đang chờ webhook đồng bộ. Không gửi lại tin này.');
+  };
+
+  const postSend = async (init: RequestInit) => {
+    const response = await fetch('/api/messenger/send', { method: 'POST', ...init });
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(new Error(result.error || 'Chưa gửi được tin nhắn.'), { status: response.status });
+    return result as { message: MessengerMessage; persisted: boolean };
+  };
+
+  // Mỗi ảnh một yêu cầu (giới hạn thân yêu cầu ~4,5 MB). Lỗi từ máy chủ, kể cả "chưa rõ kết quả", dùng mã mới ở lần gửi lại; câu báo lỗi đã nhắc kiểm tra Messenger.
+  const sendOneImage = async (target: Conversation, image: DraftImage) => {
+    const key = JSON.stringify([target.id, 'img', image.key]);
+    const requestId = outboundRequests.current.get(key) || crypto.randomUUID();
+    outboundRequests.current.set(key, requestId);
+    const psid = target.messenger!.psid;
+    try {
+      let result;
+      if (image.kind === 'product') {
+        result = await postSend({ headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ psid, imageId: image.imageId, requestId }) });
+      } else {
+        const form = new FormData();
+        form.set('psid', psid); form.set('requestId', requestId); form.set('file', image.file);
+        result = await postSend({ body: form });
+      }
+      outboundRequests.current.delete(key);
+      applySentMessage(target, result);
+    } catch (error) {
+      if ((error as { status?: number }).status) outboundRequests.current.delete(key);
+      throw error;
+    }
+  };
+
+  const withSendLock = async <T,>(target: Conversation, run: () => Promise<T>, onError: () => T): Promise<T> => {
     sendLocks.current.add(target.id);
     setSendingIds((ids) => new Set(ids).add(target.id));
-    const requestKey = JSON.stringify([target.id, text]);
-    const requestId = outboundRequests.current.get(requestKey) || crypto.randomUUID();
-    outboundRequests.current.set(requestKey, requestId);
-    try {
-      const response = await fetch('/api/messenger/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ psid: target.messenger.psid, text, requestId }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        if (response.status === 400) outboundRequests.current.delete(requestKey);
-        throw new Error(result.error || 'Chưa gửi được tin nhắn.');
-      }
-      outboundRequests.current.delete(requestKey);
-      const message = messengerChatMessage(result.message as MessengerMessage);
-      setConversations((previous) => previous.map((c) => {
-        if (c.id !== target.id) return c;
-        const messages = c.messages.some((m) => m.id === message.id) ? c.messages : [...c.messages, message];
-        const latestIn = [...messages].reverse().find((m) => m.sender === 'in');
-        if (latestIn && (latestIn.timestamp || 0) > (message.timestamp || 0)) return { ...c, messages };
-        return { ...markConversationAnswered(c, message), messages };
-      }));
-      showToast(result.persisted ? 'Meta đã xác nhận gửi tin.' : 'Meta đã nhận tin; đang chờ webhook đồng bộ. Không gửi lại tin này.');
-      return true;
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Lỗi gửi. Kiểm tra Messenger trước khi thử lại.');
-      return false;
-    } finally {
+    try { return await run(); }
+    catch (error) { showToast(error instanceof Error ? error.message : 'Lỗi gửi. Kiểm tra Messenger trước khi thử lại.'); return onError(); }
+    finally {
       sendLocks.current.delete(target.id);
       setSendingIds((ids) => { const next = new Set(ids); next.delete(target.id); return next; });
     }
+  };
+
+  // Chữ gửi trước (nếu có), rồi từng ảnh trong khay. Trả true khi phần chữ đã xong (kể cả không có chữ) để khung soạn được xóa dù một ảnh lỗi.
+  const sendLiveMessage = async (text: string): Promise<boolean> => {
+    const target = selectedConv;
+    if (!target?.messenger || sendLocks.current.has(target.id)) return false;
+    const images = draftImages(target, removedPhotos, attachedFiles);
+    if (!text.trim() && !images.length) return false;
+    let textSent = !text.trim();
+    return withSendLock(target, async () => {
+      if (!textSent) {
+        const requestKey = JSON.stringify([target.id, text]);
+        const requestId = outboundRequests.current.get(requestKey) || crypto.randomUUID();
+        outboundRequests.current.set(requestKey, requestId);
+        try { applySentMessage(target, await postSend({ headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ psid: target.messenger!.psid, text, requestId }) })); }
+        catch (error) { if ((error as { status?: number }).status === 400) outboundRequests.current.delete(requestKey); throw error; }
+        outboundRequests.current.delete(requestKey);
+        textSent = true;
+      }
+      // Một ảnh lỗi không chặn các ảnh sau (gợi ý đã bị xóa khi chữ gửi đi nên ảnh bỏ sót sẽ không còn chỗ để gửi lại); ảnh lỗi từ máy ở lại khay, ảnh sản phẩm hiện ở thanh "Ảnh chưa gửi".
+      let failed = 0, firstError: unknown;
+      for (const image of images) {
+        try { await sendOneImage(target, image); if (image.kind === 'file') dropAttached((item) => item.key === image.key); }
+        catch (error) { failed++; firstError ??= error; }
+      }
+      if (failed) throw new Error(`${firstError instanceof Error ? firstError.message : 'Chưa gửi được ảnh.'}${failed > 1 ? ` (${failed} ảnh chưa gửi)` : ''}`);
+      return true;
+    }, () => textSent);
+  };
+
+  const resendImage = async (imageId: string) => {
+    const target = selectedConv;
+    if (!target?.messenger || sendLocks.current.has(target.id)) return;
+    await withSendLock(target, async () => {
+      await sendOneImage(target, { key: `resend:${imageId}:${crypto.randomUUID()}`, kind: 'product', imageId });
+      setConversations((previous) => previous.map((c) => c.id === target.id ? { ...c, failedImages: c.failedImages?.filter((item) => item.imageId !== imageId) } : c));
+    }, () => undefined);
+  };
+
+  const addFiles = (files: File[]) => {
+    const target = selectedConv;
+    if (!target) return;
+    const accepted: DraftImage[] = [];
+    const taken = draftImages(target, removedPhotos, attachedFiles).length;
+    for (const file of files) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { showToast('Chỉ gửi được ảnh JPG, PNG hoặc WEBP.'); continue; }
+      if (file.size > 4 * 1024 * 1024) { showToast('Ảnh lớn quá 4MB, chọn ảnh nhỏ hơn nhé.'); continue; }
+      if (taken + accepted.length >= 3) { showToast('Mỗi lần gửi tối đa 3 ảnh.'); break; }
+      accepted.push({ key: `file:${crypto.randomUUID()}`, kind: 'file', file, previewUrl: URL.createObjectURL(file) });
+    }
+    if (accepted.length) setAttachedFiles((current) => [...current, ...accepted]);
+  };
+
+  const removeImage = (key: string) => {
+    const target = selectedConv;
+    if (!target) return;
+    if (key.startsWith('file:')) dropAttached((item) => item.key === key);
+    else setRemovedPhotos((current) => new Set(current).add(photoRemovalKey(target, key)));
   };
 
   const analyzeMessage = useCallback(async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages, automatic = false) => {
@@ -344,8 +434,15 @@ export function InboxShell() {
                   onUseAiSuggestion={sendLiveMessage}
                   draftText={draftText}
                   onDraftChange={setDraftText}
+                  images={draftImages(selectedConv, removedPhotos, attachedFiles)}
+                  onAddFiles={addFiles}
+                  onRemoveImage={removeImage}
+                  failedImages={selectedConv.failedImages}
+                  onResendImage={resendImage}
                   onToast={showToast}
                   onGenerateAiSuggestion={handleGenerateAiSuggestion}
+                  labelRules={tagRules}
+                  onSaveStaffLabels={(change) => saveStaffLabels(selectedConv, change)}
                   isSending={sendingIds.has(selectedConv.id)}
                   aiEnabled={autoReply}
                   savingAi={savingAiSettings}
@@ -413,7 +510,7 @@ export function InboxShell() {
             const result = await response.json();
             hiddenConversations.current.set(deleteTarget.id, result.hiddenAt || Date.now());
             setConversations((previous) => previous.filter((c) => c.id !== deleteTarget.id));
-            setDeleteTarget(null); if (deleteTarget.id === selectedConv?.id) { setDraftText(''); setMobileThreadOpen(false); } showToast('Đã xóa hội thoại khỏi inbox.');
+            setDeleteTarget(null); if (deleteTarget.id === selectedConv?.id) { setDraftText(''); clearAttached(); setMobileThreadOpen(false); } showToast('Đã xóa hội thoại khỏi inbox.');
           } catch (error) { showToast(error instanceof Error ? error.message : 'Không xóa được hội thoại.'); }
           finally { setDeleting(false); }
         })(); }} />

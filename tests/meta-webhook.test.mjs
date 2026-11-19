@@ -56,6 +56,15 @@ test('parser scopes Page, ignores receipts, distinguishes echoes and keeps attac
   assert.throws(() => parseMetaMessages({ object: 'page', entry: null }, '111'));
 });
 
+test('a sticker or Like keeps a sticker flag; a normal photo does not', () => {
+  const { parseMetaMessages } = loadModules()('lib/services/metaWebhook.ts');
+  const sticker = event('s1', 100, { text: undefined, attachments: [{ type: 'image', payload: { url: 'https://scontent.xx.fbcdn.net/s.png', sticker_id: 369239263222822 } }] });
+  const photo = event('p1', 101, { text: undefined, attachments: [{ type: 'image', payload: { url: 'https://scontent.xx.fbcdn.net/p.jpg' } }] });
+  const [first, second] = parseMetaMessages(payload(sticker, photo), '111');
+  assert.deepEqual(first.attachments, [{ type: 'image', url: 'https://scontent.xx.fbcdn.net/s.png', sticker: true }]);
+  assert.deepEqual(second.attachments, [{ type: 'image', url: 'https://scontent.xx.fbcdn.net/p.jpg' }]);
+});
+
 test('parser preserves a bounded native reply reference without inferring a source from names or payload text', () => {
   const { parseMetaMessages } = loadModules()('lib/services/metaWebhook.ts');
   assert.equal(parseMetaMessages(payload(event('reply', 100, { reply_to: { mid: 'private-post' } })), '111')[0].replyToMessageId, 'private-post');
@@ -101,7 +110,7 @@ test('webhook verifies challenges, rejects untrusted payloads, writes only signe
     assert.equal(aiCalls.length, 0);
     assert.equal(callbacks.length, 2);
     for (const callback of callbacks) await callback();
-    assert.deepEqual(aiCalls.map((a) => [a[0], a[1], a[4]]), [['111', '222', 15000], ['111', '222', 15000]]);
+    assert.deepEqual(aiCalls.map((a) => [a[0], a[1], a[4]]), [['111', '222', 5000], ['111', '222', 5000]]);
     assert.equal(stored.size, 1);
     assert.equal(stored.get('m1').text, event().message.text);
     failStorage = true;

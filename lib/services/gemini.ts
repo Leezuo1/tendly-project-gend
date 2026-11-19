@@ -28,8 +28,12 @@ interface GenerateJsonOptions<T> {
   system: string;
   user: string;
   schema: object;
+  /** Ảnh gửi kèm lời nhắc (base64); không có thì yêu cầu chỉ gồm chữ như trước. */
+  images?: { mimeType: string; data: string }[];
   temperature?: number;
   maxOutputTokens?: number;
+  /** Thời gian tối đa cho MỖI lần gọi một model (mặc định 40 s). Đặt ngắn hơn `signal` tổng để model bị treo không ăn hết ngân sách, model kế tiếp vẫn kịp trả lời. */
+  attemptTimeoutMs?: number;
   /** Kiểm tra output; ném lỗi để thử model tiếp theo. */
   parse: (output: string) => T;
 }
@@ -56,10 +60,11 @@ export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Pr
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-          signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(40_000)]) : AbortSignal.timeout(40_000),
+          signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(options.attemptTimeoutMs ?? 40_000)]) : AbortSignal.timeout(options.attemptTimeoutMs ?? 40_000),
           body: JSON.stringify({
             system_instruction: { parts: [{ text: system }] },
-            contents: [{ role: 'user', parts: [{ text: options.user }] }],
+            contents: [{ role: 'user', parts: [{ text: options.user },
+              ...(options.images ?? []).map((image) => ({ inline_data: { mime_type: image.mimeType, data: image.data } }))] }],
             generationConfig: {
               temperature: options.temperature ?? 0.8,
               topP: 0.95,
