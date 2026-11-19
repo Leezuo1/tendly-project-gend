@@ -235,7 +235,7 @@ export function ThreadPane({
       <div className="thread-compose">
         <div className="compose-tools">
         <ConversationSources context={conversation.sourceContext} />
-        {conversation.analysis && (conversation.analysis.needsHuman || conversation.analysis.canAutoReply === false) && <p className="thread-missing-facts"><strong>Cần xác nhận:</strong> {conversation.analysis.reason}</p>}
+        {conversation.isUnreplied && conversation.analysis && (conversation.analysis.needsHuman || conversation.analysis.canAutoReply === false) && <p className="thread-missing-facts"><strong>Cần xác nhận:</strong> {conversation.analysis.reason}</p>}
         {/* Đang chờ Gemini suy nghĩ */}
         {isThinkingAi && (
           <div className="ai-loading-box">

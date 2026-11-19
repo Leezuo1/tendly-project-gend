@@ -5,7 +5,7 @@ export function ConversationSources({ context }: { context?: CareSourceContext }
   const uncertain = context.resolution === 'ambiguous' || context.resolution === 'unresolved';
   return <section className="thread-sources" aria-label="Nguồn ngữ cảnh hội thoại">
     <h3>Nguồn hội thoại</h3>
-    <p role="status">{uncertain ? 'Chưa rõ khách đang hỏi nguồn nào · Cần hỏi lại'
+    <p role="status">{uncertain ? 'Chưa rõ khách hỏi bài nào · AI trả lời theo danh mục, không dùng ưu đãi của bài'
       : context.blocked ? 'Nguồn cần kiểm tra · Tự trả lời đang bị chặn'
       : context.resolution === 'reply' ? 'Khách trả lời trực tiếp tin nhắn từ nguồn này' : 'Đã liên kết qua tin nhắn riêng'}</p>
     <details><summary>Xem bài đăng, sản phẩm & ưu đãi liên quan</summary>
