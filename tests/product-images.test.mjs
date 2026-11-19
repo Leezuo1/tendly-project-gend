@@ -110,6 +110,7 @@ test('photoImageIds takes the first image of each product before any second imag
   assert.deepEqual(photoImageIds([{ imageIds: ['a', 'b'] }, { imageIds: ['c'] }]), ['a', 'c', 'b']);
   assert.deepEqual(photoImageIds([{ imageIds: ['a', 'b'] }, { imageIds: ['c'] }], 2), ['a', 'c']);
   assert.deepEqual(photoImageIds([]), []);
+  assert.equal(photoImageIds([{ imageIds: ['a', 'b', 'c', 'd'] }, { imageIds: ['e', 'f', 'g'] }]).length, 7, 'no cap by default');
 });
 
 test('readPhotoCandidates offers unsent images first and still offers the sent ones again', async () => {

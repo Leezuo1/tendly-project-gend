@@ -31,7 +31,7 @@ Một trợ lý AI phục vụ nhiều công việc của cùng shop, sử dụn
 
 Các trạng thái dưới đây mô tả bằng chứng trong code/tài liệu tại thời điểm init, không xác nhận dịch vụ bên ngoài đang hoạt động hay bản deploy đã được kiểm thử.
 
-- **Customer support:** có backend cho webhook/lưu trữ/hộp thư/gửi tin Messenger, phân tích và gợi ý AI, cùng cơ chế tự trả lời riêng. Tự trả lời mặc định tắt; trạng thái chờ xác nhận chặn tự gửi đến khi shop trả lời thủ công. AI vẫn có thể sai.
+- **Customer support:** có backend cho webhook/lưu trữ/hộp thư/gửi tin Messenger, phân tích và gợi ý AI, cùng cơ chế tự trả lời riêng. Tự trả lời mặc định tắt. Khi bật mà AI không trả lời được (ngoài chủ đề, thiếu căn cứ, nguồn tin chưa rõ), AI gửi một mẫu cố định báo đã chuyển nhân viên rồi tắt tự trả lời của hội thoại đó; nhân viên xử lý xong thì bật lại bằng công tắc. Một số ca lỗi (lỗi AI, gửi chưa rõ kết quả) vẫn giữ hội thoại đến khi nhân viên trả lời. AI vẫn có thể sai.
 - **Marketing:** có API cho soạn nội dung, đăng bài, xử lý bình luận Facebook và remarketing Messenger. Việc gửi/đăng thành công phụ thuộc cấu hình, quyền và phản hồi của provider; có API không đồng nghĩa đã xác minh gửi thật.
 - **Livestream assistant:** có luồng phiên, gom câu hỏi, gợi ý/phê duyệt phản hồi, đơn nháp, sản phẩm/flash sale và cửa sổ hỗ trợ. Đơn nháp cần người bán xác nhận; không coi đây là hệ thống thanh toán, vận chuyển hay quản lý đơn hoàn chỉnh. TikTok/Shopee Live chưa được xác nhận triển khai.
 - **Sales assistant:** hỗ trợ tư vấn theo sản phẩm/FAQ và công việc bán hàng trong các luồng trên. Phạm vi tự động hóa bán hàng độc lập ngoài các luồng hiện có còn để ngỏ.
@@ -58,7 +58,7 @@ Các trạng thái dưới đây mô tả bằng chứng trong code/tài liệu 
 ## Product Principles
 
 1. Phục vụ toàn bộ công việc của shop qua bốn mảng: CSKH, livestream, marketing và hỗ trợ bán hàng.
-2. AI bám nguồn tri thức của shop; thiếu dữ liệu hoặc cần người thật thì giữ lại để người bán xử lý.
+2. AI bám nguồn tri thức của shop; thiếu dữ liệu hoặc cần người thật thì báo khách bằng mẫu cố định và chuyển người bán xử lý, AI không tự trả lời tiếp ở hội thoại đó cho đến khi người bán bật lại.
 3. Giữ danh tính người gửi/người nhận rõ ràng và quyền kiểm soát thực chất của người bán đối với tự động hóa.
 4. Phân biệt dữ liệu mẫu, tính năng có backend và tích hợp đã được xác minh thực tế trong nội dung và thiết kế.
 5. Bảo toàn dữ liệu, kiểm tra quyền và khả năng truy cập khi thay đổi các luồng hiện có.

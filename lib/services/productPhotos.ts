@@ -26,8 +26,8 @@ export function keepNamedProducts(picked: string[], candidates: PhotoCandidate[]
   return kept;
 }
 
-/** Xoay vòng: ảnh đầu của từng sản phẩm, rồi ảnh thứ hai..., tối đa `max` ảnh. */
-export function photoImageIds(chosen: Pick<PhotoCandidate, 'imageIds'>[], max = 3): string[] {
+/** Xoay vòng: ảnh đầu của từng sản phẩm, rồi ảnh thứ hai..., tối đa `max` ảnh (mặc định không giới hạn). */
+export function photoImageIds(chosen: Pick<PhotoCandidate, 'imageIds'>[], max = Infinity): string[] {
   const ids: string[] = [];
   for (let round = 0; ids.length < max; round++) {
     let any = false;

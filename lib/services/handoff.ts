@@ -2,7 +2,7 @@ import type { Pool } from 'pg';
 import { HANDOFF_REPLY } from '@/lib/services/imageIntake';
 
 /** Mẫu cố định khi AI không trả lời được (khách ngoài chủ đề, nguồn tin chưa rõ…); không do model viết nên không thể lỡ hứa điều gì. */
-export const UNKNOWN_REPLY = 'Mình chưa rõ ý bạn lắm. Mình đã chuyển tin nhắn cho nhân viên, bạn đợi chút để nhân viên phản hồi nhé.';
+export const UNKNOWN_REPLY = 'Shop đã nhận được tin nhắn của bạn. Nhân viên sẽ xem và phản hồi bạn sớm nhất có thể nhé.';
 // Hằng của mã (không có đầu vào người dùng); nhân đôi dấu nháy cho chắc.
 const NOTICE_TEXT = [HANDOFF_REPLY, UNKNOWN_REPLY].map(text => `'${text.replace(/'/g, "''")}'`).join(',');
 

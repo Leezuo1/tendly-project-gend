@@ -54,6 +54,7 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
   db: Pool = getMessengerPool(), debounceMs = 0) {
   if (isInteractiveRequest()) await assertOperationAllowed(db);
   else if (!await canRunAutomation(db)) return {};
+  const startedAt = Date.now();
   const id = JSON.stringify([pageId, psid]);
   const settings = (await db.query('SELECT * FROM messenger_ai_settings WHERE page_id=$1', [pageId])).rows[0];
   // Sản phẩm và FAQ lấy từ danh mục hiện hành, không dùng bản chụp lúc xác nhận.
@@ -169,7 +170,7 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
         [pageId, latest.message_id, Date.now(), sent.persisted ? 'sent' : 'unknown']);
       if (unknownHandoff) await db.query('UPDATE messenger_conversations SET ai_auto_reply=false,ai_updated_at=GREATEST(ai_updated_at+1,$3) WHERE page_id=$1 AND id=$2', [pageId, id, Date.now()]);
       // Ảnh đi sau chữ và không bao giờ đổi trạng thái job: trạng thái cuối của job chỉ phản ánh phần chữ.
-      if (sent.persisted && reply.analysis.photoImageIds?.length) await sendPhotosAfterText(db, pageId, psid, requestId, latest.sent_at, reply.analysis.photoImageIds);
+      if (sent.persisted && reply.analysis.photoImageIds?.length) await sendPhotosAfterText(db, pageId, psid, requestId, latest.sent_at, reply.analysis.photoImageIds, startedAt + 50_000);
       return { reply, sent, messageId: latest.message_id };
     } catch (error) {
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
@@ -197,9 +198,11 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
  * một ảnh lỗi chỉ để lại dòng failed/unknown ở messenger_outbound_requests (hiện thành "Ảnh chưa gửi" trong hộp thoại) và dừng các ảnh sau.
  * Trước mỗi ảnh kiểm tra khách chưa nhắn thêm và công tắc tự trả lời còn bật; ảnh là phần còn lại của câu trả lời cũ.
  */
-async function sendPhotosAfterText(db: Pool, pageId: string, psid: string, requestId: string, sentAt: string | number, imageIds: string[]) {
+async function sendPhotosAfterText(db: Pool, pageId: string, psid: string, requestId: string, sentAt: string | number, imageIds: string[], deadline: number) {
   const conversationId = JSON.stringify([pageId, psid]);
   for (const [index, imageId] of imageIds.entries()) {
+    // shortcut: không giới hạn số ảnh nhưng ngừng gửi khi gần hết maxDuration của hàm; ảnh chưa gửi sẽ được đưa lại cho AI ở lượt sau (ảnh chưa gửi xếp trước).
+    if (Date.now() > deadline) return;
     try {
       const open = await db.query(`SELECT 1 FROM messenger_conversations c JOIN messenger_ai_settings s ON s.page_id=c.page_id
         WHERE c.page_id=$1 AND c.id=$2 AND c.ai_auto_reply AND s.auto_reply AND c.hidden_at IS NULL
