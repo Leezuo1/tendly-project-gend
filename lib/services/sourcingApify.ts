@@ -7,6 +7,8 @@ export const sourcingActors = { tiktok: 'clockworks/tiktok-scraper', suppliers: 
 // Trần phí Apify cho mỗi lượt chạy (maxTotalChargeUsd). Apify từ chối trần dưới 0,5 USD (max-total-charge-usd-below-minimum), nên đây là mức thấp nhất dùng được.
 // Chi phí thật bị chặn bởi khối lượng (TIKTOK_MAX_RESULTS × COMMENTS_PER_POST), không phải bởi trần.
 export const sourcingBudgetUsd = { tiktok: 0.5, suppliers: 0.5, market: 0.5 } as const;
+/** Thời gian tối đa mỗi lượt Apify (giây). Theo dõi thị trường đọc nội dung trang của tối đa 6 truy vấn nên cần lâu hơn 5 phút. */
+export const sourcingTimeoutSec = { tiktok: 300, suppliers: 300, market: 900 } as const;
 /** Theo dõi thị trường: tối đa 6 truy vấn Google × 1 trang (~10 kết quả), giữ tối đa 30 kết quả cho AI đọc. */
 export const MARKET_MAX_QUERIES = 6;
 export const MARKET_MAX_RESULTS = 30;
@@ -165,7 +167,7 @@ export function parseApifyRun(payload: unknown) {
 export async function startApifyRun(kind: SourcingKind, actorInput: unknown, token: string) {
   const actor = sourcingActors[kind].replace('/', '~');
   // No automatic POST retry: a lost response can still mean a billable run was created.
-  return parseApifyRun(await apifyRequest(`actors/${actor}/runs?timeout=300&maxTotalChargeUsd=${sourcingBudgetUsd[kind]}`, token, actorInput));
+  return parseApifyRun(await apifyRequest(`actors/${actor}/runs?timeout=${sourcingTimeoutSec[kind]}&maxTotalChargeUsd=${sourcingBudgetUsd[kind]}`, token, actorInput));
 }
 
 const metricValue = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
