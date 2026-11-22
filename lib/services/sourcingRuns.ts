@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
-import { apifyRequest, apifyToken, commentDatasets, groupTikTokComments, MARKET_MAX_QUERIES, normalizeMarketResults, normalizeSupplierResults, normalizeTikTok, parseApifyRun, record,
+import { apifyRequest, apifyToken, sourcingTimeoutSec, commentDatasets, groupTikTokComments, MARKET_MAX_QUERIES, normalizeMarketResults, normalizeSupplierResults, normalizeTikTok, parseApifyRun, record,
   sourcingRequest, startApifyRun, SourcingProviderError, type SourcingKind } from '@/lib/services/sourcingApify';
 
 export class SourcingRunError extends Error {
@@ -38,7 +38,7 @@ export async function createSourcingRun(owner: string, kind: SourcingKind, input
       WHERE sourcing_start_limits.next_start_at<=$4 RETURNING owner`, [owner, kind, now + 60_000, now]);
     if (!slot.rowCount) throw new SourcingRunError('Vui lòng đợi một phút giữa hai lượt tìm cùng loại.', 429);
     const active = await client.query(`SELECT id FROM sourcing_runs WHERE owner=$1 AND kind=$2
-      AND status IN ('starting','running','unknown') AND created_at>$3 LIMIT 1`, [owner, kind, now - 360_000]);
+      AND status IN ('starting','running','unknown') AND created_at>$3 LIMIT 1`, [owner, kind, now - (sourcingTimeoutSec[kind] + 60) * 1000]);
     if (active.rowCount) throw new SourcingRunError('Lượt tìm trước đang chạy hoặc chưa rõ trạng thái. Kiểm tra lượt đó trước khi tìm lại.', 429);
     await client.query(`INSERT INTO sourcing_runs(id,owner,kind,status,context_json,created_at,updated_at)
       VALUES($1,$2,$3,'starting',$4::jsonb,$5,$5)`, [id, owner, kind, JSON.stringify(prepared.context), now]);
