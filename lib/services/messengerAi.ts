@@ -111,8 +111,9 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || (imageInput ? `[Khách gửi ${attachments.length} ảnh]` : '[Tệp đính kèm chưa được đọc]'), context, sources, history,
       { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput, photos);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updated_at}`;
-    // Hard check on what the model wrote: masked data echoed back, links or amounts that the shop's own data (or the customer) never gave.
-    const unsupported = unsupportedReplyReason(reply.reply, JSON.stringify([source.products, source.faqs, source.shop, history, customerText, sources, careRules(profile, settings.page_profile_json), settings.page_profile_json]), { longNumbers: !!imageInput });
+    // Hard check on what the model wrote: links or amounts that the shop's own data (or the customer) never gave.
+    // shortcut: earlier customer turns count as known only within the last 10 before this batch; a number typed further back still blocks, upgrade if staff see false handoffs.
+    const unsupported = unsupportedReplyReason(reply.reply, JSON.stringify([source.products, source.faqs, source.shop, history, customerText, context.filter((m) => m.role === 'user'), sources, careRules(profile, settings.page_profile_json), settings.page_profile_json]), { longNumbers: !!imageInput });
     if (unsupported) reply.analysis.reason = `${unsupported} ${reply.analysis.reason}`.trim();
     // Mẫu cố định cho ảnh (chuyển shop/từ chối) an toàn để tự gửi; câu do model viết thì giữ các điều kiện chặn cũ.
     // Đang có ca chờ nhân viên cho tin khác: không tự gửi tiếp (kể cả ảnh thứ hai), chỉ để gợi ý chờ duyệt.

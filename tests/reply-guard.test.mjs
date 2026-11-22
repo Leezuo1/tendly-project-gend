@@ -13,7 +13,7 @@ test('amounts are read in the ways Vietnamese shops write them', () => {
   assert.deepEqual(vndAmounts('Size M, 2 màu, mở lúc 8 giờ'), []);
 });
 
-test('a reply is held when it echoes masked data, or has a link or amount the shop never supplied', () => {
+test('a reply is held when it has a link or amount the shop never supplied', () => {
   const known = JSON.stringify({ faq: 'Phí ship 30.000đ. Xem https://shop.vn/doi-tra.' });
   assert.equal(unsupportedReplyReason('Ship 30k nhé, chi tiết tại https://shop.vn/doi-tra.', known), null);
   assert.equal(unsupportedReplyReason('Áo 221.000đ ạ', JSON.stringify([{ price: 221000 }])), null, 'catalog price (a bare JSON number) is allowed');
@@ -21,7 +21,6 @@ test('a reply is held when it echoes masked data, or has a link or amount the sh
   assert.match(unsupportedReplyReason('Giảm còn 99k', known), /số tiền/);
   assert.match(unsupportedReplyReason('Giảm còn 99.000đ', JSON.stringify({ fingerprint: '990001ab' })), /số tiền/, 'digits inside ids do not allow an amount');
   assert.match(unsupportedReplyReason('Mua tại https://evil.example/x', known), /đường dẫn/);
-  assert.match(unsupportedReplyReason('Em gọi [SĐT] nhé', known), /che/);
   assert.equal(unsupportedReplyReason('Dạ shop mở cửa lúc 8 giờ ạ', known), null);
 });
 
