@@ -121,7 +121,14 @@ async function shopProfile(role: AiRoleId, pageId: string): Promise<{ profile: A
     return { profile: parseAiConfiguration({ ...defaults, profiles: { ...defaults.profiles, chat: row.profile_json } }).profiles.chat, platform: 'facebook' };
   }
   const page = await readPageProfile(pageId, db);
-  return page.revision ? { profile: page.configuration.profiles[role], platform: page.platform } : null;
+  // Công tắc "Bật" của AI Content là bật/tắt cá nhân hóa của shop; tắt thì AI chỉ dùng thiết lập chung của Tendly.
+  if (!page.revision || (role === 'content' && !page.configuration.profiles.content.enabled)) return null;
+  return { profile: page.configuration.profiles[role], platform: page.platform };
+}
+
+/** Cấu hình AI Content hiện hành của shop (đọc trực tiếp, không dùng bản chép trong chiến dịch); null khi chưa lưu hoặc công tắc tắt. */
+export async function contentShopProfile(pageId: string): Promise<AiProfile | null> {
+  return (await shopProfile('content', pageId))?.profile ?? null;
 }
 
 /** Chỗ ghép duy nhất: Global → Platform (admin) → Page (shop). Mọi lời gọi Gemini đi qua đây. */

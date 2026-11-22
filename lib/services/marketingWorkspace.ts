@@ -117,7 +117,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
     const account = accounts.find(a => a.id === campaign.accountId);
     if (!account) throw new MarketingWorkflowError('Tài khoản không thuộc shop.', 403);
     const deadline = signal ? AbortSignal.any([signal, AbortSignal.timeout(50_000)]) : AbortSignal.timeout(50_000);
-    const plan = existing ?? await generateContentPlan(campaign, account, deadline);
+    const plan = existing ?? await generateContentPlan(campaign, account, deadline, pageId);
     plan.review = await reviewContentPlan(plan, campaign, account, await marketingReviewCatalog(pageId, campaign, account), deadline);
     await changeWorkspace(pageId, revision, async (state, db) => {
       const catalog = await marketingReviewCatalog(pageId, campaign, account, db);
@@ -153,7 +153,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
     if (previous?.publication !== undefined && previous.publication !== 'draft') throw new MarketingWorkflowError('Không sửa bài đã đăng hoặc đang được gửi.');
     if (retry?.basePostHash && post && retry.basePostHash !== marketingPostHash(post)) throw new MarketingWorkflowError('Bài/ảnh đã đổi. Review lại bản đang sửa.', 409);
     const original: GeneratedPostDraft | undefined = retry?.variants[0]?.original ?? (post ? { title: post.title, content: post.content, hashtags: post.hashtags, imageIdea: post.imageIdea, imagePrompt: '' } : undefined);
-    const results = await generateReviewedMarketing(campaign, account, await postReviewCatalog(pageId, current.workspace, campaign, account, binding!), original, signal, outline);
+    const results = await generateReviewedMarketing(campaign, account, await postReviewCatalog(pageId, current.workspace, campaign, account, binding!), original, signal, outline, pageId);
     await changeWorkspace(pageId, revision, async (state, db) => {
       if (!previous && state.reviews.length >= 100) throw new MarketingWorkflowError('Tối đa 100 bài theo chiến dịch.');
       try { requireFreshReviewEvidence(results.evidence, await postReviewCatalog(pageId, state, campaign, account, binding!, db)); }

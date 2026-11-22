@@ -179,6 +179,7 @@ test('shop personalizes each AI per Page on the server; prompt layers Global →
   assert.equal(initial.revision, 0); assert.equal(initial.platform, 'facebook');
   const configuration = initial.configuration;
   configuration.profiles.content.instructions = 'SHOP-PAGE-INSTRUCTION';
+  configuration.profiles.content.enabled = true; // công tắc là bật/tắt cá nhân hóa của shop cho AI Content
   configuration.profiles.content.platformRules.facebook = { enabled: true, values: { cta: 'SHOP-FB-CTA' } };
   assert.equal((await get('222')).status, 403);
   assert.equal((await put({ pageId: '222', configuration, revision: 0 })).status, 403);
@@ -198,6 +199,11 @@ test('shop personalizes each AI per Page on the server; prompt layers Global →
   assert.ok(system.includes('SHOP-FB-CTA') && !system.includes('OTHER-PAGE'));
   await gemini.generateGeminiJson({ role: 'content', includeShop: false, system: 's', user: 'u', schema: {}, parse: JSON.parse });
   assert.ok(!system.includes('SHOP-PAGE-INSTRUCTION'));
+  assert.equal((await global.contentShopProfile('111')).instructions, 'SHOP-PAGE-INSTRUCTION', 'enabled: the live profile is returned');
+  await query("UPDATE ai_page_profiles SET document=jsonb_set(document,'{profiles,content,enabled}','false') WHERE page_id='111'");
+  assert.equal(await global.contentShopProfile('111'), null, 'switch off: no shop personalization');
+  await gemini.generateGeminiJson({ role: 'content', system: 's', user: 'u', schema: {}, parse: JSON.parse });
+  assert.ok(system.includes('THIẾT LẬP CHUNG') && !system.includes('SHOP-PAGE-INSTRUCTION') && !system.includes('SHOP-FB-CTA'), 'switch off: only the Tendly global layer reaches the model');
 });
 
 test('scheduler rejects app cookies, legacy keys and a missing/wrong cron secret', async () => {

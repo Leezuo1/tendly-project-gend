@@ -216,6 +216,38 @@ test('review parser validates stable IDs, blocked status, and malformed output',
   assert.throws(() => api.parseMarketingReview('not json', [draft], evidence, 'facebook'));
 });
 
+test('Content context uses the live shop profile, not the campaign snapshot, and drops it when none is given', async () => {
+  const f = await fixture(); const api = f.load('lib/services/aiPostReview.ts');
+  await f.act('campaign', { brief: { ...f.brief, accountId: '123' }, knowledge: f.knowledge, configuration: f.config });
+  const campaign = (await f.state()).workspace.campaigns[0], account = { id: '123', name: 'Page', platform: 'facebook', mock: false };
+  const noBriefTone = { ...campaign, tone: '', profile: { ...campaign.profile, tone: '' } };
+  const live = { ...campaign.configuration.profiles.content, goal: 'LIVE-GOAL', output: 'LIVE-OUT', instructions: 'LIVE-INSTR', input: 'LIVE-IN', rules: { ...campaign.configuration.profiles.content.rules, tone: 'LIVE-TONE' } };
+  const withShop = api.marketingGenerationContext(noBriefTone, account, live);
+  assert.deepEqual(withShop.shopAi, { goal: 'LIVE-GOAL', input: 'LIVE-IN', output: 'LIVE-OUT', instructions: 'LIVE-INSTR' });
+  assert.equal(withShop.contentRules.tone, 'LIVE-TONE', 'the live config rule is the fallback when the brief sets no tone');
+  assert.notEqual(campaign.configuration.profiles.content.goal, 'LIVE-GOAL', 'the snapshot in the campaign is not what is used');
+  const without = api.marketingGenerationContext(noBriefTone, account);
+  assert.equal(without.shopAi, undefined); assert.ok(!without.contentRules.tone, 'no shop profile: no config rules reach the prompt');
+  assert.equal(api.marketingGenerationContext({ ...noBriefTone, tone: 'BRIEF-TONE' }, account, live).contentRules.tone, 'BRIEF-TONE', 'a tone written in the brief still wins over the config');
+});
+
+test('through the real workspace flow the saved Content profile reaches the plan and the post call only when its switch is on', async () => {
+  for (const enabled of [true, false]) {
+    const f = await fixture();
+    const profile = { ...f.config, profiles: { ...f.config.profiles, content: { ...f.config.profiles.content, enabled, instructions: 'WS-MARKER' } } };
+    await f.pool.query("INSERT INTO ai_page_profiles(page_id,shop_id,platform,document,updated_at,updated_by) VALUES('123','shop','facebook',$1::jsonb,1,'t')", [JSON.stringify(profile)]);
+    await f.act('campaign', { brief: { ...f.brief, accountId: '123' }, knowledge: f.knowledge, configuration: f.config });
+    const campaign = (await f.state()).workspace.campaigns[0];
+    await f.act('approveCampaign', { id: campaign.id });
+    await f.act('generatePlan', { campaignId: campaign.id });
+    const planCall = f.calls.find(call => call.schema.properties.pillars);
+    assert.equal(planCall.pageId, '123', 'the plan call names the page so the shop layer is read for it');
+    assert.equal(planCall.user.includes('WS-MARKER'), enabled, `plan context, switch ${enabled}`);
+    await f.act('generate', { campaignId: campaign.id, plan: await f.plan(campaign.id) });
+    assert.equal(f.calls[0].user.includes('WS-MARKER'), enabled, `post context, switch ${enabled}`);
+  }
+});
+
 test('Facebook selects Review evidence separately from Content and publishes only after owner approval', async () => {
   const f = await fixture();
   await f.act('campaign', { brief: { ...f.brief, accountId: '123' }, knowledge: f.knowledge, configuration: f.config });

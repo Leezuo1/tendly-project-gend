@@ -1,6 +1,7 @@
 import { buildPostPrompt, cleanHashtags, parsePostOutput, POST_RESPONSE_SCHEMA } from '@/lib/services/aiPost';
 import { generateGeminiJson } from '@/lib/services/gemini';
-import { effectiveAiRules } from '@/lib/services/aiConfiguration';
+import { effectiveAiRules, type AiProfile } from '@/lib/services/aiConfiguration';
+import { contentShopProfile } from '@/lib/services/aiGlobalSettings';
 import { MarketingWorkflowError, MARKETING_POST_GOALS } from '@/lib/services/marketingBrief';
 import { blockingIssue, evidenceConflicts, reviewHash, reviewMoneyAmounts, selectReviewEvidence, validateReviewedDraft } from '@/lib/services/reviewEvidence';
 import type { MarketingAccount, MarketingCampaign } from '@/lib/types/marketingWorkspace';
@@ -110,20 +111,22 @@ export async function reviewPostDrafts(originals: GeneratedPostDraft[], evidence
   }
 }
 
-export function marketingGenerationContext(campaign: MarketingCampaign, account: MarketingAccount) {
+/** `shop` là cấu hình AI Content hiện hành của shop (contentShopProfile); null khi chưa lưu hoặc công tắc tắt thì chỉ còn thiết lập chung và brief. */
+export function marketingGenerationContext(campaign: MarketingCampaign, account: MarketingAccount, shop: AiProfile | null = null) {
   const platform = account.platform === 'shopee' ? undefined : account.platform;
-  const shop = campaign.configuration.profiles.content, baseRules = effectiveAiRules(shop, platform);
+  const baseRules: Record<string, string | undefined> = shop ? effectiveAiRules(shop, platform) : {};
   return { account: { id: account.id, name: account.name, platform: account.platform },
-    // Cá nhân hóa của shop cho Page (bản chép vào campaign lúc tạo brief), nằm dưới thiết lập chung của Tendly.
-    shopAi: { goal: shop.goal, output: shop.output, instructions: shop.instructions || undefined },
+    // Cá nhân hóa của shop cho Page, nằm dưới thiết lập chung của Tendly.
+    shopAi: shop ? { goal: shop.goal, input: shop.input, output: shop.output, instructions: shop.instructions || undefined } : undefined,
     brief: { ...campaign, knowledge: undefined, configuration: undefined },
     knowledge: { ...campaign.knowledge, products: campaign.knowledge.products.filter(p => campaign.productIds.includes(p.id)), emailTriggers: [] },
     contentRules: { ...baseRules, ...Object.fromEntries(Object.entries(campaign.profile).filter(([key, value]) => key !== 'samples' && typeof value === 'string' && value.trim())), tone: campaign.tone || campaign.profile.tone || baseRules.tone, format: campaign.format || campaign.profile.format || baseRules.format, cta: campaign.cta || campaign.profile.cta || baseRules.cta },
   };
 }
 
-export async function generateReviewedMarketing(campaign: MarketingCampaign, account: MarketingAccount, catalog: ReviewSource[], original?: GeneratedPostDraft, signal?: AbortSignal, outline?: { title: string; outline: string }): Promise<PostReviewResult> {
-  const context = { ...marketingGenerationContext(campaign, account), approvedOutline: outline }, deadline = signal ? AbortSignal.any([signal, AbortSignal.timeout(40_000)]) : AbortSignal.timeout(40_000);
+export async function generateReviewedMarketing(campaign: MarketingCampaign, account: MarketingAccount, catalog: ReviewSource[], original?: GeneratedPostDraft, signal?: AbortSignal, outline?: { title: string; outline: string }, pageId?: string): Promise<PostReviewResult> {
+  const shop = pageId ? await contentShopProfile(pageId) : null;
+  const context = { ...marketingGenerationContext(campaign, account, shop), approvedOutline: outline }, deadline = signal ? AbortSignal.any([signal, AbortSignal.timeout(40_000)]) : AbortSignal.timeout(40_000);
   let originals: GeneratedPostDraft[], contentModel: string;
   if (account.mock) {
     const product = context.knowledge.products[0];
