@@ -1,4 +1,4 @@
-// Đồng bộ tin nhắn Zalo CÁ NHÂN về Tendly bằng zca-js (API không chính thức, mô phỏng Zalo Web; có thể bị khóa tài khoản).
+// Đồng bộ tin nhắn Zalo CÁ NHÂN về Tendly và gửi tin từ Tendly bằng zca-js (API không chính thức, mô phỏng Zalo Web; có thể bị khóa tài khoản).
 // Chỉ dùng tài khoản thử nghiệm. Chạy: npm run zalo:listener (lần đầu quét QR, các lần sau dùng lại phiên đã lưu).
 import { setTimeout } from 'node:timers/promises';
 import { createRequire } from 'node:module';
@@ -88,3 +88,24 @@ api.listener.on('closed', (code, reason) => {
   process.exit(1);
 });
 api.listener.start({ retryOnClose: true });
+
+// Gửi tin: hỏi hàng đợi của app mỗi ~1,5 giây (cũng là tín hiệu "worker còn sống"). Kết quả báo ở lượt hỏi kế tiếp.
+// Tin shop gửi sẽ hiện trong hộp thư khi Zalo phát lại tin của chính mình (selfListen) qua đường nhận tin ở trên.
+let results = [];
+while (true) {
+  let busy = false;
+  try {
+    const response = await fetch(new URL('/api/zalo/outbox', base), { method: 'POST', signal: AbortSignal.timeout(15_000),
+      headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ownId, results }) });
+    if (response.ok) {
+      results = [];
+      const { jobs } = await response.json();
+      for (const job of jobs) {
+        busy = true;
+        try { await api.sendMessage(job.text, job.psid, ThreadType.User); results.push({ id: job.id, ok: true }); console.log(`Đã gửi tin Zalo tới ${job.psid}.`); }
+        catch (error) { results.push({ id: job.id, ok: false, error: error instanceof Error ? error.message : 'Zalo không gửi được tin.' }); console.error('Gửi tin Zalo lỗi:', error instanceof Error ? error.message : error); }
+      }
+    } else if (response.status < 500) console.error(`Tendly từ chối lượt hỏi hàng đợi (${response.status}).`);
+  } catch { /* app tạm không với tới: hỏi lại ở lượt sau, kết quả chưa báo được giữ lại */ }
+  if (!busy) await setTimeout(1500);
+}

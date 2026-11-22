@@ -110,7 +110,7 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
     // The scheduler has a server-only bearer secret, tested separately below.
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;
@@ -216,8 +216,10 @@ test('scheduler rejects app cookies, legacy keys and a missing/wrong cron secret
   assert.equal((await route.GET(f.req('GET', cookie, undefined, { Authorization: 'Bearer wrong-secret' }))).status, 401);
 });
 
-test('Zalo ingest rejects app cookies, legacy keys and a missing/wrong ingest secret', async () => {
-  const f = await fixture(); const route = f.load('app/api/zalo/ingest/route.ts');
+test('Zalo ingest and outbox reject app cookies, legacy keys and a missing/wrong ingest secret', async () => {
+  const f = await fixture();
+  for (const file of ['app/api/zalo/ingest/route.ts', 'app/api/zalo/outbox/route.ts']) {
+  const route = f.load(file);
   const cookie = await f.login('admin');
   delete process.env.ZALO_INGEST_SECRET;
   assert.equal((await route.POST(f.req('POST', cookie, {}))).status, 401);
@@ -226,6 +228,7 @@ test('Zalo ingest rejects app cookies, legacy keys and a missing/wrong ingest se
     assert.equal((await route.POST(f.req('POST', cookie, {}))).status, 401);
     assert.equal((await route.POST(f.req('POST', cookie, {}, { Authorization: 'Bearer wrong-secret' }))).status, 401);
   } finally { delete process.env.ZALO_INGEST_SECRET; }
+  }
 });
 
 test('Customer Care configuration and conversation switches reject foreign origins for an authorized admin', async () => {
@@ -376,7 +379,7 @@ test('new accounts cannot reach any business API even after the demo is unlocked
   globalThis.fetch = async () => { calls++; throw new Error('new user must not reach providers'); };
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;

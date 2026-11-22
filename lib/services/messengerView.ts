@@ -56,7 +56,7 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     isUnreplied: unanswered, isUrgent: false, pendingSince: unanswered ? latestIn?.timestamp : undefined,
     hasNewMessage: newIncoming ? unanswered : previous?.hasNewMessage,
     unreadMessageIds,
-    threadWho: { name, sub: zalo ? 'Zalo cá nhân · Chỉ xem, chưa gửi từ Tendly' : 'Messenger · Page đã kết nối' }, messages,
+    threadWho: { name, sub: zalo ? 'Zalo cá nhân' : 'Messenger · Page đã kết nối' }, messages,
     profile: { name, avatar, avatarUrl, messengerId: thread.psid, identityStatus: thread.customer?.status || 'pending',
       since: `Nhận tin từ ${time(thread.createdAt)}`, tags: [], channel: zalo ? 'Zalo' : 'Messenger',
       orderCount: 'Chưa có dữ liệu', shippingArea: 'Chưa có dữ liệu', timeline: messages.slice(-3).reverse().map((m) => ({

@@ -238,6 +238,23 @@ export function InboxShell() {
   const sendLiveMessage = async (text: string): Promise<boolean> => {
     const target = selectedConv;
     if (!target?.messenger || sendLocks.current.has(target.id)) return false;
+    if (target.channel === 'zalo') {
+      // Zalo: worker gửi bằng zca-js; tin hiện trong hội thoại khi Zalo phát lại tin của shop (vòng đồng bộ kế tiếp).
+      if (!text.trim()) return false;
+      return withSendLock(target, async () => {
+        const key = JSON.stringify([target.id, 'zalo', text]);
+        const requestId = outboundRequests.current.get(key) || crypto.randomUUID();
+        outboundRequests.current.set(key, requestId);
+        const response = await fetch('/api/zalo/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ psid: target.messenger!.psid, text, requestId }) }).catch(() => null);
+        // Mất mạng: giữ mã để lần bấm gửi lại không tạo tin thứ hai. Có phản hồi: mã đã dùng xong.
+        if (!response) throw new Error('Mất kết nối. Kiểm tra Zalo trước khi gửi lại.');
+        outboundRequests.current.delete(key);
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Chưa gửi được tin Zalo.');
+        showToast(result.status === 'sent' ? 'Đã gửi qua Zalo.' : 'Zalo đang gửi tin; đừng gửi lại.');
+        return true;
+      }, () => false);
+    }
     const images = draftImages(target, removedPhotos, attachedFiles);
     if (!text.trim() && !images.length) return false;
     let textSent = !text.trim();
