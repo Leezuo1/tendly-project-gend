@@ -155,6 +155,8 @@ export function ThreadPane({
   };
 
   const isFb = conversation.channel === 'facebook';
+  // Zalo cá nhân mới đồng bộ tin về (worker zca-js); gửi từ Tendly và AI tự trả lời chưa làm.
+  const readOnly = !isFb && !!conversation.messenger;
 
   return (
     <div className="thread-pane">
@@ -170,7 +172,7 @@ export function ThreadPane({
           </div>
           <div>
             <div className="name" title={conversation.threadWho.name}>{conversation.threadWho.name}</div>
-            <div className="sub"><span className="thread-context">{conversation.threadWho.sub}</span><span className="thread-platform">{isFb ? 'Messenger' : 'Zalo OA'}</span></div>
+            <div className="sub"><span className="thread-context">{conversation.threadWho.sub}</span><span className="thread-platform">{isFb ? 'Messenger' : readOnly ? 'Zalo' : 'Zalo OA'}</span></div>
           </div>
         </div>
 
@@ -180,7 +182,7 @@ export function ThreadPane({
             {conversation.threadWho.badgeTag.label}
           </span>
         )}
-          {conversation.isUnreplied && (
+          {conversation.isUnreplied && !readOnly && (
             <button type="button" className="btn btn-outline btn-sm" onClick={handleAskGemini} disabled={isThinkingAi}>
               {isThinkingAi ? 'Đang phân tích...' : 'Phân tích AI'}
             </button>
@@ -188,7 +190,7 @@ export function ThreadPane({
         </div>
       </div>
 
-      {conversation.messenger && onToggleAutoReply && <div className="thread-ai-control">
+      {conversation.messenger && !readOnly && onToggleAutoReply && <div className="thread-ai-control">
         <div><strong>AI tự động trả lời</strong><p role="status">{savingAi ? 'Đang lưu…'
           : !aiEnabled ? 'AI đang tắt trong cấu hình chung'
           : !conversation.autoReply ? 'Đang tắt cho hội thoại này'
@@ -339,7 +341,7 @@ export function ThreadPane({
         )}
 
         </div>
-        {role !== 'customer' && conversation.messenger && labelRules && onSaveStaffLabels && (
+        {role !== 'customer' && conversation.messenger && !readOnly && labelRules && onSaveStaffLabels && (
           <LabelBar tags={conversation.tags} rules={labelRules} onChange={onSaveStaffLabels} disabled={isSending} />
         )}
         {role !== 'customer' && conversation.messenger && failedImages.length > 0 && (
@@ -358,7 +360,7 @@ export function ThreadPane({
         {role !== 'customer' && conversation.messenger && onRemoveImage && <PhotoTray items={images} onRemove={onRemoveImage} disabled={isSending} />}
         {/* Khung nhập tin nhắn */}
         <div className={`compose-row ${role === 'customer' ? 'mode-customer' : ''}`}>
-          {role !== 'customer' && conversation.messenger && onAddFiles && (
+          {role !== 'customer' && conversation.messenger && !readOnly && onAddFiles && (
             <>
               <button type="button" className="compose-attach" title="Đính kèm ảnh từ máy" aria-label="Đính kèm ảnh từ máy"
                 disabled={isThinkingAi || isSending} onClick={() => fileRef.current?.click()}>📎</button>
@@ -373,19 +375,20 @@ export function ThreadPane({
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              role === 'customer'
+              readOnly ? 'Zalo mới đồng bộ tin nhắn về, chưa gửi từ Tendly.'
+              : role === 'customer'
                 ? `Nhập câu hỏi với vai ${conversation.name} (ví dụ: 'Trời mưa không?', 'Còn size L không?')...`
                 : 'Nhập tin nhắn phản hồi của Shop...'
             }
             aria-label="Nhập tin nhắn"
-            disabled={isThinkingAi || isSending}
+            disabled={isThinkingAi || isSending || readOnly}
             maxLength={conversation.messenger ? 2000 : undefined}
           />
           <button
             type="button"
             className={`compose-send ${role === 'customer' ? 'send-as-customer' : ''}`}
             onClick={handleSend}
-            disabled={(!draftText.trim() && !(images.length && role !== 'customer')) || isThinkingAi || isSending}
+            disabled={(!draftText.trim() && !(images.length && role !== 'customer')) || isThinkingAi || isSending || readOnly}
             title={role === 'customer' ? 'Gửi với vai Khách hàng' : 'Gửi với vai Shop'}
             aria-label="Gửi tin nhắn"
           >

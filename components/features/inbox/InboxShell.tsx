@@ -352,7 +352,7 @@ export function InboxShell() {
     let timer: ReturnType<typeof setTimeout>;
     const backfill = async () => {
       const conversation = conversationsRef.current.find((c) => c.id === selectedId);
-      if (!conversation?.messenger || cancelled) return;
+      if (!conversation?.messenger || conversation.channel !== 'facebook' || cancelled) return;
       if (pendingRequests.current.size) { timer = setTimeout(backfill, 3000); return; }
       try {
         const response = await fetch(`/api/messenger/conversation?psid=${conversation.messenger.psid}`, { cache: 'no-store' });

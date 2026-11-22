@@ -31,10 +31,12 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
         ? (m.timestamp || 0) >= (previousIn?.timestamp || 0)
         : (m.timestamp || 0) > (latestOut?.timestamp || 0))).map((m) => m.id),
   ])];
+  // Tin Zalo cá nhân lưu chung bảng với page_id "zalo:<id>" (lib/services/zaloMessages.ts); không import ở đây để khỏi kéo pg vào trình duyệt.
+  const zalo = thread.pageId.startsWith('zalo:');
   const name = thread.customer?.name || `Khách ${thread.psid.slice(-6)}`;
   const avatar = thread.customer?.name
     ? thread.customer.name.split(/\s+/).filter(Boolean).slice(-2).map((part) => Array.from(part)[0]).join('').toUpperCase()
-    : 'FB';
+    : zalo ? 'ZL' : 'FB';
   const avatarUrl = thread.customer?.avatarUrl || undefined;
   const base: Conversation = {
     sourceContext: thread.sourceContext,
@@ -50,13 +52,13 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     id: thread.id, messenger: { pageId: thread.pageId, psid: thread.psid, viewStartAt: thread.viewStartAt,
       hasOlder: previous?.messenger?.viewStartAt === thread.viewStartAt && previous?.messenger?.hasOlder === false && (previous.messages[0]?.timestamp || 0) < (thread.messages[0]?.timestamp || 0)
         ? false : thread.hasOlder },
-    name, avatar, avatarUrl, channel: 'facebook', time: latest?.time || '', preview: latest?.text || '', tags: [],
+    name, avatar, avatarUrl, channel: zalo ? 'zalo' : 'facebook', time: latest?.time || '', preview: latest?.text || '', tags: [],
     isUnreplied: unanswered, isUrgent: false, pendingSince: unanswered ? latestIn?.timestamp : undefined,
     hasNewMessage: newIncoming ? unanswered : previous?.hasNewMessage,
     unreadMessageIds,
-    threadWho: { name, sub: 'Messenger · Page đã kết nối' }, messages,
+    threadWho: { name, sub: zalo ? 'Zalo cá nhân · Chỉ xem, chưa gửi từ Tendly' : 'Messenger · Page đã kết nối' }, messages,
     profile: { name, avatar, avatarUrl, messengerId: thread.psid, identityStatus: thread.customer?.status || 'pending',
-      since: `Nhận tin từ ${time(thread.createdAt)}`, tags: [], channel: 'Messenger',
+      since: `Nhận tin từ ${time(thread.createdAt)}`, tags: [], channel: zalo ? 'Zalo' : 'Messenger',
       orderCount: 'Chưa có dữ liệu', shippingArea: 'Chưa có dữ liệu', timeline: messages.slice(-3).reverse().map((m) => ({
         id: m.id, text: `${m.sender === 'in' ? 'Khách nhắn' : 'Shop trả lời'}: ${m.text.slice(0, 160)}${m.text.length > 160 ? '…' : ''}`, time: m.time,
       })) },

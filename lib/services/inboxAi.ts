@@ -45,7 +45,8 @@ export function automaticAnalysisCandidates(
 ): Conversation[] {
   return sortReplyQueue(conversations).filter((c) => {
     const message = latestCustomerMessage(c);
-    return Boolean(c.messenger && c.isUnreplied && message
+    // Zalo cá nhân chỉ xem: các API phân tích tra theo PAGE_ID của Messenger nên sẽ lỗi.
+    return Boolean(c.messenger && c.channel === 'facebook' && c.isUnreplied && message
       && c.analysis?.messageId !== message.id
       && attempted.get(c.id) !== message.id && !pending.has(c.id));
   }).slice(0, Math.max(0, capacity - pending.size));
