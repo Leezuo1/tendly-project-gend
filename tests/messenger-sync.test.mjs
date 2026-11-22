@@ -283,26 +283,13 @@ test('past orders reach the AI as a summary without personal data, only for that
   assert.doesNotMatch(seen.at(-1), /customerOrderHistory/);
 });
 
-test('phone numbers and emails are masked before text reaches the AI, and the debounce is shared and clamped', async () => {
-  const { maskPersonalData } = loader()('lib/services/piiMask.ts');
-  for (const phone of ['0901 234 567', '0901.234.567', '0901-234-567', '+84901234567', '84901234567', '0901234567']) {
-    assert.equal(maskPersonalData(`gọi ${phone} nhé`), 'gọi [SĐT] nhé', phone);
-  }
-  assert.equal(maskPersonalData('mail lan.nguyen+shop@gmail.com ok'), 'mail [email] ok');
-  assert.equal(maskPersonalData('áo 400000đ, size 38, 2 cái'), 'áo 400000đ, size 38, 2 cái');
+test('phone numbers and emails reach the AI as written, and the debounce is shared and clamped', async () => {
   const f = await aiFixture(true);
   const seen = [];
   f.state.beforeReply = async (options) => { seen.push(options.user); };
   await f.incoming('p1', { text: 'SĐT mình 0901 234 567, mail a.b@c.vn' }); await f.process();
-  assert.match(seen[0], /\[SĐT\]/);
-  assert.doesNotMatch(seen[0], /0901|234 567|a\.b@c\.vn/);
-  // Customer-written comments inside the conversation sources are masked too, the shop's own phone is not.
-  const system = f.load('lib/services/customerCare.ts').buildCustomerCarePrompt(
-    { ...f.knowledge, shop: { ...f.knowledge.shop, phone: '0281234567' } }, f.profile, null,
-    { sources: [{ id: 'c1', commentText: '0901234567 chốt nha' }] });
-  assert.doesNotMatch(system, /0901234567/);
-  assert.match(system, /\[SĐT\] chốt nha/);
-  assert.match(system, /0281234567/);
+  assert.match(seen[0], /0901 234 567/);
+  assert.match(seen[0], /a\.b@c\.vn/);
   const { messengerDebounceMs } = loader()('lib/services/messengerDebounce.ts');
   const old = process.env.MESSENGER_AI_DEBOUNCE_MS;
   try {
@@ -620,7 +607,7 @@ test('a reply that names a staff label is never auto-sent; the handoff template 
   assert.equal((await query("SELECT status FROM messenger_ai_jobs WHERE message_id='label-leak'")).rows[0].status, 'sent');
 });
 
-test('AI reads staff labels by name (masked) and picks up to 3 labels from the shop set, on the webhook run and the re-analyse button', async () => {
+test('AI reads staff labels by name and picks up to 3 labels from the shop set, on the webhook run and the re-analyse button', async () => {
   const f = await aiFixture(false);
   const conversation = f.load('app/api/messenger/conversation/route.ts'), care = f.load('app/api/customer-care/route.ts');
   const suggest = () => care.POST(new Request('http://localhost/api/customer-care', { method: 'POST', headers: { origin: 'http://localhost' },
@@ -633,10 +620,9 @@ test('AI reads staff labels by name (masked) and picks up to 3 labels from the s
   f.state.beforeReply = async (options) => { seen.push(options); };
   f.state.labels = ['buy', 'khong-co', 'buy'];
   await f.process();
-  const applied = '"staffLabels":[{"label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"label":"Gọi lại [SĐT]","context":"Gọi [SĐT] sau 5 giờ chiều"}]';
-  assert.ok(seen[0].user.includes(applied), 'each applied label reaches the AI with its context, in the order applied, masked');
-  assert.ok(seen[0].user.includes('"labelOptions":[{"id":"call","label":"Gọi lại [SĐT]","context":"Gọi [SĐT] sau 5 giờ chiều"},{"id":"si","label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"id":"buy","label":"Muốn đặt hàng"}]'), 'options carry the context too, none when empty');
-  assert.doesNotMatch(seen[0].user, /0912345678/);
+  const applied = '"staffLabels":[{"label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"label":"Gọi lại 0912345678","context":"Gọi 0912345678 sau 5 giờ chiều"}]';
+  assert.ok(seen[0].user.includes(applied), 'each applied label reaches the AI with its context, in the order applied');
+  assert.ok(seen[0].user.includes('"labelOptions":[{"id":"call","label":"Gọi lại 0912345678","context":"Gọi 0912345678 sau 5 giờ chiều"},{"id":"si","label":"Khách sỉ","context":"Khách mua sỉ từ 10 cái, ưu tiên báo giá sỉ."},{"id":"buy","label":"Muốn đặt hàng"}]'), 'options carry the context too, none when empty');
   assert.ok(seen[0].system.includes('staffLabels là các nhãn nhân viên đã dán') && seen[0].system.includes('Đọc context để hiểu khách đang ở tình huống nào'));
   assert.ok(seen[0].system.includes('labelOptions là bộ nhãn của shop'));
   assert.deepEqual((await query('SELECT analysis FROM messenger_analysis_history')).rows[0].analysis.labels, ['buy'], 'unknown ids dropped, deduplicated');
@@ -644,7 +630,7 @@ test('AI reads staff labels by name (masked) and picks up to 3 labels from the s
   assert.ok(seen.at(-1).user.includes(applied), 're-analyse button passes labels too');
   await setTagRules([{ ...tagRule('call', 'Gọi lại 0912345678'), type: 'risk' }]);
   await suggest();
-  assert.ok(seen.at(-1).user.includes('"staffLabels":[{"label":"Gọi lại [SĐT]"}]'), 'a label deleted from the set is no longer sent; a label without context sends its name only');
+  assert.ok(seen.at(-1).user.includes('"staffLabels":[{"label":"Gọi lại 0912345678"}]'), 'a label deleted from the set is no longer sent; a label without context sends its name only');
   await setTagRules([]);
   f.state.labels = undefined;
   await suggest();
@@ -697,6 +683,13 @@ test('a product-photo reply that repeats a long number read from the image is ne
   text.state.replyText = 'Mình đã nhận số 0123456789 bạn gửi ạ.';
   await text.incoming('typed-number', { text: 'Số của mình là 0123456789' }); await text.process();
   assert.equal(text.state.sends, 1);
+  // A number the customer typed in an earlier batch (over 5 minutes ago) is not "read from the image": repeating it is allowed.
+  const earlier = await aiFixture(true); await enableAutoReply(earlier);
+  earlier.state.imageKinds = ['product'];
+  earlier.state.replyText = 'Mình đã ghi nhận số 0123456789 của bạn, bạn muốn xem mẫu nào ạ?';
+  await earlier.incoming('typed-before', { text: 'Số của mình là 0123456789', timestamp: Date.now() - 600_000 });
+  await earlier.incoming('photo-after', { text: '', attachments: [photo] }); await earlier.process();
+  assert.deepEqual(await sentTexts(), [earlier.state.replyText]);
 });
 
 test('defect, receipt and other_support photos send the handoff template', async () => {

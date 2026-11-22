@@ -23,7 +23,6 @@ const digitRuns = (text: string) => text.replace(/(?<=\d{3})[\s.\-](?=\d{3})/g, 
  * `longNumbers`: bật khi tin khách có ảnh. Số đọc từ ảnh biên lai/giấy tờ không được lặp lại trừ khi shop đã có số đó (lời nhắc chỉ dặn, đây là chặn cứng).
  */
 export function unsupportedReplyReason(reply: string, known: string, options: { longNumbers?: boolean } = {}): string | null {
-  if (/\[(?:SĐT|email)\]/i.test(reply)) return 'Câu trả lời chứa dữ liệu cá nhân đã bị che; cần nhân viên kiểm tra.';
   const urls = (text: string) => (text.match(/(?:https?:\/\/|www\.)[^\s"')]+/gi) ?? []).map(url => url.replace(/[.,;:!?]+$/, '').toLowerCase());
   const allowedUrls = new Set(urls(known));
   if (urls(reply).some(url => !allowedUrls.has(url))) return 'Câu trả lời có đường dẫn không nằm trong dữ liệu của shop.';

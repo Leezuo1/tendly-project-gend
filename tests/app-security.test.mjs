@@ -110,7 +110,7 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
     // The scheduler has a server-only bearer secret, tested separately below.
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;
@@ -179,6 +179,7 @@ test('shop personalizes each AI per Page on the server; prompt layers Global →
   assert.equal(initial.revision, 0); assert.equal(initial.platform, 'facebook');
   const configuration = initial.configuration;
   configuration.profiles.content.instructions = 'SHOP-PAGE-INSTRUCTION';
+  configuration.profiles.content.enabled = true; // công tắc là bật/tắt cá nhân hóa của shop cho AI Content
   configuration.profiles.content.platformRules.facebook = { enabled: true, values: { cta: 'SHOP-FB-CTA' } };
   assert.equal((await get('222')).status, 403);
   assert.equal((await put({ pageId: '222', configuration, revision: 0 })).status, 403);
@@ -198,6 +199,11 @@ test('shop personalizes each AI per Page on the server; prompt layers Global →
   assert.ok(system.includes('SHOP-FB-CTA') && !system.includes('OTHER-PAGE'));
   await gemini.generateGeminiJson({ role: 'content', includeShop: false, system: 's', user: 'u', schema: {}, parse: JSON.parse });
   assert.ok(!system.includes('SHOP-PAGE-INSTRUCTION'));
+  assert.equal((await global.contentShopProfile('111')).instructions, 'SHOP-PAGE-INSTRUCTION', 'enabled: the live profile is returned');
+  await query("UPDATE ai_page_profiles SET document=jsonb_set(document,'{profiles,content,enabled}','false') WHERE page_id='111'");
+  assert.equal(await global.contentShopProfile('111'), null, 'switch off: no shop personalization');
+  await gemini.generateGeminiJson({ role: 'content', system: 's', user: 'u', schema: {}, parse: JSON.parse });
+  assert.ok(system.includes('THIẾT LẬP CHUNG') && !system.includes('SHOP-PAGE-INSTRUCTION') && !system.includes('SHOP-FB-CTA'), 'switch off: only the Tendly global layer reaches the model');
 });
 
 test('scheduler rejects app cookies, legacy keys and a missing/wrong cron secret', async () => {
@@ -208,6 +214,21 @@ test('scheduler rejects app cookies, legacy keys and a missing/wrong cron secret
   process.env.CRON_SECRET = 'server-only-cron-test-secret';
   assert.equal((await route.GET(f.req('GET', cookie))).status, 401);
   assert.equal((await route.GET(f.req('GET', cookie, undefined, { Authorization: 'Bearer wrong-secret' }))).status, 401);
+});
+
+test('Zalo ingest and outbox reject app cookies, legacy keys and a missing/wrong ingest secret', async () => {
+  const f = await fixture();
+  for (const file of ['app/api/zalo/ingest/route.ts', 'app/api/zalo/outbox/route.ts']) {
+  const route = f.load(file);
+  const cookie = await f.login('admin');
+  delete process.env.ZALO_INGEST_SECRET;
+  assert.equal((await route.POST(f.req('POST', cookie, {}))).status, 401);
+  process.env.ZALO_INGEST_SECRET = 'server-only-zalo-test-secret';
+  try {
+    assert.equal((await route.POST(f.req('POST', cookie, {}))).status, 401);
+    assert.equal((await route.POST(f.req('POST', cookie, {}, { Authorization: 'Bearer wrong-secret' }))).status, 401);
+  } finally { delete process.env.ZALO_INGEST_SECRET; }
+  }
 });
 
 test('Customer Care configuration and conversation switches reject foreign origins for an authorized admin', async () => {
@@ -358,7 +379,7 @@ test('new accounts cannot reach any business API even after the demo is unlocked
   globalThis.fetch = async () => { calls++; throw new Error('new user must not reach providers'); };
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;

@@ -206,3 +206,7 @@ vite.config.ts.timestamp-*
 
 # agent skills (local tooling)
 .agents/
+
+# zalo listener (cookie phiên Zalo = quyền điều khiển tài khoản)
+.zalo-session.json
+zalo-qr.png

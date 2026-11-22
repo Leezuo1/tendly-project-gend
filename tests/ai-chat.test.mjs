@@ -439,6 +439,7 @@ test('AI tự xử lý mọi hội thoại đang chờ, giới hạn song song, 
   const attempted = new Map([['a', 'a-message'], ['b', 'b-message']]);
   assert.deepEqual(f.inbox.automaticAnalysisCandidates([a, b, c], pending, attempted).map((x) => x.id), ['c']);
   assert.deepEqual(f.inbox.automaticAnalysisCandidates([a, b, c], new Set(['a', 'other']), attempted), []);
+  assert.deepEqual(f.inbox.automaticAnalysisCandidates([{ ...c, channel: 'zalo' }], pending, attempted), [], 'Zalo cá nhân chỉ xem, không tự phân tích qua API Messenger');
   const newer = { ...a, messages: [...a.messages, { id: 'a-new', sender: 'in', text: 'Hỏi thêm' }] };
   assert.deepEqual(f.inbox.automaticAnalysisCandidates([newer], pending, attempted), []);
   assert.equal(f.inbox.automaticAnalysisCandidates([newer], new Set(), attempted)[0].id, 'a');
