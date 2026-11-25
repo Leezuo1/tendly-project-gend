@@ -43,7 +43,10 @@ export async function generateGeminiJson<T>(options: GenerateJsonOptions<T>): Pr
   if (!apiKey) throw new GeminiNotConfigured('Chưa cấu hình GEMINI_API_KEY trên máy chủ.');
   const system = options.role === 'sourcing' ? options.system
     : `${await globalAiSystemPrompt(options.role, options.platform, options.pageId, options.includeShop)}\n\n${options.system}`;
-  const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : GEMINI_CANDIDATE_MODELS;
+  const base = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : GEMINI_CANDIDATE_MODELS;
+  // Marketing/content and Smart Sourcing may use their own model; a bad id falls back to the usual list.
+  const contentModel = options.role === 'content' || options.role === 'sourcing' ? process.env.GEMINI_CONTENT_MODEL : undefined;
+  const models = contentModel ? [...new Set([contentModel, ...base])] : base;
 
   for (const model of models) {
     if (options.signal?.aborted) break;

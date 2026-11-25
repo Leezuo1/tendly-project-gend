@@ -123,7 +123,7 @@ Sản phẩm là nguồn cho giá, chất liệu, size, màu và tổng tồn kh
 
 Khung chat khách và ô thử AI vẫn gửi nguồn tri thức từ mock DB trình duyệt tới `/api/chat`; server kiểm tra cấu trúc, lọc trạng thái và tạo chỉ dẫn. Customer Care Messenger dùng quy tắc đã xác nhận trên backend theo Page được cấp quyền qua `/api/customer-care`, còn sản phẩm và FAQ lấy từ danh mục hiện hành trong database (`shop_catalog`, migration 024; trình duyệt tự đồng bộ qua `/api/shop-catalog`, lệch revision thì bản máy chủ thắng và bản cũ được cất ở localStorage `tendly.catalogBackup`). Sản phẩm mẫu chưa chỉnh sửa không được đưa tới khách thật; chưa có danh mục trong database thì dùng bản chụp đã xác nhận trước đó. Webhook và Inbox không nhận dữ liệu tùy ý từ client. Lịch sử phân tích Messenger tiếp tục lưu trong PostgreSQL.
 
-Đặt `GEMINI_API_KEY` trong `.env.local` (xem `.env.example`), có thể đặt thêm `GEMINI_MODEL` để chọn model được cấp quyền. Khóa chỉ được đọc ở server. API sử dụng [Gemini generateContent](https://ai.google.dev/api/generate-content).
+Đặt `GEMINI_API_KEY` trong `.env.local` (xem `.env.example`), có thể đặt thêm `GEMINI_MODEL` để chọn model được cấp quyền, và `GEMINI_CONTENT_MODEL` để Marketing content và Smart Sourcing dùng model riêng (lỗi thì quay về model mặc định; xem log `"model"` để biết model nào đã trả lời). Khóa chỉ được đọc ở server. API sử dụng [Gemini generateContent](https://ai.google.dev/api/generate-content).
 
 ## Cảm xúc và hàng chờ trả lời
 
