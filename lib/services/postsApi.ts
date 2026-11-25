@@ -10,7 +10,6 @@ export function requireDashboardKey(request: Request): Response | null {
   return legacyAccessError(request) ?? null;
 }
 
-/** Đổi lỗi thành response, không đưa chi tiết lỗi database (có thể chứa thông tin kết nối) ra ngoài. */
 const POSTS_RULES = [
   rule(AppSecurityError, securityErrorResponse),
   rule(MarketingWorkflowError, e => errorJson(e.message, e.status)),
@@ -41,3 +40,4 @@ export async function readJson(request: Request): Promise<unknown> {
     throw new InvalidPostRequest('Nội dung yêu cầu không phải JSON hợp lệ.');
   }
 }
+/** Đổi lỗi thành response, không đưa chi tiết lỗi database (có thể chứa thông tin kết nối) ra ngoài. */

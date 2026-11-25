@@ -29,7 +29,6 @@ export async function readMarketingJson(request: Request): Promise<Record<string
   return parseJsonObject(raw, () => new InvalidMarketingRequest('Nội dung yêu cầu không phải JSON hợp lệ.'));
 }
 
-/** Đổi lỗi thành response, không đưa chi tiết lỗi database ra ngoài. */
 const MARKETING_RULES = [
   rule(AppSecurityError, securityErrorResponse),
   rule(MarketingWorkflowError, e => errorJson(e.message, e.status)),
@@ -41,6 +40,7 @@ const MARKETING_RULES = [
   rule(GeminiUnavailable, e => errorJson(e.message, 502)),
 ];
 
+/** Đổi lỗi thành response, không đưa chi tiết lỗi database ra ngoài. */
 export function marketingErrorResponse(error: unknown): Response {
   const mapped = mapError(error, MARKETING_RULES);
   if (mapped) return mapped;

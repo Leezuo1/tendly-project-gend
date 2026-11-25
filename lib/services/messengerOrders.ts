@@ -7,8 +7,6 @@ export interface CustomerOrderHistory {
   recent: { id: string; status: 'confirmed' | 'draft'; items: string; totalVnd: number; date: string }[];
 }
 
-// Readable dates: raw epoch milliseconds tend to be turned into wrong dates by the model.
-
 // What the AI may know about a customer's orders: ids, items, quantities and totals. Never contact details.
 export async function readCustomerOrderHistory(pageId: string, psid: string,
   db: Pick<Pool, 'query'> = getMessengerPool()): Promise<CustomerOrderHistory | null> {

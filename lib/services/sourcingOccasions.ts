@@ -1,5 +1,5 @@
-import { vnDay } from '@/lib/utils/vnTime';
 /** Lịch dịp bán hàng tại Việt Nam để Smart Sourcing gợi ý "sắp tới nên làm gì". Ngày do code tính, AI chỉ đề xuất góc khai thác. */
+import { vnDay } from '@/lib/utils/vnTime';
 export interface SalesOccasion { name: string; date: string; daysLeft: number; hint: string }
 
 // Ngày âm lịch quy đổi sẵn; hết bảng thì dịp đó tự ẩn thay vì đoán sai ngày.
@@ -50,7 +50,6 @@ function occasionsOfYear(year: number): [string, string][] {
   for (const [name, dates] of Object.entries(LUNAR)) if (dates[year]) list.push([name, `${year}-${dates[year]}`]);
   return list;
 }
-/** Ngày hôm nay theo giờ Việt Nam, dạng YYYY-MM-DD. */
 
 /** Các dịp trong `days` ngày tới (tính cả hôm nay), gần nhất trước. */
 export function upcomingOccasions(now = new Date(), days = 90): SalesOccasion[] {

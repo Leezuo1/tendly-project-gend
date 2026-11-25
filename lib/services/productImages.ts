@@ -1,5 +1,5 @@
-import { isMissingTable } from '@/lib/http/errors';
 /** Ảnh sản phẩm do shop tải lên (bảng shop_product_images). Byte ảnh không nằm trong catalog_json. */
+import { isMissingTable } from '@/lib/http/errors';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { PostImageMime } from '@/lib/types/posts';

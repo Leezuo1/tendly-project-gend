@@ -1,8 +1,8 @@
-import { graphUrl } from '@/lib/services/graph';
 /**
  * Đăng bài lên Fanpage qua Graph API (cần quyền pages_manage_posts):
  * không ảnh → POST /{page-id}/feed · có ảnh → POST /{page-id}/photos (ảnh + caption thành một bài trên tường).
  */
+import { graphUrl } from '@/lib/services/graph';
 import type { PostImageMime } from '@/lib/types/posts';
 import { assertOperationAllowed } from '@/lib/services/appSecurity';
 

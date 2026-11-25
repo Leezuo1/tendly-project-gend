@@ -1,8 +1,8 @@
-import { collapseSpaces } from '@/lib/utils/text';
 /**
  * Câu trả lời mẫu cho từng nhóm bình luận — điền giá/tồn kho từ dữ liệu shop, không gọi AI.
  * Không bịa thông tin shop chưa khai báo (phí ship, chính sách đổi trả lấy từ FAQ nếu có).
  */
+import { collapseSpaces } from '@/lib/utils/text';
 import { normalize, formatMoney } from '@/lib/utils/format';
 import type { AiKnowledge } from '@/lib/types/ai';
 import type { LiveIntent, LivePreparation } from '@/lib/types/live';

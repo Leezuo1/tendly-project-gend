@@ -1,9 +1,9 @@
-import { graphCredentials, graphUrl } from '@/lib/services/graph';
 /**
  * Shop duyệt 1 câu trả lời cho cả nhóm → nhắn riêng (Private Reply) cho từng người bình luận trong nhóm.
  * Giống sendCommentPrivateReply (lib/services/facebookComments.ts): đặt chỗ trong DB trước khi gửi,
  * kết quả mơ hồ thì để "unknown" và không bao giờ tự gửi lại.
  */
+import { graphCredentials, graphUrl } from '@/lib/services/graph';
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
 import { assertOperationAllowed } from '@/lib/services/appSecurity';
 import { graphRead, saveFacebookComments } from '@/lib/services/facebookComments';
