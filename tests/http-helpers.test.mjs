@@ -152,3 +152,12 @@ test('graphCredentials trims, validates the version and graphUrl builds Graph UR
   }
   assert.equal(graphUrl('v23.0', '222/messages'), 'https://graph.facebook.com/v23.0/222/messages');
 });
+
+test('vnDay uses the Vietnam calendar day and collapseSpaces trims and squeezes whitespace', () => {
+  const { vnDay } = load('lib/utils/vnTime.ts');
+  const { collapseSpaces } = load('lib/utils/text.ts');
+  assert.equal(vnDay(Date.UTC(2026, 0, 1, 17, 30)), '2026-01-02'); // 00:30 ngày hôm sau theo giờ VN
+  assert.equal(vnDay(new Date(Date.UTC(2026, 0, 1, 16, 59))), '2026-01-01');
+  assert.equal(collapseSpaces('  a \n\t b  '), 'a b');
+  assert.equal(collapseSpaces(''), '');
+});

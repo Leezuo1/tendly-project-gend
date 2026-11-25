@@ -1,5 +1,6 @@
 /** Ảnh kèm bài đăng: kiểm tra file ảnh và tạo ảnh AI miễn phí qua Pollinations (không cần API key). */
 import type { PostImageMime } from '@/lib/types/posts';
+import { collapseSpaces } from '@/lib/utils/text';
 
 /** Vercel giới hạn body request ~4,5MB; trình duyệt đã nén ảnh trước khi gửi nên 4MB là dư. */
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -27,7 +28,7 @@ export function checkPostImage(bytes: Uint8Array): PostImageMime {
 
 /** Ghép mô tả của AI với phong cách ảnh sản phẩm; ảnh đăng Fanpage không nên có chữ (AI vẽ chữ hay sai). */
 export function buildImagePrompt(description: string): string {
-  const subject = description.replace(/\s+/g, ' ').trim().slice(0, MAX_PROMPT_LENGTH);
+  const subject = collapseSpaces(description).slice(0, MAX_PROMPT_LENGTH);
   if (!subject) throw new InvalidPostImage('Chưa có mô tả ảnh để AI tạo.');
   return `${subject}. Professional e-commerce product photography, natural soft lighting, clean composition, high detail, no text, no watermark, no logo.`;
 }

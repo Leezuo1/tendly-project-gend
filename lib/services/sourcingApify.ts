@@ -1,3 +1,4 @@
+import { collapseSpaces } from '@/lib/utils/text';
 import { hotScore, normalizeSourcingPosts, prepareSourcingSearch, SourcingInputError, type SourcingComment } from '@/lib/services/sourcingSearch';
 import { resolveOccasions } from '@/lib/services/sourcingOccasions';
 import type { SourcingKind, SupplierCandidate } from '@/lib/types/sourcing';
@@ -50,7 +51,7 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
     };
   }
   if (kind === 'market') return marketRequest(input, now);
-  const product = typeof input.product === 'string' ? input.product.trim().replace(/\s+/g, ' ') : '';
+  const product = typeof input.product === 'string' ? collapseSpaces(input.product) : '';
   if (product.length < 2 || product.length > 120 || /[\u0000-\u001f\u007f]/.test(product)
     || !/^[\p{L}\p{N}\s.,()&+%\/-]+$/u.test(product) || product.split(' ').length > 16) {
     throw new SourcingInputError('Tên sản phẩm cần từ 2–120 ký tự, tối đa 16 từ; không nhập URL hoặc cú pháp tìm kiếm.');
@@ -71,7 +72,7 @@ export function sourcingRequest(kind: SourcingKind, input: Record<string, unknow
 }
 
 const SAFE_TERM = /^[\p{L}\p{N}\s.,()&+%\/'-]+$/u;
-const term = (value: unknown) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+const term = (value: unknown) => typeof value === 'string' ? collapseSpaces(value) : '';
 /** Đối thủ: tên thương hiệu, link website hoặc link fanpage Facebook. Trả truy vấn Google tương ứng, không nhận cú pháp tìm kiếm tự gõ. */
 export function competitorQuery(value: unknown) {
   const raw = term(value);

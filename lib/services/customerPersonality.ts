@@ -1,3 +1,4 @@
+import { collapseSpaces } from '@/lib/utils/text';
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
@@ -43,7 +44,7 @@ export async function refreshCustomerPersonality(pageId: string, psid: string,
       parse: (text) => {
         const value = JSON.parse(text).summary;
         if (typeof value !== 'string' || !value.trim() || value.length > 120) throw new Error('Invalid summary');
-        return value.replace(/\s+/g, ' ').trim();
+        return collapseSpaces(value);
       },
     });
     await db.query(`UPDATE messenger_conversations SET personality_summary=$3,personality_source_hash=$4,personality_refresh_after=0

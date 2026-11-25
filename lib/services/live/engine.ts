@@ -1,3 +1,4 @@
+import { vnDay } from '@/lib/utils/vnTime';
 /**
  * Lõi Livestream — không phụ thuộc nền tảng. Nguồn bình luận ở sources.ts, gửi tin ở reply.ts.
  *
@@ -846,7 +847,7 @@ export async function readInsights(pageId: string, db: Database = getMessengerPo
   const ids = sessions.map((s) => s.id);
   const orderRows = ids.length ? (await db.query(`SELECT o.session_id, o.items_json, o.status FROM live_orders o
     WHERE o.session_id=ANY($1::text[])`, [ids])).rows : [];
-  const month = (ts: number) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(0, 7);
+  const month = (ts: number) => vnDay(ts).slice(0, 7);
   const byMonth = new Map<string, LiveInsights['monthly'][number] & { qty: Map<string, { name: string; count: number }> }>();
   for (const s of sessions) {
     const key = month(s.startedAt);

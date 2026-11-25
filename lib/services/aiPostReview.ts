@@ -1,3 +1,4 @@
+import { collapseSpaces } from '@/lib/utils/text';
 import { buildPostPrompt, cleanHashtags, parsePostOutput, POST_RESPONSE_SCHEMA } from '@/lib/services/aiPost';
 import { generateGeminiJson } from '@/lib/services/gemini';
 import { effectiveAiRules, type AiProfile } from '@/lib/services/aiConfiguration';
@@ -23,7 +24,7 @@ const fieldValue = (draft: GeneratedPostDraft, key: ReviewField) => key === 'has
 // Compare fields ignoring whitespace; hashtags go through the same cleaning as the parsed draft (adds "#", dedups, caps the count), then ignore case and order.
 const same = (field: ReviewField, a: string, b: string) => {
   const clean = (value: string) => field === 'hashtags' ? cleanHashtags(value.split(/\s+/)).map(tag => tag.toLowerCase()).sort().join(' ')
-    : value.normalize('NFC').replace(/\s+/g, ' ').trim();
+    : collapseSpaces(value.normalize('NFC'));
   return clean(a) === clean(b);
 };
 export function parseMarketingReview(output: string, originals: GeneratedPostDraft[], evidence: ReviewEvidence, channel: string): ReviewedVariant[] {

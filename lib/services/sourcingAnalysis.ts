@@ -1,3 +1,4 @@
+import { vnDay } from '@/lib/utils/vnTime';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { generateGeminiJson, GeminiNotConfigured } from '@/lib/services/gemini';
 import { publicSourcingRun, SourcingRunError } from '@/lib/services/sourcingRuns';
@@ -245,7 +246,7 @@ export function marketCalendar(selected: SalesOccasion[], now = new Date()) {
   for (const item of upcomingOccasions(now, 60)) if (list.length < 5 && !list.some(entry => entry.name === item.name)) list.push(item);
   return list;
 }
-const daysUntil = (date: string, now: Date) => date ? Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })}T00:00:00Z`)) / 86_400_000) : -1;
+const daysUntil = (date: string, now: Date) => date ? Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${vnDay(now)}T00:00:00Z`)) / 86_400_000) : -1;
 
 /** Kiểm tra báo cáo thị trường: tin/đối thủ/xu hướng phải có nguồn thật; dịp lấy ngày từ lịch của code; đề xuất nội dung cần nguồn hoặc gắn một dịp trong lịch. */
 export function parseMarketReport(output: string, ids: Map<string, string>, context: { topics: string[]; competitors: string[]; calendar: SalesOccasion[] }, now = new Date()): Omit<SourcingAnalysis, 'model' | 'createdAt'> {

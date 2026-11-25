@@ -1,3 +1,4 @@
+import { vnDay } from '@/lib/utils/vnTime';
 import type { Pool } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 
@@ -7,7 +8,6 @@ export interface CustomerOrderHistory {
 }
 
 // Readable dates: raw epoch milliseconds tend to be turned into wrong dates by the model.
-const day = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 // What the AI may know about a customer's orders: ids, items, quantities and totals. Never contact details.
 export async function readCustomerOrderHistory(pageId: string, psid: string,
@@ -20,8 +20,8 @@ export async function readCustomerOrderHistory(pageId: string, psid: string,
     const recent = (await db.query(`SELECT id,items_json,total,status,created_at FROM messenger_orders
       WHERE page_id=$1 AND psid=$2 AND status<>'cancelled' ORDER BY created_at DESC LIMIT 3`, params)).rows;
     if (!recent.length) return null;
-    return { confirmedOrders: Number(total.n), confirmedTotalVnd: Number(total.sum), lastConfirmedDate: total.last == null ? null : day(Number(total.last)),
-      recent: recent.map((row) => ({ id: String(row.id), status: row.status, totalVnd: Number(row.total), date: day(Number(row.created_at)),
+    return { confirmedOrders: Number(total.n), confirmedTotalVnd: Number(total.sum), lastConfirmedDate: total.last == null ? null : vnDay(Number(total.last)),
+      recent: recent.map((row) => ({ id: String(row.id), status: row.status, totalVnd: Number(row.total), date: vnDay(Number(row.created_at)),
         items: (Array.isArray(row.items_json) ? row.items_json : []).slice(0, 10)
           .map((item: { name?: unknown; qty?: unknown }) => `${String(item?.name ?? '').slice(0, 80)} x${Number(item?.qty) || 1}`).join(', ') })) };
   } catch {

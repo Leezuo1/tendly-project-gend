@@ -1,3 +1,4 @@
+import { vnDay } from '@/lib/utils/vnTime';
 import type { Pool } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import type { CrmCustomer, CrmOrder, CrmOrderStatus, CrmOverview } from '@/lib/types/crm';
@@ -5,8 +6,6 @@ import type { CrmCustomer, CrmOrder, CrmOrderStatus, CrmOverview } from '@/lib/t
 const DAY = 86_400_000;
 const ROWS = 500;
 export const CRM_RANGES = [7, 30, 90] as const;
-/** Ngày theo giờ Việt Nam, dạng YYYY-MM-DD. */
-const vnDay = (ms: number) => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 const json = (value: unknown) => typeof value === 'string' ? JSON.parse(value) : value;
 const items = (value: unknown) => (Array.isArray(json(value)) ? json(value) as Record<string, unknown>[] : []).slice(0, 30).map(item => ({
   name: String(item?.name ?? '').slice(0, 120) || 'Sản phẩm', qty: Math.max(1, Number(item?.qty) || 1),
