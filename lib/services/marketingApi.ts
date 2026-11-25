@@ -1,3 +1,4 @@
+import { parseJsonObject } from '@/lib/http/body';
 import { InvalidAiKnowledge } from '@/lib/services/aiKnowledge';
 import { GeminiNotConfigured, GeminiUnavailable } from '@/lib/services/gemini';
 import { MessengerSendError } from '@/lib/services/messengerSend';
@@ -24,13 +25,7 @@ export function parsePsid(value: unknown): string {
 export async function readMarketingJson(request: Request): Promise<Record<string, unknown>> {
   const raw = await request.text();
   if (raw.length > 600_000) throw new InvalidMarketingRequest('Yêu cầu quá lớn.');
-  try {
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('not an object');
-    return data;
-  } catch {
-    throw new InvalidMarketingRequest('Nội dung yêu cầu không phải JSON hợp lệ.');
-  }
+  return parseJsonObject(raw, () => new InvalidMarketingRequest('Nội dung yêu cầu không phải JSON hợp lệ.'));
 }
 
 /** Đổi lỗi thành response, không đưa chi tiết lỗi database ra ngoài. */

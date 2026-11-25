@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
 import type { Pool } from 'pg';
+import { parseJsonObject } from '@/lib/http/body';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import type { AppSession } from '@/lib/types/security';
 
@@ -42,9 +43,8 @@ export async function readSecurityJson(request: Request): Promise<Record<string,
       if (size > 8192) { await reader.cancel(); throw new AppSecurityError('Nội dung yêu cầu quá lớn.', 413, 'BODY_TOO_LARGE'); }
       chunks.push(value);
     }
-    const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid JSON');
-    return data;
+    return parseJsonObject(Buffer.concat(chunks).toString('utf8'),
+      () => new AppSecurityError('Nội dung yêu cầu không hợp lệ.', 400, 'INVALID_JSON'));
   } catch (error) {
     if (error instanceof AppSecurityError) throw error;
     throw new AppSecurityError('Nội dung yêu cầu không hợp lệ.', 400, 'INVALID_JSON');
