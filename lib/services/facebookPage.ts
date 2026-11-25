@@ -1,3 +1,4 @@
+import { graphUrl } from '@/lib/services/graph';
 /**
  * Đăng bài lên Fanpage qua Graph API (cần quyền pages_manage_posts):
  * không ảnh → POST /{page-id}/feed · có ảnh → POST /{page-id}/photos (ảnh + caption thành một bài trên tường).
@@ -40,7 +41,7 @@ export async function publishToFacebookPage(
   let res: Response;
   try { await assertOperationAllowed(); } catch (error) { throw Object.assign(error as Error, { unsent: true }); }
   try {
-    res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${pageId}/${image ? 'photos' : 'feed'}`, {
+    res = await fetch(graphUrl(GRAPH_API_VERSION, `${pageId}/${image ? 'photos' : 'feed'}`), {
       method: 'POST',
       body,
       signal: AbortSignal.timeout(image ? 45_000 : 20_000),
@@ -77,7 +78,7 @@ export async function fetchPostEngagement(
   let missingPermission: string | null = null;
   await Promise.all(postIds.filter((id) => /^\d+(_\d+)?$/.test(id)).map(async (id) => {
     try {
-      const res = await fetch(`https://graph.facebook.com/${GRAPH_API_VERSION}/${id}?fields=${encodeURIComponent(fields)}`, {
+      const res = await fetch(graphUrl(GRAPH_API_VERSION, `${id}?fields=${encodeURIComponent(fields)}`), {
         headers: { Authorization: `Bearer ${token}` }, // token không đặt trên URL
         signal: AbortSignal.timeout(10_000),
       });

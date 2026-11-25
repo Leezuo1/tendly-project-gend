@@ -132,3 +132,23 @@ test('createPool applies the shared limits and the caller connection timeout', a
     assert.equal(pool.options.statement_timeout, 8000);
   } finally { await pool.end(); }
 });
+
+test('graphCredentials trims, validates the version and graphUrl builds Graph URLs', () => {
+  const { graphCredentials, graphUrl } = load('lib/services/graph.ts');
+  const saved = { token: process.env.PAGE_ACCESS_TOKEN, version: process.env.META_GRAPH_VERSION };
+  try {
+    Object.assign(process.env, { PAGE_ACCESS_TOKEN: ' tok ', META_GRAPH_VERSION: ' v23.0 ' });
+    assert.deepEqual(graphCredentials(), { token: 'tok', version: 'v23.0' });
+    process.env.META_GRAPH_VERSION = '23';
+    assert.equal(graphCredentials(), null);
+    Object.assign(process.env, { PAGE_ACCESS_TOKEN: '  ', META_GRAPH_VERSION: 'v23.0' });
+    assert.equal(graphCredentials(), null);
+    delete process.env.PAGE_ACCESS_TOKEN;
+    assert.equal(graphCredentials(), null);
+  } finally {
+    for (const [key, value] of [['PAGE_ACCESS_TOKEN', saved.token], ['META_GRAPH_VERSION', saved.version]]) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+  assert.equal(graphUrl('v23.0', '222/messages'), 'https://graph.facebook.com/v23.0/222/messages');
+});

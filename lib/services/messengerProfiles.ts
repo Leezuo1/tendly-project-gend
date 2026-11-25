@@ -1,3 +1,4 @@
+import { graphCredentials, graphUrl } from '@/lib/services/graph';
 import type { Pool } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
 import { customerProfileFromRow } from '@/lib/services/messengerInboxDb';
@@ -17,9 +18,9 @@ function safeAvatar(value: unknown): string | null {
 export async function refreshMessengerProfiles(snapshot: MessengerInboxSnapshot,
   db: Pick<Pool, 'query'> = getMessengerPool(), transport: typeof fetch = fetch) {
   const pageId = process.env.PAGE_ID?.trim();
-  const token = process.env.PAGE_ACCESS_TOKEN?.trim();
-  const version = process.env.META_GRAPH_VERSION?.trim();
-  if (!pageId || !token || !version || !/^v\d+\.\d+$/.test(version)) return snapshot;
+  const credentials = graphCredentials();
+  if (!pageId || !credentials) return snapshot;
+  const { token, version } = credentials;
   const now = Date.now();
   const candidates = snapshot.conversations.filter((thread) => thread.pageId === pageId &&
     /^\d{1,64}$/.test(thread.psid) && (thread.customer?.retryAfter ?? 0) <= now).slice(0, 3);
@@ -34,7 +35,7 @@ export async function refreshMessengerProfiles(snapshot: MessengerInboxSnapshot,
     let avatarUrl: string | null = null;
     let available = false;
     try {
-      const response = await transport(`https://graph.facebook.com/${version}/${encodeURIComponent(thread.psid)}?fields=first_name,last_name,profile_pic`, {
+      const response = await transport(graphUrl(version, `${encodeURIComponent(thread.psid)}?fields=first_name,last_name,profile_pic`), {
         headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(3000), cache: 'no-store',
       });
       if (response.ok) {
