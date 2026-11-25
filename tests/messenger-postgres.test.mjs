@@ -11,7 +11,7 @@ function load(file) {
   const compiled = ts.transpileModule(readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText;
-  new Function('require', 'module', 'exports', compiled)(require, loaded, loaded.exports);
+  new Function('require', 'module', 'exports', compiled)(name => name.startsWith('@/') ? load(`${name.slice(2)}.ts`) : require(name), loaded, loaded.exports);
   return loaded.exports;
 }
 

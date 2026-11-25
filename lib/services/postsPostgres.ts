@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Pool } from 'pg';
-import { attachDatabasePool } from '@vercel/functions';
+import type { Pool } from 'pg';
+import { createPool } from '@/lib/db/pool';
 import type { MarketingPost, NewMarketingPost, PostDraft, PostImageMime, PostImageSource } from '@/lib/types/posts';
 
 type Queryable = Pick<Pool, 'query'>;
@@ -14,13 +14,7 @@ export class PostLocked extends Error {}
 function getPool(): Pool {
   if (!process.env.DATABASE_URL?.trim()) throw new PostsDatabaseNotConfigured('Chưa cấu hình DATABASE_URL.');
   if (!pool) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 3, connectionTimeoutMillis: 5000, idleTimeoutMillis: 5000,
-      statement_timeout: 8000,
-    });
-    pool.on('error', () => console.error('Marketing posts database idle connection failed.'));
-    if (process.env.VERCEL) attachDatabasePool(pool);
+    pool = createPool({ label: 'Marketing posts', connectionTimeoutMillis: 5000 });
   }
   return pool;
 }

@@ -120,3 +120,15 @@ test('errorJson, mapError and isMissingTable', async () => {
   assert.equal(isMissingTable({ code: 'x' }), false);
   assert.equal(isMissingTable(null), false);
 });
+
+test('createPool applies the shared limits and the caller connection timeout', async () => {
+  const { createPool } = load('lib/db/pool.ts');
+  process.env.DATABASE_URL = 'postgresql://user:pw@127.0.0.1:1/db';
+  const pool = createPool({ label: 'Test', connectionTimeoutMillis: 1234 });
+  try {
+    assert.equal(pool.options.max, 3);
+    assert.equal(pool.options.connectionTimeoutMillis, 1234);
+    assert.equal(pool.options.idleTimeoutMillis, 5000);
+    assert.equal(pool.options.statement_timeout, 8000);
+  } finally { await pool.end(); }
+});
