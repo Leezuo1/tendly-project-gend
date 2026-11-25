@@ -1,3 +1,4 @@
+import { errorJson, isMissingTable, mapError, rule } from '@/lib/http/errors';
 import { AppSecurityError, legacyAccessError, securityErrorResponse } from '@/lib/services/appSecurity';
 import { InvalidPostRequest } from '@/lib/services/aiPost';
 import { MarketingWorkflowError } from '@/lib/services/marketingBrief';
@@ -10,25 +11,27 @@ export function requireDashboardKey(request: Request): Response | null {
 }
 
 /** Đổi lỗi thành response, không đưa chi tiết lỗi database (có thể chứa thông tin kết nối) ra ngoài. */
+const POSTS_RULES = [
+  rule(AppSecurityError, securityErrorResponse),
+  rule(MarketingWorkflowError, e => errorJson(e.message, e.status)),
+  rule(InvalidPostRequest, e => errorJson(e.message, 400)),
+  rule(InvalidPostImage, e => errorJson(e.message, 400)),
+  rule(ImageGenerationFailed, e => errorJson(e.message, 502)),
+  rule(PostNotFound, e => errorJson(e.message, 404)),
+  rule(PostLocked, e => errorJson(e.message, 409)),
+  rule(PostsDatabaseNotConfigured, () => errorJson('Chưa kết nối database (DATABASE_URL) nên chưa lưu được bài viết.', 503, { code: 'NO_DATABASE' })),
+  rule(FacebookNotConfigured, e => errorJson(e.message, 503, { code: 'NO_FACEBOOK' })),
+  rule(FacebookPublishFailed, e => errorJson(e.message, 502)),
+];
+
 export function postsErrorResponse(error: unknown): Response {
-  if (error instanceof AppSecurityError) return securityErrorResponse(error);
-  if (error instanceof MarketingWorkflowError) return Response.json({ error: error.message }, { status: error.status });
-  if (error instanceof InvalidPostRequest || error instanceof InvalidPostImage) {
-    return Response.json({ error: error.message }, { status: 400 });
-  }
-  if (error instanceof ImageGenerationFailed) return Response.json({ error: error.message }, { status: 502 });
-  if (error instanceof PostNotFound) return Response.json({ error: error.message }, { status: 404 });
-  if (error instanceof PostLocked) return Response.json({ error: error.message }, { status: 409 });
-  if (error instanceof PostsDatabaseNotConfigured) {
-    return Response.json({ error: 'Chưa kết nối database (DATABASE_URL) nên chưa lưu được bài viết.', code: 'NO_DATABASE' }, { status: 503 });
-  }
-  if (error instanceof FacebookNotConfigured) return Response.json({ error: error.message, code: 'NO_FACEBOOK' }, { status: 503 });
-  if (error instanceof FacebookPublishFailed) return Response.json({ error: error.message }, { status: 502 });
-  if ((error as { code?: unknown })?.code === '42P01') {
-    return Response.json({ error: 'Database chưa có đủ bảng bài đăng (marketing_posts, marketing_post_images). Chạy npm run db:migrate rồi thử lại.', code: 'NO_TABLE' }, { status: 503 });
+  const mapped = mapError(error, POSTS_RULES);
+  if (mapped) return mapped;
+  if (isMissingTable(error)) {
+    return errorJson('Database chưa có đủ bảng bài đăng (marketing_posts, marketing_post_images). Chạy npm run db:migrate rồi thử lại.', 503, { code: 'NO_TABLE' });
   }
   console.error('Marketing posts request failed.');
-  return Response.json({ error: 'Không truy cập được database. Vui lòng thử lại.' }, { status: 503 });
+  return errorJson('Không truy cập được database. Vui lòng thử lại.', 503);
 }
 
 export async function readJson(request: Request): Promise<unknown> {

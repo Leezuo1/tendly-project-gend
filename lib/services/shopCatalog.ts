@@ -1,3 +1,4 @@
+import { isMissingTable } from '@/lib/http/errors';
 import type { Pool } from 'pg';
 import { LEGACY_PRODUCTS } from '@/lib/data/admin';
 import { buildKnowledge, InvalidAiKnowledge, parseAiKnowledge, type CatalogDb } from '@/lib/services/aiKnowledge';
@@ -11,7 +12,6 @@ export class ShopCatalogError extends Error {
 }
 type Db = Pick<Pool, 'query'>;
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
-const noTable = (error: unknown) => (error as { code?: string })?.code === '42P01';
 
 /** Bộ sản phẩm mẫu cũ (dữ liệu giả, có icon) chưa chỉnh sửa không được tới khách thật. Bộ Coolmate hiện tại là danh mục shop dùng nên không bị loại. */
 const samples = () => new Set(LEGACY_PRODUCTS.map(product => JSON.stringify(product)));
@@ -30,7 +30,7 @@ export async function readShopTagRules(pageId: string, db: Db = getMessengerPool
   try {
     const rules = (await db.query('SELECT catalog_json FROM shop_catalog WHERE page_id=$1', [pageId])).rows[0]?.catalog_json?.contextTagRules;
     if (Array.isArray(rules)) return rules as ContextTagRule[];
-  } catch (error) { if (!noTable(error)) throw error; }
+  } catch (error) { if (!isMissingTable(error)) throw error; }
   return structuredClone(DEFAULT_CONTEXT_TAG_RULES);
 }
 
@@ -65,6 +65,6 @@ export async function liveKnowledge(pageId: string, fallback: unknown, db: Db = 
   try {
     const row = (await db.query('SELECT knowledge_json FROM shop_catalog WHERE page_id=$1', [pageId])).rows[0];
     if (row) return parseAiKnowledge(row.knowledge_json);
-  } catch (error) { if (!noTable(error)) throw error; }
+  } catch (error) { if (!isMissingTable(error)) throw error; }
   return fallback == null ? null : parseAiKnowledge(fallback);
 }

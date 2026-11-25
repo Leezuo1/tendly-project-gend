@@ -1,3 +1,4 @@
+import { isMissingTable } from '@/lib/http/errors';
 import { createHmac } from 'node:crypto';
 import type { Product } from '@/lib/types/admin';
 
@@ -192,7 +193,7 @@ export async function shopeeCatalog(config: Config, token: string) {
 
 export function shopeeErrorResponse(error: unknown) {
   if (error instanceof ShopeeError) return Response.json({ error: error.message }, { status: error.status });
-  const missingTable = (error as { code?: string })?.code === '42P01';
+  const missingTable = isMissingTable(error);
   return Response.json({ error: missingTable ? 'Chưa có bảng Shopee. Chạy npm run db:migrate rồi thử lại.'
     : 'Không truy cập được dữ liệu Shopee. Kiểm tra database rồi thử lại.' }, { status: 503 });
 }

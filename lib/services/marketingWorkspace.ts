@@ -1,3 +1,4 @@
+import { isMissingTable } from '@/lib/http/errors';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
@@ -316,7 +317,7 @@ export async function marketingWorkspaceAction(pageId: string, actor: string, re
 
 export async function managedMarketingPost(pageId: string, postId: string) {
   try { return (await readMarketingWorkspace(pageId)).workspace.reviews.some(item => item.postId === postId); }
-  catch (error) { if ((error as { code?: string }).code === '42P01') return false; throw error; }
+  catch (error) { if (isMissingTable(error)) return false; throw error; }
 }
 export async function publishMarketingPost(pageId: string, postId: string, slotId?: string, revision?: number) {
   const claim = await changeWorkspace(pageId, revision, async (state, db) => {

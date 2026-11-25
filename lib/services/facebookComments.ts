@@ -1,3 +1,4 @@
+import { isMissingTable } from '@/lib/http/errors';
 import type { Pool } from 'pg';
 import { marketingCommentContext } from '@/lib/services/marketingCommentContext';
 import { assertOperationAllowed, canRunAutomation, runAutomaticAccess } from '@/lib/services/appSecurity';
@@ -188,7 +189,7 @@ async function isActiveLivePost(pageId: string, postId: string, db: Database): P
       [pageId, postId]);
     return live.rows.length > 0;
   } catch (error) {
-    if ((error as { code?: string }).code === '42P01') return false; // Chưa chạy migration Livestream.
+    if (isMissingTable(error)) return false; // Chưa chạy migration Livestream.
     throw error;
   }
 }

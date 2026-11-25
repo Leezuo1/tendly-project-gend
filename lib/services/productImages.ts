@@ -1,3 +1,4 @@
+import { isMissingTable } from '@/lib/http/errors';
 /** Ảnh sản phẩm do shop tải lên (bảng shop_product_images). Byte ảnh không nằm trong catalog_json. */
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
@@ -60,7 +61,7 @@ export async function readPhotoCandidates(pageId: string, psid: string, products
         AND r.status IN ('sent','unknown','sending') AND r.text='[ảnh] '||i.id) AS sent
       FROM shop_product_images i WHERE i.page_id=$1 AND i.product_id=ANY($2::text[]) ORDER BY i.created_at`, [pageId, products.map((product) => product.id), psid])).rows;
   } catch (error) {
-    if ((error as { code?: string }).code === '42P01') return [];
+    if (isMissingTable(error)) return [];
     throw error;
   }
   return products.flatMap((product) => {
