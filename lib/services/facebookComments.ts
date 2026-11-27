@@ -1,3 +1,5 @@
+import { graphCredentials, graphUrl } from '@/lib/services/graph';
+import { isMissingTable } from '@/lib/http/errors';
 import type { Pool } from 'pg';
 import { marketingCommentContext } from '@/lib/services/marketingCommentContext';
 import { assertOperationAllowed, canRunAutomation, runAutomaticAccess } from '@/lib/services/appSecurity';
@@ -70,12 +72,9 @@ export async function saveCommentSettings(pageId: string, autoReply: boolean, kn
 }
 
 function graphConfig() {
-  const token = process.env.PAGE_ACCESS_TOKEN;
-  const version = process.env.META_GRAPH_VERSION;
-  if (!token || !version || !/^v\d+\.\d+$/.test(version)) {
-    throw new FacebookCommentError('Cần cấu hình PAGE_ACCESS_TOKEN và META_GRAPH_VERSION.', 503);
-  }
-  return { token, version };
+  const credentials = graphCredentials();
+  if (!credentials) throw new FacebookCommentError('Cần cấu hình PAGE_ACCESS_TOKEN và META_GRAPH_VERSION.', 503);
+  return credentials;
 }
 
 export async function graphRead(id: string, fields: string, signal?: AbortSignal,
@@ -83,7 +82,7 @@ export async function graphRead(id: string, fields: string, signal?: AbortSignal
   const { token, version } = graphConfig();
   try {
     const path = id.split('/').map(encodeURIComponent).join('/');
-    const response = await fetch(`https://graph.facebook.com/${version}/${path}?${new URLSearchParams({ ...params, fields })}`, {
+    const response = await fetch(graphUrl(version, `${path}?${new URLSearchParams({ ...params, fields })}`), {
       headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000),
     });
@@ -150,7 +149,7 @@ export async function sendCommentPrivateReply(pageId: string, commentId: string,
   let messageId: string | null = null;
   let recipientId: string | null = null;
   try {
-    const response = await fetch(`https://graph.facebook.com/${version}/${pageId}/messages`, {
+    const response = await fetch(graphUrl(version, `${pageId}/messages`), {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(12_000),
       body: JSON.stringify({ recipient: { comment_id: commentId }, message: { text } }),
@@ -188,7 +187,7 @@ async function isActiveLivePost(pageId: string, postId: string, db: Database): P
       [pageId, postId]);
     return live.rows.length > 0;
   } catch (error) {
-    if ((error as { code?: string }).code === '42P01') return false; // Chưa chạy migration Livestream.
+    if (isMissingTable(error)) return false; // Chưa chạy migration Livestream.
     throw error;
   }
 }

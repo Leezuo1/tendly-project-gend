@@ -1,4 +1,5 @@
 /** Lịch dịp bán hàng tại Việt Nam để Smart Sourcing gợi ý "sắp tới nên làm gì". Ngày do code tính, AI chỉ đề xuất góc khai thác. */
+import { vnDay } from '@/lib/utils/vnTime';
 export interface SalesOccasion { name: string; date: string; daysLeft: number; hint: string }
 
 // Ngày âm lịch quy đổi sẵn; hết bảng thì dịp đó tự ẩn thay vì đoán sai ngày.
@@ -49,12 +50,10 @@ function occasionsOfYear(year: number): [string, string][] {
   for (const [name, dates] of Object.entries(LUNAR)) if (dates[year]) list.push([name, `${year}-${dates[year]}`]);
   return list;
 }
-/** Ngày hôm nay theo giờ Việt Nam, dạng YYYY-MM-DD. */
-export const vnToday = (now = new Date()) => now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 /** Các dịp trong `days` ngày tới (tính cả hôm nay), gần nhất trước. */
 export function upcomingOccasions(now = new Date(), days = 90): SalesOccasion[] {
-  const today = vnToday(now), start = Date.parse(`${today}T00:00:00Z`), year = Number(today.slice(0, 4));
+  const today = vnDay(now), start = Date.parse(`${today}T00:00:00Z`), year = Number(today.slice(0, 4));
   return [...occasionsOfYear(year), ...occasionsOfYear(year + 1)]
     .map(([name, date]) => ({ name, date, daysLeft: Math.round((Date.parse(`${date}T00:00:00Z`) - start) / 86_400_000), hint: HINTS[name] ?? '' }))
     .filter(item => item.daysLeft >= 0 && item.daysLeft <= days)

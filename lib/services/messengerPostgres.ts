@@ -1,6 +1,6 @@
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { getDefaultAutoSelectFamilyAttemptTimeout, setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
-import { attachDatabasePool } from '@vercel/functions';
+import { createPool } from '@/lib/db/pool';
 import type { MessengerMessage } from '@/lib/types/messenger';
 
 let pool: Pool | undefined;
@@ -11,14 +11,7 @@ export function getMessengerPool(): Pool {
     if (!process.env.VERCEL) {
       setDefaultAutoSelectFamilyAttemptTimeout(Math.max(getDefaultAutoSelectFamilyAttemptTimeout(), 2000));
     }
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 3, connectionTimeoutMillis: process.env.VERCEL ? 5000 : 15000, idleTimeoutMillis: 5000,
-      statement_timeout: 8000,
-    });
-    // Prevent an unhandled idle-client error without logging connection strings.
-    pool.on('error', () => console.error('Messenger database idle connection failed.'));
-    if (process.env.VERCEL) attachDatabasePool(pool);
+    pool = createPool({ label: 'Messenger', connectionTimeoutMillis: process.env.VERCEL ? 5000 : 15000 });
   }
   return pool;
 }

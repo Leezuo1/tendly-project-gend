@@ -1,3 +1,4 @@
+import { isMissingTable } from '@/lib/http/errors';
 import type { Pool } from 'pg';
 import type { MarketingWorkspace } from '@/lib/types/marketingWorkspace';
 import { offerValidAt } from '@/lib/services/marketingBrief';
@@ -5,7 +6,7 @@ import { offerValidAt } from '@/lib/services/marketingBrief';
 export async function marketingCommentContext(pageId: string, postId: string, db: Pick<Pool, 'query'>) {
   let row;
   try { row = (await db.query('SELECT document FROM marketing_workspaces WHERE page_id=$1', [pageId])).rows[0]; }
-  catch (error) { if ((error as { code?: string }).code === '42P01') return null; throw error; }
+  catch (error) { if (isMissingTable(error)) return null; throw error; }
   if (!row) return null;
   const state: MarketingWorkspace = typeof row.document === 'string' ? JSON.parse(row.document) : row.document;
   return marketingContextFromWorkspace(state, postId);

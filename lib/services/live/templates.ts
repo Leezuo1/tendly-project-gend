@@ -2,6 +2,7 @@
  * Câu trả lời mẫu cho từng nhóm bình luận — điền giá/tồn kho từ dữ liệu shop, không gọi AI.
  * Không bịa thông tin shop chưa khai báo (phí ship, chính sách đổi trả lấy từ FAQ nếu có).
  */
+import { collapseSpaces } from '@/lib/utils/text';
 import { normalize, formatMoney } from '@/lib/utils/format';
 import type { AiKnowledge } from '@/lib/types/ai';
 import type { LiveIntent, LivePreparation } from '@/lib/types/live';
@@ -120,7 +121,7 @@ const QUESTION_TITLE: Partial<Record<LiveIntent, (name: string) => string>> = {
 export function groupQuestion(intent: LiveIntent, productName: string | null, samples: string[]): string {
   const title = productName ? QUESTION_TITLE[intent] : undefined;
   if (title && productName) return title(productName);
-  const best = [...samples].map((s) => s.replace(/\s+/g, ' ').trim()).filter((s) => s && s.length <= 120)
+  const best = [...samples].map((s) => collapseSpaces(s)).filter((s) => s && s.length <= 120)
     .sort((a, b) => b.length - a.length)[0] ?? samples[0]?.slice(0, 120) ?? '';
   if (!best) return 'Câu hỏi của khách';
   const text = best.charAt(0).toUpperCase() + best.slice(1);

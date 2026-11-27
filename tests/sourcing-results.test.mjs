@@ -46,7 +46,8 @@ test('TikTok posts are not checked against supplier-only criteria (price, MOQ, r
 const load = (file, stubs) => {
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', code)(name => stubs[name] ?? require(name), module, module.exports);
+  // lib/utils are pure helpers: load them for real instead of stubbing each one.
+  new Function('require', 'module', 'exports', code)(name => stubs[name] ?? (name.startsWith('@/lib/utils/') ? load(`${name.slice(2)}.ts`, {}) : require(name)), module, module.exports);
   return module.exports;
 };
 

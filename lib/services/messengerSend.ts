@@ -1,3 +1,4 @@
+import { graphCredentials, graphUrl } from '@/lib/services/graph';
 import type { Pool } from 'pg';
 import type { MessengerMessage } from '@/lib/types/messenger';
 import type { PostImageMime } from '@/lib/types/posts';
@@ -22,11 +23,11 @@ export async function sendMessengerMessage(input: SendMessengerInput,
   db: Pool = getMessengerPool(), transport: typeof fetch = fetch) {
   await assertOperationAllowed(db);
   const pageId = process.env.PAGE_ID;
-  const token = process.env.PAGE_ACCESS_TOKEN;
-  const version = process.env.META_GRAPH_VERSION;
-  if (!pageId || !token || !version || !/^v\d+\.\d+$/.test(version)) {
+  const credentials = graphCredentials();
+  if (!pageId || !credentials) {
     throw new MessengerSendError('Cần cấu hình PAGE_ID, PAGE_ACCESS_TOKEN và META_GRAPH_VERSION.', 503);
   }
+  const { token, version } = credentials;
   const thread = await db.query(`SELECT last_in_at FROM messenger_conversations WHERE page_id=$1 AND id=$2`,
     [pageId, JSON.stringify([pageId, input.psid])]);
   const lastIn = Number(thread.rows[0]?.last_in_at);
@@ -93,7 +94,7 @@ export async function sendMessengerMessage(input: SendMessengerInput,
       form.append('message', JSON.stringify({ attachment: { type: 'image', payload: {} } }));
       form.append('filedata', new Blob([input.image.data as BlobPart], { type: input.image.mime }), 'image');
     }
-    response = await transport(`https://graph.facebook.com/${version}/${encodeURIComponent(pageId)}/messages`, {
+    response = await transport(graphUrl(version, `${encodeURIComponent(pageId)}/messages`), {
       method: 'POST', headers: input.image ? { Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(input.image ? 15_000 : 12_000),
       body: input.image ? form : JSON.stringify({ recipient: { id: input.psid }, messaging_type: 'RESPONSE', message: { text: input.text } }),

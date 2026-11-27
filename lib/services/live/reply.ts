@@ -3,6 +3,7 @@
  * Giống sendCommentPrivateReply (lib/services/facebookComments.ts): đặt chỗ trong DB trước khi gửi,
  * kết quả mơ hồ thì để "unknown" và không bao giờ tự gửi lại.
  */
+import { graphCredentials, graphUrl } from '@/lib/services/graph';
 import { getMessengerPool, savePostgresMessages } from '@/lib/services/messengerPostgres';
 import { assertOperationAllowed } from '@/lib/services/appSecurity';
 import { graphRead, saveFacebookComments } from '@/lib/services/facebookComments';
@@ -14,12 +15,9 @@ const BATCH = 15;
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 function metaConfig() {
-  const token = process.env.PAGE_ACCESS_TOKEN?.trim();
-  const version = process.env.META_GRAPH_VERSION?.trim();
-  if (!token || !version || !/^v\d+\.\d+$/.test(version)) {
-    throw new LiveError('Cần cấu hình PAGE_ACCESS_TOKEN và META_GRAPH_VERSION để nhắn riêng.', 503, 'NO_FACEBOOK');
-  }
-  return { token, version };
+  const credentials = graphCredentials();
+  if (!credentials) throw new LiveError('Cần cấu hình PAGE_ACCESS_TOKEN và META_GRAPH_VERSION để nhắn riêng.', 503, 'NO_FACEBOOK');
+  return credentials;
 }
 
 interface MemberRow {
@@ -42,7 +40,7 @@ async function sendFacebook(pageId: string, commentId: string, text: string, db:
   catch { return { outcome: 'not_allowed', messageId: null, recipientId: null }; }
   if (!await stillApproved()) return { outcome: 'failed', messageId: null, recipientId: null };
   try {
-    const response = await fetch(`https://graph.facebook.com/${version}/${pageId}/messages`, {
+    const response = await fetch(graphUrl(version, `${pageId}/messages`), {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(12_000),
       body: JSON.stringify({ recipient: { comment_id: commentId }, message: { text } }),
@@ -215,7 +213,7 @@ export async function replyPublicly(pageId: string, sessionId: string, groupKey:
     throw error;
   }
   try {
-    response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(target.comment_id)}/comments`, {
+    response = await fetch(graphUrl(version, `${encodeURIComponent(target.comment_id)}/comments`), {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(12_000), body: JSON.stringify({ message }),
     });

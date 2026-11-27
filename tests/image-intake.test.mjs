@@ -145,6 +145,22 @@ test('generateGeminiJson sends images as inline_data parts and leaves text-only 
   assert.deepEqual(bodies[2].contents[0].parts, [{ text: 'u' }]);
 });
 
+test('GEMINI_CONTENT_MODEL is tried first for sourcing, falls back to the usual model, and is ignored when unset', async () => {
+  const { generateGeminiJson } = load('lib/services/gemini.ts');
+  const originalFetch = globalThis.fetch, keys = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.env.GEMINI_MODEL, GEMINI_CONTENT_MODEL: process.env.GEMINI_CONTENT_MODEL };
+  process.env.GEMINI_API_KEY = 'test-key'; process.env.GEMINI_MODEL = 'base-model'; process.env.GEMINI_CONTENT_MODEL = 'content-model';
+  const urls = [];
+  globalThis.fetch = async (url) => { urls.push(url); return url.includes('content-model') ? Response.json({}, { status: 404 }) : Response.json({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }); };
+  try {
+    const call = () => generateGeminiJson({ role: 'sourcing', system: 's', user: 'u', schema: {}, parse: (text) => JSON.parse(text) });
+    await call(); delete process.env.GEMINI_CONTENT_MODEL; await call();
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(keys)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+  assert.deepEqual(urls.map((url) => url.match(/models\/([^:]+):/)[1]), ['content-model', 'base-model', 'base-model']);
+});
+
 test('a model that stalls is cut off after attemptTimeoutMs so the next model can still answer inside the overall budget', async () => {
   const { generateGeminiJson, GEMINI_CANDIDATE_MODELS } = load('lib/services/gemini.ts');
   const originalFetch = globalThis.fetch, keys = { GEMINI_API_KEY: process.env.GEMINI_API_KEY, GEMINI_MODEL: process.env.GEMINI_MODEL };

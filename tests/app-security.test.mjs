@@ -109,8 +109,8 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
   let checked = 0;
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    // The scheduler has a server-only bearer secret, tested separately below.
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
+    // Scheduler, Zalo and CRM export use server-only bearer secrets (CRM: tests/crm-export.test.mjs).
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/', '/crm/customers/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;
@@ -158,6 +158,14 @@ test('AI global configuration is admin-only, revision-checked, and applied by th
   // Smart Sourcing do dev đặt prompt cố định: không đi qua cấu hình admin/shop, và cấu hình đã lưu từ trước có khóa sourcing vẫn đọc được.
   await f.load('lib/services/gemini.ts').generateGeminiJson({ role: 'sourcing', platform: 'tiktok', system: 'SOURCING-ONLY', user: 'Hello', schema: {}, parse: JSON.parse });
   assert.equal(system, 'SOURCING-ONLY');
+  // GEMINI_CONTENT_MODEL reaches content and sourcing only; chat and review keep GEMINI_MODEL.
+  process.env.GEMINI_CONTENT_MODEL = 'content-model';
+  const models = [];
+  globalThis.fetch = async (url) => { models.push(url.match(/models\/([^:]+):/)[1]); return Response.json({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }); };
+  try {
+    for (const role of ['content', 'sourcing', 'chat', 'review']) await f.load('lib/services/gemini.ts').generateGeminiJson({ role, system: 's', user: 'u', schema: {}, parse: JSON.parse });
+  } finally { delete process.env.GEMINI_CONTENT_MODEL; }
+  assert.deepEqual(models, ['content-model', 'content-model', 'test-model', 'test-model']);
   assert.ok(f.load('lib/services/sourcingPrompts.ts').sourcingPrompt('tiktok').includes('Product Trend Analyst'));
   assert.ok(f.load('lib/services/sourcingPrompts.ts').sourcingPrompt('google').includes('B2B Sourcing & Procurement Specialist'));
   const legacy = structuredClone(persisted.configuration); legacy.profiles.sourcing = { base: {}, platforms: {} };
@@ -379,7 +387,7 @@ test('new accounts cannot reach any business API even after the demo is unlocked
   globalThis.fetch = async () => { calls++; throw new Error('new user must not reach providers'); };
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/', '/crm/customers/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;

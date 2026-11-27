@@ -16,6 +16,8 @@ export function customerProfileFromRow(row: Record<string, unknown>): MessengerC
     status: row.profile_status as MessengerCustomerProfile['status'],
     refreshedAt: row.profile_refreshed_at == null ? null : Number(row.profile_refreshed_at),
     retryAfter: row.profile_retry_after == null ? null : Number(row.profile_retry_after),
+    needs: typeof row.needs === 'string' ? row.needs : '',
+    needsUpdatedAt: row.needs_updated_at == null ? null : Number(row.needs_updated_at),
   };
 }
 
@@ -35,7 +37,7 @@ export async function readMessengerInbox(pageId: string, limit = 100, db: Pick<P
     AND j.status IN ('review','unknown','sending') AND j.sent_at>COALESCE(c.last_out_at,0)) OR ${handoffOpenSql('c')}) AS waiting_confirmation,
     ${handoffOpenSql('c')} AS handoff_open,
     u.psid, u.display_name, u.first_name, u.last_name,
-    u.avatar_url, u.profile_status, u.profile_refreshed_at, u.profile_retry_after FROM messenger_conversations c
+    u.avatar_url, u.profile_status, u.profile_refreshed_at, u.profile_retry_after, u.needs, u.needs_updated_at FROM messenger_conversations c
     JOIN messenger_customers u ON c.customer_id=u.id WHERE c.page_id=$1 AND c.hidden_at IS NULL
     ORDER BY waiting_confirmation DESC,c.last_message_at DESC NULLS LAST, c.id LIMIT $2`, [pageId, limit + 1]);
   const conversations: MessengerThread[] = [];

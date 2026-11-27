@@ -4,6 +4,7 @@
  * Luồng: dashboard gọi sync (~3 giây/lần) → kéo bình luận mới → phân loại bằng luật → gom nhóm + tạo/gộp đơn nháp
  * → (tối đa 2 lần gọi AI có giới hạn) → trả snapshot. Phần lớn bình luận không cần AI nên chi phí thấp.
  */
+import { vnDay } from '@/lib/utils/vnTime';
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { getMessengerPool } from '@/lib/services/messengerPostgres';
@@ -846,7 +847,7 @@ export async function readInsights(pageId: string, db: Database = getMessengerPo
   const ids = sessions.map((s) => s.id);
   const orderRows = ids.length ? (await db.query(`SELECT o.session_id, o.items_json, o.status FROM live_orders o
     WHERE o.session_id=ANY($1::text[])`, [ids])).rows : [];
-  const month = (ts: number) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(0, 7);
+  const month = (ts: number) => vnDay(ts).slice(0, 7);
   const byMonth = new Map<string, LiveInsights['monthly'][number] & { qty: Map<string, { name: string; count: number }> }>();
   for (const s of sessions) {
     const key = month(s.startedAt);

@@ -70,6 +70,8 @@ export interface CustomerProfile {
   orderCount: string;
   shippingArea: string;
   totalSpent?: string;
+  /** Nhu cầu nhân viên ghi cho khách (chỉ khách Messenger). */
+  needs?: string;
   timeline: TimelineEvent[];
 }
 

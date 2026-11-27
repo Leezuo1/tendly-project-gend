@@ -1,3 +1,5 @@
+import { parseJsonObject } from '@/lib/http/body';
+import { errorJson, isMissingTable, mapError, rule } from '@/lib/http/errors';
 import { InvalidAiKnowledge } from '@/lib/services/aiKnowledge';
 import { GeminiNotConfigured, GeminiUnavailable } from '@/lib/services/gemini';
 import { MessengerSendError } from '@/lib/services/messengerSend';
@@ -24,29 +26,25 @@ export function parsePsid(value: unknown): string {
 export async function readMarketingJson(request: Request): Promise<Record<string, unknown>> {
   const raw = await request.text();
   if (raw.length > 600_000) throw new InvalidMarketingRequest('Yêu cầu quá lớn.');
-  try {
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('not an object');
-    return data;
-  } catch {
-    throw new InvalidMarketingRequest('Nội dung yêu cầu không phải JSON hợp lệ.');
-  }
+  return parseJsonObject(raw, () => new InvalidMarketingRequest('Nội dung yêu cầu không phải JSON hợp lệ.'));
 }
+
+const MARKETING_RULES = [
+  rule(AppSecurityError, securityErrorResponse),
+  rule(MarketingWorkflowError, e => errorJson(e.message, e.status)),
+  rule(InvalidMarketingRequest, e => errorJson(e.message, 400)),
+  rule(InvalidAiKnowledge, e => errorJson(e.message, 400)),
+  rule(MarketingNotConfigured, e => errorJson(e.message, 503, { code: 'NO_CONFIG' })),
+  rule(MessengerSendError, e => errorJson(e.message, e.status)),
+  rule(GeminiNotConfigured, e => errorJson(e.message, 503)),
+  rule(GeminiUnavailable, e => errorJson(e.message, 502)),
+];
 
 /** Đổi lỗi thành response, không đưa chi tiết lỗi database ra ngoài. */
 export function marketingErrorResponse(error: unknown): Response {
-  if (error instanceof AppSecurityError) return securityErrorResponse(error);
-  if (error instanceof MarketingWorkflowError) return Response.json({ error: error.message }, { status: error.status });
-  if (error instanceof InvalidMarketingRequest || error instanceof InvalidAiKnowledge) {
-    return Response.json({ error: error.message }, { status: 400 });
-  }
-  if (error instanceof MarketingNotConfigured) return Response.json({ error: error.message, code: 'NO_CONFIG' }, { status: 503 });
-  if (error instanceof MessengerSendError) return Response.json({ error: error.message }, { status: error.status });
-  if (error instanceof GeminiNotConfigured) return Response.json({ error: error.message }, { status: 503 });
-  if (error instanceof GeminiUnavailable) return Response.json({ error: error.message }, { status: 502 });
-  if ((error as { code?: unknown })?.code === '42P01') {
-    return Response.json({ error: 'Database chưa có đủ bảng. Chạy npm run db:migrate rồi thử lại.', code: 'NO_TABLE' }, { status: 503 });
-  }
+  const mapped = mapError(error, MARKETING_RULES);
+  if (mapped) return mapped;
+  if (isMissingTable(error)) return errorJson('Database chưa có đủ bảng. Chạy npm run db:migrate rồi thử lại.', 503, { code: 'NO_TABLE' });
   console.error('Marketing request failed.');
-  return Response.json({ error: 'Không đọc được dữ liệu. Vui lòng thử lại.' }, { status: 503 });
+  return errorJson('Không đọc được dữ liệu. Vui lòng thử lại.', 503);
 }

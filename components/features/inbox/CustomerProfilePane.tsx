@@ -13,9 +13,28 @@ interface CustomerProfilePaneProps {
   aiStatus?: 'analyzing' | 'ready' | 'error';
   isUnreplied: boolean;
   personalitySummary?: string;
+  /** Lưu nhu cầu; chỉ truyền cho khách Messenger. */
+  onSaveNeeds?: (needs: string) => Promise<void>;
 }
 
-export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, personalitySummary, waitingConfirmation }: CustomerProfilePaneProps) {
+function NeedsSection({ saved, onSave }: { saved: string; onSave: (needs: string) => Promise<void> }) {
+  const [draft, setDraft] = React.useState(saved);
+  const [lastSaved, setLastSaved] = React.useState(saved);
+  const [saving, setSaving] = React.useState(false);
+  // Bản đã lưu đổi từ máy chủ (khách khác, máy khác): nhận lại, trừ khi nhân viên đang gõ dở khác bản cũ.
+  if (saved !== lastSaved) { setLastSaved(saved); if (draft === lastSaved) setDraft(saved); }
+  const save = async () => { setSaving(true); try { await onSave(draft.trim()); } finally { setSaving(false); } };
+  return (
+    <div className="profile-section">
+      <div className="profile-section-title">Nhu cầu</div>
+      <textarea className="profile-needs" aria-label="Nhu cầu của khách" rows={3} maxLength={500} value={draft}
+        placeholder="Khách đang cần gì? (vd: áo thun size L, giao trước thứ 6)" onChange={(event) => setDraft(event.target.value)} />
+      <button type="button" className="btn btn-outline btn-sm" disabled={saving || draft.trim() === saved} onClick={save}>{saving ? 'Đang lưu…' : 'Lưu'}</button>
+    </div>
+  );
+}
+
+export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, personalitySummary, waitingConfirmation, onSaveNeeds }: CustomerProfilePaneProps) {
   return (
     <div className="profile-pane">
       {/* Profile Head */}
@@ -77,6 +96,8 @@ export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, 
           </div>
         )}
       </div>
+
+      {profile.channel === 'Messenger' && onSaveNeeds && <NeedsSection key={profile.messengerId} saved={profile.needs ?? ''} onSave={onSaveNeeds} />}
 
       {/* 360 Timeline */}
       <div className="profile-section">
