@@ -965,6 +965,20 @@
   margin-bottom: 10px;
 }
 
+.inbox-root .profile-needs {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--sand);
+  border-radius: 8px;
+}
+
 .inbox-root .profile-kv {
   display: flex;
   justify-content: space-between;

@@ -12,7 +12,7 @@ const ready = (async () => {
   for (const file of ['001-messenger.sql', '002-messenger-outbound.sql', '003-messenger-profiles.sql', '004-conversation-memory.sql', '005-conversation-view.sql',
     '011-messenger-ai.sql', '015-marketing-workspace.sql', '016-customer-care.sql', '008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql',
     '011-live-cockpit.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql', '024-shop-catalog.sql', '025-conversation-staff-labels.sql',
-    '026-conversation-handoff.sql', '027-shop-product-images.sql', '028-zalo-outbox.sql']) await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
+    '026-conversation-handoff.sql', '027-shop-product-images.sql', '028-zalo-outbox.sql', '029-customer-needs.sql']) await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
 })();
 const query = async (sql, values) => {
   const result = await db.query(sql, values);

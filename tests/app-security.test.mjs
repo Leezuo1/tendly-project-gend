@@ -109,8 +109,8 @@ test('all data API handlers reject anonymous/legacy keys and locked users before
   let checked = 0;
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    // The scheduler has a server-only bearer secret, tested separately below.
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
+    // Scheduler, Zalo and CRM export use server-only bearer secrets (CRM: tests/crm-export.test.mjs).
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/', '/crm/customers/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;
@@ -387,7 +387,7 @@ test('new accounts cannot reach any business API even after the demo is unlocked
   globalThis.fetch = async () => { calls++; throw new Error('new user must not reach providers'); };
   for (const relative of readdirSync('app/api', { recursive: true }).filter(file => file.endsWith('route.ts'))) {
     const file = `app/api/${relative.replaceAll('\\', '/')}`;
-    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/'].some(part => file.includes(part))) continue;
+    if (['/meta/webhook/', '/auth/', '/inbox/session/', '/security/', '/marketing/schedules/run/', '/zalo/ingest/', '/zalo/outbox/', '/crm/customers/'].some(part => file.includes(part))) continue;
     const route = f.load(file);
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
       if (!route[method]) continue;

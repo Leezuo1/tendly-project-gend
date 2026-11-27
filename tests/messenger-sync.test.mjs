@@ -18,7 +18,7 @@ const ready = (async () => {
   await db.exec(readFileSync('db/migrations/015-marketing-workspace.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
   await db.exec(readFileSync('db/migrations/016-customer-care.sql', 'utf8'));
-  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql', '024-shop-catalog.sql', '025-conversation-staff-labels.sql', '026-conversation-handoff.sql', '027-shop-product-images.sql']) {
+  for (const file of ['008-facebook-comments.sql', '009-livestream.sql', '010-live-waiting.sql', '011-live-cockpit.sql', '017-customer-care-sources.sql', '017-customer-care-sources.sql', '023-messenger-orders.sql', '024-shop-catalog.sql', '025-conversation-staff-labels.sql', '026-conversation-handoff.sql', '027-shop-product-images.sql', '029-customer-needs.sql']) {
     await db.exec(readFileSync(`db/migrations/${file}`, 'utf8'));
   }
   await db.exec(readFileSync('db/migrations/005-conversation-view.sql', 'utf8'));
@@ -548,6 +548,26 @@ const setTagRules = (rules) => query(`INSERT INTO shop_catalog(page_id,catalog_j
 const tagRule = (id, label) => ({ id, label, keywords: [], type: 'neutral', enabled: true });
 const labelRequest = (route, body) => route.POST(new Request('http://localhost/api/messenger/conversation', { method: 'POST',
   headers: { origin: 'http://localhost', Authorization: `Bearer ${process.env.INBOX_ACCESS_KEY}` }, body: JSON.stringify({ action: 'labels', ...body }) }));
+
+test('customer needs: profile row maps needs, and staff saves them through the conversation route', async () => {
+  const { customerProfileFromRow } = loader()('lib/services/messengerInboxDb.ts');
+  const mapped = customerProfileFromRow({ display_name: 'A', profile_status: 'ready', needs: 'Cần áo size L', needs_updated_at: '5' });
+  assert.equal(mapped.needs, 'Cần áo size L');
+  assert.equal(mapped.needsUpdatedAt, 5);
+  const bare = customerProfileFromRow({ display_name: 'A', profile_status: 'ready' });
+  assert.equal(bare.needs, '');
+  assert.equal(bare.needsUpdatedAt, null);
+  const f = await aiFixture(false);
+  const route = f.load('app/api/messenger/conversation/route.ts');
+  await f.incoming('needs-1');
+  const save = (needs, psid = '222') => labelRequest(route, { action: 'needs', psid, needs });
+  const ok = await save('Cần áo size L');
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).needs, 'Cần áo size L');
+  assert.equal((await query("SELECT needs FROM messenger_customers WHERE psid='222'")).rows[0].needs, 'Cần áo size L');
+  assert.equal((await save('x'.repeat(501))).status, 400);
+  assert.equal((await save('a', '555')).status, 404);
+});
 
 test('staff labels: changes are applied on the server against the shop set, no cap, unknown new label asks to retry, per Page', async () => {
   const f = await aiFixture(false);

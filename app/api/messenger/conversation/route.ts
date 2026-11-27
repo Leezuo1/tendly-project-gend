@@ -4,6 +4,7 @@ import { hideConversation, pendingHistoricalAnalysis, saveConversationMemory } f
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
 import { refreshCustomerPersonality } from '@/lib/services/customerPersonality';
 import { saveStaffLabels, StaffLabelsError } from '@/lib/services/staffLabels';
+import { saveCustomerNeeds, CustomerNeedsError } from '@/lib/services/customerNeeds';
 
 export const runtime = 'nodejs';
 async function handle(request: Request) {
@@ -23,6 +24,10 @@ async function handle(request: Request) {
     if (body.action === 'labels') {
       try { return Response.json({ staffLabels: await saveStaffLabels(pageId, body.psid, body.change) }); }
       catch (error) { if (error instanceof StaffLabelsError) return Response.json({ error: error.message }, { status: error.status }); throw error; }
+    }
+    if (body.action === 'needs') {
+      try { return Response.json(await saveCustomerNeeds(pageId, body.psid, body.needs)); }
+      catch (error) { if (error instanceof CustomerNeedsError) return Response.json({ error: error.message }, { status: error.status }); throw error; }
     }
     if (typeof body.messageId !== 'string' || !body.messageId || body.messageId.length > 1024
       || typeof body.reply !== 'string' || !body.reply.trim() || body.reply.length > 8000

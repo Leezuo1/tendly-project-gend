@@ -142,6 +142,16 @@ export function InboxShell() {
       setConversations(previous => previous.map(c => c.id === target.id ? { ...c, staffLabels: body.staffLabels } : c));
     } catch (error) { showToast(error instanceof Error && error.message ? error.message : 'Không lưu được nhãn.'); }
   };
+  const saveNeeds = async (target: Conversation, needs: string) => {
+    if (!target.messenger) return;
+    try {
+      const response = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ psid: target.messenger.psid, action: 'needs', needs }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error);
+      setConversations(previous => previous.map(c => c.id === target.id ? { ...c, profile: { ...c.profile, needs: body.needs } } : c));
+    } catch (error) { showToast(error instanceof Error && error.message ? error.message : 'Không lưu được nhu cầu.'); }
+  };
   const filteredConversations = useMemo(() => {
     return sortReplyQueue(taggedConversations.filter((conv) => {
       if (filter === 'urgent' && (!conv.isUnreplied || !conv.isUrgent)) return false;
@@ -502,6 +512,7 @@ export function InboxShell() {
                   aiStatus={selectedConv.aiStatus}
                   isUnreplied={Boolean(selectedConv.isUnreplied)}
                   personalitySummary={selectedConv.personalitySummary}
+                  onSaveNeeds={selectedConv.messenger ? (needs) => saveNeeds(selectedConv, needs) : undefined}
                 />
               </>
             )}
