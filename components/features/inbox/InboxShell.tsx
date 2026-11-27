@@ -149,7 +149,7 @@ export function InboxShell() {
         body: JSON.stringify({ psid: target.messenger.psid, action: 'needs', needs }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
-      setConversations(previous => previous.map(c => c.id === target.id ? { ...c, profile: { ...c.profile, needs: body.needs } } : c));
+      setConversations(previous => previous.map(c => c.id === target.id ? { ...c, profile: { ...c.profile, needs: body.needs, needsSource: body.needsSource } } : c));
     } catch (error) { showToast(error instanceof Error && error.message ? error.message : 'Không lưu được nhu cầu.'); }
   };
   const filteredConversations = useMemo(() => {
@@ -322,6 +322,7 @@ export function InboxShell() {
   const analyzeMessage = useCallback(async (conversation: Conversation, messageId: string, text: string, contextMessages = conversation.messages, automatic = false) => {
     try {
       let data: AiChatReply;
+      let customerNeeds: { needs: string; needsSource?: '' | 'ai' | 'staff' } | undefined;
       if (conversation.messenger) {
         const request = async () => {
           const response = await fetch(automatic ? '/api/messenger/ai' : '/api/customer-care', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -339,11 +340,12 @@ export function InboxShell() {
         if (!result.reply) throw new Error('Chưa có gợi ý. Kiểm tra cấu hình AI Chat hoặc chờ lượt phân tích đang chạy.');
         if (result.messageId !== messageId) return;
         data = result.reply;
+        customerNeeds = result.customerNeeds;
       } else {
         data = await askShopAi(text, sessionContext(contextMessages, messageId));
       }
       setConversations((prev) => prev.map((c) => c.id === conversation.id
-        ? applyConversationAnalysis(c, messageId, data) : c));
+        ? applyConversationAnalysis(c, messageId, data, customerNeeds) : c));
       if (!automatic) showToast('Đã cập nhật cảm xúc, ưu tiên và gợi ý trả lời của AI.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không phân tích được tin nhắn.';
@@ -386,8 +388,14 @@ export function InboxShell() {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error);
         if (!result.jobs.length && !cancelled) {
-          await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const sumRes = await fetch('/api/messenger/conversation', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ psid: conversation.messenger.psid, action: 'summarize' }) });
+          const sumBody = await sumRes.json().catch(() => null);
+          if (sumRes.ok && sumBody?.customerNeeds && !cancelled) {
+            const cn = sumBody.customerNeeds as { needs: string; needsSource?: '' | 'ai' | 'staff' };
+            setConversations((prev) => prev.map((c) => c.id === conversation.id && c.profile.needsSource !== 'staff'
+              ? { ...c, profile: { ...c.profile, needs: cn.needs, needsSource: cn.needsSource } } : c));
+          }
         }
         for (const job of result.jobs as { messageId: string }[]) {
           if (cancelled) return;

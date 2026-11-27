@@ -67,7 +67,7 @@ ${JSON.stringify({ rules: careRules(profile, page), page, goal: profile.goal, in
 
 export async function generateCareReply(knowledge: AiKnowledge, profile: AiProfile, page: CarePageProfile | null,
   message: string, context: AiSessionMessage[] = [], sources?: CareSourceContext, history: CustomerOrderHistory | null = null,
-  labels: { rules: ContextTagRule[]; staff: { label: string; context?: string }[] } = { rules: [], staff: [] }, images?: ImageInput, photos: PhotoCandidate[] = []) {
+  labels: { rules: ContextTagRule[]; staff: { label: string; context?: string }[] } = { rules: [], staff: [] }, images?: ImageInput, photos: PhotoCandidate[] = [], existingNeeds?: string) {
   const sourceSummary = knowledgeSummary({ ...knowledge,
     products: profile.sources.includes('products') ? knowledge.products : [], faqs: profile.sources.includes('faqs') ? knowledge.faqs : [] });
   // Ảnh không tải được: chuyển shop, không gọi model.
@@ -81,6 +81,7 @@ export async function generateCareReply(knowledge: AiKnowledge, profile: AiProfi
   const { result, model } = await generateGeminiJson({ role: 'chat', platform: 'facebook', includeShop: false, system: buildCustomerCarePrompt(knowledge, profile, page, grounded, !!images, offered.length > 0), ...(images ? { images: images.images } : {}),
     user: JSON.stringify({ sessionContext: profile.sources.includes('conversation') ? context : [],
       ...(history && profile.sources.includes('conversation') ? { customerOrderHistory: history } : {}),
+      ...(existingNeeds && profile.sources.includes('conversation') ? { existingNeeds } : {}),
       ...(labels.staff.length && profile.sources.includes('conversation') ? { staffLabels: labels.staff.map(note) } : {}),
       ...(options.length ? { labelOptions: options } : {}), ...(images ? { imageCount: images.count } : {}),
       ...(offered.length ? { shopPhotos: offered.map(({ productId, name }) => ({ productId, name })) } : {}), latestCustomerMessage: message }),

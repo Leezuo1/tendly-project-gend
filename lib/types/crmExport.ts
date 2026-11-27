@@ -4,6 +4,7 @@ export interface CrmCustomerRecord {
   channel: 'messenger';
   name: string | null;
   needs: string;
+  needsSource: 'ai' | 'staff' | null;
   needsUpdatedAt: number | null;
   createdAt: number;
   lastMessageAt: number | null;

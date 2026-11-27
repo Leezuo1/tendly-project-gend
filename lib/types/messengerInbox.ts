@@ -11,8 +11,9 @@ export interface MessengerCustomerProfile {
   status: 'pending' | 'ready' | 'unavailable';
   refreshedAt: number | null;
   retryAfter: number | null;
-  /** Nhu cầu do nhân viên ghi; rỗng nếu chưa ghi. */
+  /** Nhu cầu do nhân viên ghi hoặc AI suy luận; rỗng nếu chưa có. */
   needs: string;
+  needsSource?: '' | 'ai' | 'staff';
   needsUpdatedAt: number | null;
 }
 

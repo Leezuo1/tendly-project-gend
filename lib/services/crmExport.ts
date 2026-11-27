@@ -10,7 +10,7 @@ export function parseCrmLimit(value: string | null): number {
 /** Khách còn hiển thị trong Hộp thoại của Page, sắp theo psid; `after` là `nextCursor` của trang trước. */
 export async function readCrmCustomers(pageId: string, opts: { limit: number; after?: string | null },
   db: Pick<Pool, 'query'> = getMessengerPool()): Promise<CrmCustomerPage> {
-  const rows = (await db.query(`SELECT u.psid, u.display_name, u.needs, u.needs_updated_at, u.created_at, c.last_message_at,
+  const rows = (await db.query(`SELECT u.psid, u.display_name, u.needs, u.needs_source, u.needs_updated_at, u.created_at, c.last_message_at,
       COALESCE(o.n,0) AS n, COALESCE(o.total,0) AS total, o.last_at, COALESCE(o.mock,false) AS mock
     FROM messenger_customers u
     JOIN messenger_conversations c ON c.customer_id=u.id AND c.hidden_at IS NULL
@@ -22,6 +22,7 @@ export async function readCrmCustomers(pageId: string, opts: { limit: number; af
   const num = (value: unknown) => value == null ? null : Number(value);
   return {
     customers: page.map((row) => ({ id: row.psid, channel: 'messenger' as const, name: row.display_name ?? null, needs: row.needs ?? '',
+      needsSource: row.needs_source === 'ai' || row.needs_source === 'staff' ? row.needs_source : null,
       needsUpdatedAt: num(row.needs_updated_at), createdAt: Number(row.created_at), lastMessageAt: num(row.last_message_at),
       orders: { confirmedCount: Number(row.n), confirmedTotalVnd: Number(row.total), lastConfirmedAt: num(row.last_at), includesMock: row.mock === true } })),
     nextCursor: rows.length > opts.limit ? page[page.length - 1].psid : null,
