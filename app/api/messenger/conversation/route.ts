@@ -4,7 +4,7 @@ import { hideConversation, pendingHistoricalAnalysis, saveConversationMemory } f
 import { parseAiAnalysis } from '@/lib/services/aiAnalysis';
 import { refreshCustomerPersonality } from '@/lib/services/customerPersonality';
 import { saveStaffLabels, StaffLabelsError } from '@/lib/services/staffLabels';
-import { saveCustomerNeeds, CustomerNeedsError } from '@/lib/services/customerNeeds';
+import { refreshCustomerNeeds, saveCustomerNeeds, CustomerNeedsError } from '@/lib/services/customerNeeds';
 
 export const runtime = 'nodejs';
 async function handle(request: Request) {
@@ -20,7 +20,13 @@ async function handle(request: Request) {
       return Response.json({ deleted: (result.rowCount ?? 0) > 0, hiddenAt: result.rows[0] ? Number(result.rows[0].hidden_at) : null });
     }
     if (request.method === 'GET') return Response.json({ jobs: await pendingHistoricalAnalysis(pageId, body.psid) }, { headers: { 'Cache-Control': 'no-store' } });
-    if (body.action === 'summarize') return Response.json(await refreshCustomerPersonality(pageId, body.psid));
+    if (body.action === 'summarize') {
+      const [personality, customerNeeds] = await Promise.all([
+        refreshCustomerPersonality(pageId, body.psid),
+        refreshCustomerNeeds(pageId, body.psid).catch(() => null),
+      ]);
+      return Response.json({ ...personality, ...(customerNeeds ? { customerNeeds } : {}) });
+    }
     if (body.action === 'labels') {
       try { return Response.json({ staffLabels: await saveStaffLabels(pageId, body.psid, body.change) }); }
       catch (error) { if (error instanceof StaffLabelsError) return Response.json({ error: error.message }, { status: error.status }); throw error; }

@@ -33,6 +33,7 @@ curl.exe -H "Authorization: Bearer <CRM_API_KEY>" "http://localhost:3000/api/crm
       "channel": "messenger",
       "name": "Nguyễn An",
       "needs": "Cần áo thun size L, giao trước thứ 6",
+      "needsSource": "ai",
       "needsUpdatedAt": 1795800000000,
       "createdAt": 1795000000000,
       "lastMessageAt": 1795790000000,
@@ -49,7 +50,8 @@ curl.exe -H "Authorization: Bearer <CRM_API_KEY>" "http://localhost:3000/api/crm
 |---|---|
 | `id` | Mã khách trên Messenger (psid), ổn định, dùng làm khóa ở CRM. |
 | `name` | Tên lấy từ Messenger; `null` nếu Messenger chưa cung cấp. |
-| `needs` | Nhu cầu do nhân viên ghi trong Hộp thoại; chuỗi rỗng nếu chưa ghi. |
+| `needs` | Nhu cầu của khách (AI tự tóm tắt từ hội thoại hoặc nhân viên sửa tay); chuỗi rỗng nếu chưa có. |
+| `needsSource` | Nguồn của `needs`: `'ai'`, `'staff'`, hoặc `null` nếu chưa có. |
 | `orders` | Chỉ tính đơn đã xác nhận. `includesMock: true` nghĩa là có đơn demo trong số liệu; CRM thật nên bỏ qua khách có cờ này hoặc lọc lại. |
 
 ## Giới hạn

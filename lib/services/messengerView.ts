@@ -57,7 +57,8 @@ export function mergeMessengerThread(thread: MessengerThread, previous?: Convers
     hasNewMessage: newIncoming ? unanswered : previous?.hasNewMessage,
     unreadMessageIds,
     threadWho: { name, sub: zalo ? 'Zalo cá nhân' : 'Messenger · Page đã kết nối' }, messages,
-    profile: { name, avatar, avatarUrl, messengerId: thread.psid, identityStatus: thread.customer?.status || 'pending', needs: thread.customer?.needs ?? '',
+    profile: { name, avatar, avatarUrl, messengerId: thread.psid, identityStatus: thread.customer?.status || 'pending',
+      needs: thread.customer?.needs ?? '', needsSource: thread.customer?.needsSource ?? '',
       since: `Nhận tin từ ${time(thread.createdAt)}`, tags: [], channel: zalo ? 'Zalo' : 'Messenger',
       orderCount: 'Chưa có dữ liệu', shippingArea: 'Chưa có dữ liệu', timeline: messages.slice(-3).reverse().map((m) => ({
         id: m.id, text: `${m.sender === 'in' ? 'Khách nhắn' : 'Shop trả lời'}: ${m.text.slice(0, 160)}${m.text.length > 160 ? '…' : ''}`, time: m.time,

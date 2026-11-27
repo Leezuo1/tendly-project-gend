@@ -31,6 +31,8 @@ export interface AiMessageAnalysis {
   needsHuman: boolean;
   canAutoReply?: boolean;
   communicationStyle?: string;
+  /** Tóm tắt nhu cầu khách hàng do AI rút ra từ hội thoại (tối đa 500 ký tự). */
+  customerNeeds?: string;
   /** id nhãn ngữ cảnh AI chọn từ bộ nhãn của shop (tối đa 3). */
   labels?: string[];
   /** Loại của từng ảnh khách gửi (model điền, theo thứ tự ảnh). */

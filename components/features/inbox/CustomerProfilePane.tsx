@@ -17,7 +17,7 @@ interface CustomerProfilePaneProps {
   onSaveNeeds?: (needs: string) => Promise<void>;
 }
 
-function NeedsSection({ saved, onSave }: { saved: string; onSave: (needs: string) => Promise<void> }) {
+function NeedsSection({ saved, source, onSave }: { saved: string; source?: '' | 'ai' | 'staff'; onSave: (needs: string) => Promise<void> }) {
   const [draft, setDraft] = React.useState(saved);
   const [lastSaved, setLastSaved] = React.useState(saved);
   const [saving, setSaving] = React.useState(false);
@@ -30,6 +30,7 @@ function NeedsSection({ saved, onSave }: { saved: string; onSave: (needs: string
       <textarea className="profile-needs" aria-label="Nhu cầu của khách" rows={3} maxLength={500} value={draft}
         placeholder="Khách đang cần gì? (vd: áo thun size L, giao trước thứ 6)" onChange={(event) => setDraft(event.target.value)} />
       <button type="button" className="btn btn-outline btn-sm" disabled={saving || draft.trim() === saved} onClick={save}>{saving ? 'Đang lưu…' : 'Lưu'}</button>
+      {saved && source === 'ai' && <p className="emotion-analysis-note">✨ AI tự điền từ hội thoại. Bạn có thể sửa và bấm Lưu.</p>}
     </div>
   );
 }
@@ -97,7 +98,7 @@ export function CustomerProfilePane({ profile, analysis, aiStatus, isUnreplied, 
         )}
       </div>
 
-      {profile.channel === 'Messenger' && onSaveNeeds && <NeedsSection key={profile.messengerId} saved={profile.needs ?? ''} onSave={onSaveNeeds} />}
+      {profile.channel === 'Messenger' && onSaveNeeds && <NeedsSection key={profile.messengerId} saved={profile.needs ?? ''} source={profile.needsSource} onSave={onSaveNeeds} />}
 
       {/* 360 Timeline */}
       <div className="profile-section">

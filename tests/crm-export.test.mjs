@@ -19,11 +19,11 @@ const route = load('app/api/crm/customers/route.ts');
 const wrap = (db) => ({ query: async (sql, values) => { const result = await db.query(sql, values); return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length }; } });
 const pg = new PGlite();
 const ready = (async () => {
-  for (const file of ['001-messenger', '003-messenger-profiles', '004-conversation-memory', '005-conversation-view', '023-messenger-orders', '029-customer-needs']) {
+  for (const file of ['001-messenger', '003-messenger-profiles', '004-conversation-memory', '005-conversation-view', '023-messenger-orders', '029-customer-needs', '030-customer-needs-ai']) {
     await pg.exec(readFileSync(`db/migrations/${file}.sql`, 'utf8'));
   }
-  await pg.exec(`INSERT INTO messenger_customers(id,page_id,psid,created_at,display_name,needs,needs_updated_at) VALUES
-    ('c1','111','100',1,'An','Cần áo size L',9), ('c2','111','200',2,'Bình','',NULL), ('c3','111','300',3,NULL,'',NULL), ('c4','222','400',4,'Khác','',NULL);
+  await pg.exec(`INSERT INTO messenger_customers(id,page_id,psid,created_at,display_name,needs,needs_source,needs_updated_at) VALUES
+    ('c1','111','100',1,'An','Cần áo size L','staff',9), ('c2','111','200',2,'Bình','','',NULL), ('c3','111','300',3,NULL,'','',NULL), ('c4','222','400',4,'Khác','','',NULL);
     INSERT INTO messenger_conversations(id,customer_id,page_id,created_at,last_message_at,hidden_at) VALUES
     ('v1','c1','111',1,50,NULL), ('v2','c2','111',2,60,5), ('v3','c3','111',3,NULL,NULL), ('v4','c4','222',4,70,NULL);
     INSERT INTO messenger_orders(id,page_id,psid,items_json,total,status,is_mock,created_at,updated_at) VALUES
@@ -40,9 +40,11 @@ test('exports visible customers of the Page with needs and confirmed-order total
   const an = customers[0];
   assert.equal(an.name, 'An');
   assert.equal(an.needs, 'Cần áo size L');
+  assert.equal(an.needsSource, 'staff');
   assert.equal(an.needsUpdatedAt, 9);
   assert.deepEqual(an.orders, { confirmedCount: 2, confirmedTotalVnd: 500000, lastConfirmedAt: 20, includesMock: true });
   assert.equal(customers[1].orders.includesMock, false);
+  assert.equal(customers[1].needsSource, null);
   assert.equal(customers[1].name, null);
   assert.equal(customers[1].lastMessageAt, null);
 });

@@ -12,6 +12,7 @@ import { careRules, CustomerCareError, generateCareReply, parseCareProfile } fro
 import { readConversationSources } from '@/lib/services/conversationSources';
 import { readCustomerOrderHistory } from '@/lib/services/messengerOrders';
 import { readConversationMemories, saveConversationMemory } from '@/lib/services/conversationMemory';
+import { inboundNeedsHash, readCustomerNeedsState, saveAiCustomerNeeds } from '@/lib/services/customerNeeds';
 import { unsupportedReplyReason } from '@/lib/services/replyGuard';
 import { AutomationStoppedError, sendMessengerMessage } from '@/lib/services/messengerSend';
 import { AppSecurityError, assertOperationAllowed, canRunAutomation, isInteractiveRequest, runAutomaticAccess } from '@/lib/services/appSecurity';
@@ -108,8 +109,9 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
     const history = await readCustomerOrderHistory(pageId, psid, db);
     const rules = await readShopTagRules(pageId, db);
     const photos = await readPhotoCandidates(pageId, psid, source.products, db);
+    const needsState = await readCustomerNeedsState(pageId, psid, db);
     const reply = await generateCareReply(source, profile, settings.page_profile_json, customerText.slice(0, 8000) || (imageInput ? `[Khách gửi ${attachments.length} ảnh]` : '[Tệp đính kèm chưa được đọc]'), context, sources, history,
-      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput, photos);
+      { rules, staff: staffLabelNotes(latest.staff_labels, rules) }, imageInput, photos, needsState.needsSource !== 'staff' ? needsState.needs : undefined);
     reply.sourceSummary += ` · Quy tắc Chat ${settings.updated_at}`;
     // Hard check on what the model wrote: links or amounts that the shop's own data (or the customer) never gave.
     // shortcut: earlier customer turns count as known only within the last 10 before this batch; a number typed further back still blocks, upgrade if staff see false handoffs.
@@ -143,11 +145,12 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
       return {};
     }
     await saveConversationMemory(pageId, psid, latest.message_id, reply, db);
+    const customerNeeds = await saveAiCustomerNeeds(pageId, psid, reply.analysis.customerNeeds, await inboundNeedsHash(pageId, psid, db), db);
     if (reply.analysis.imageOutcome === 'handoff') await markHandoff(db, pageId, id, latest.message_id);
     await db.query(`UPDATE messenger_ai_jobs SET status=$3,updated_at=$4 WHERE page_id=$1 AND message_id=$2 AND status='processing'`,
       [pageId, latest.message_id, blocked ? 'review' : 'ready', Date.now()]);
     if (blocked || !settings.auto_reply || !latest.ai_auto_reply || Number(latest.sent_at) <= Number(settings.enabled_at)
-      || Number(latest.sent_at) <= Number(latest.ai_enabled_at)) return { reply, messageId: latest.message_id };
+      || Number(latest.sent_at) <= Number(latest.ai_enabled_at)) return { reply, messageId: latest.message_id, customerNeeds };
     // Recheck the switch, current message and all unresolved reviews immediately before reserving the send.
     const send = await db.query(`UPDATE messenger_ai_jobs j SET status='sending',updated_at=$3
       FROM messenger_conversations c,messenger_ai_settings s
@@ -161,7 +164,7 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
         AND (other.status IN ('review','sending','unknown') OR (other.status='processing' AND other.updated_at>=$3::bigint-120000))
         AND other.message_id<>j.message_id AND other.sent_at>COALESCE(c.last_out_at,0))
       RETURNING j.message_id`, [pageId, latest.message_id, Date.now(), settings.updated_at, latest.ai_updated_at, reply.analysis.imageOutcome === 'handoff']);
-    if (!send.rowCount) return { reply, messageId: latest.message_id };
+    if (!send.rowCount) return { reply, messageId: latest.message_id, customerNeeds };
     const requestId = randomUUID();
     if (reply.analysis.imageOutcome === 'handoff') await setHandoffRequest(db, pageId, id, latest.message_id, requestId);
     try {
@@ -172,11 +175,11 @@ export async function processMessengerAi(pageId: string, psid: string, knowledge
       if (unknownHandoff) await db.query('UPDATE messenger_conversations SET ai_auto_reply=false,ai_updated_at=GREATEST(ai_updated_at+1,$3) WHERE page_id=$1 AND id=$2', [pageId, id, Date.now()]);
       // Ảnh đi sau chữ và không bao giờ đổi trạng thái job: trạng thái cuối của job chỉ phản ánh phần chữ.
       if (sent.persisted && reply.analysis.photoImageIds?.length) await sendPhotosAfterText(db, pageId, psid, requestId, latest.sent_at, reply.analysis.photoImageIds, startedAt + 55_000);
-      return { reply, sent, messageId: latest.message_id };
+      return { reply, sent, messageId: latest.message_id, customerNeeds };
     } catch (error) {
       await db.query(`UPDATE messenger_ai_jobs SET status=$4,updated_at=$3 WHERE page_id=$1 AND message_id=$2`,
         [pageId, latest.message_id, Date.now(), error instanceof AppSecurityError || error instanceof AutomationStoppedError ? 'review' : 'unknown']);
-      return { reply, messageId: latest.message_id };
+      return { reply, messageId: latest.message_id, customerNeeds };
     }
   } catch (cause) {
     await db.query(`UPDATE messenger_ai_jobs SET status='review',updated_at=$3 WHERE page_id=$1 AND message_id=$2 AND status IN ('processing','ready')`,

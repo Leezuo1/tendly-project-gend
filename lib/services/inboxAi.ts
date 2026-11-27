@@ -52,7 +52,12 @@ export function automaticAnalysisCandidates(
   }).slice(0, Math.max(0, capacity - pending.size));
 }
 
-export function applyConversationAnalysis(conversation: Conversation, messageId: string, result: AiChatReply): Conversation {
+export function applyConversationAnalysis(
+  conversation: Conversation,
+  messageId: string,
+  result: AiChatReply,
+  customerNeeds?: { needs: string; needsSource?: '' | 'ai' | 'staff' },
+): Conversation {
   // Kết quả chậm không được ghi đè tin nhắn mới hoặc tạo lại đề xuất đã xử lý.
   if (latestCustomerMessage(conversation)?.id !== messageId || !conversation.isUnreplied) return conversation;
   if (result.sourceContext && conversation.sourceContext && result.sourceContext.fingerprint !== conversation.sourceContext.fingerprint) {
@@ -64,6 +69,11 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
     label: PRIORITY_LABELS[a.priority], type: a.priority === 'high' ? 'high' : 'neutral',
     source: 'ai', kind: 'priority',
   };
+  const nextNeeds = customerNeeds
+    ? { needs: customerNeeds.needs, needsSource: customerNeeds.needsSource }
+    : a.customerNeeds && conversation.profile.needsSource !== 'staff'
+      ? { needs: a.customerNeeds, needsSource: 'ai' as const }
+      : {};
   return {
     ...conversation,
     waitingConfirmation: conversation.waitingConfirmation || a.canAutoReply === false,
@@ -73,6 +83,7 @@ export function applyConversationAnalysis(conversation: Conversation, messageId:
     tags: [...conversation.tags.filter((t) => t.type === 'vip'), priorityTag],
     threadWho: { ...conversation.threadWho, badgeTag: undefined },
     profile: { ...conversation.profile,
+      ...nextNeeds,
       tags: conversation.profile.tags.filter((t) => t.type === 'vip' || (t.type === 'loop' && t.source !== 'ai')),
     },
     aiSuggestion: {

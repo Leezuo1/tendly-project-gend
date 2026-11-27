@@ -1,5 +1,6 @@
 import { IMAGE_KINDS, type AiMessageAnalysis, type AiSessionMessage, type ImageKind } from '@/lib/types/ai';
 import { normalize } from '@/lib/utils/format';
+import { collapseSpaces } from '@/lib/utils/text';
 
 export const AI_RESPONSE_SCHEMA = {
   type: 'object',
@@ -14,6 +15,7 @@ export const AI_RESPONSE_SCHEMA = {
         needsHuman: { type: 'boolean' },
         canAutoReply: { type: 'boolean', description: 'Chỉ true khi đủ căn cứ trong nguồn tri thức để trả lời đầy đủ, không cần shop xác nhận.' },
         communicationStyle: { type: 'string', description: 'Phong cách giao tiếp quan sát được trong tin khách và ngữ cảnh, tối đa 200 ký tự. Không đủ căn cứ thì để chuỗi trống; không gán tính cách cố định hay chẩn đoán.' },
+        customerNeeds: { type: 'string', description: 'Tóm tắt ngắn gọn bằng tiếng Việt nhu cầu mua hàng hoặc yêu cầu hỗ trợ hiện tại của khách (tối đa 500 ký tự). Nếu chưa rõ thì để chuỗi trống hoặc giữ existingNeeds.' },
         labels: { type: 'array', items: { type: 'string' }, description: 'Tối đa 3 id trong labelOptions phù hợp tình huống; không có thì mảng rỗng.' },
         imageKinds: { type: 'array', items: { type: 'string', enum: [...IMAGE_KINDS] }, description: 'Chỉ khi khách gửi ảnh: mỗi ảnh một phần tử, theo thứ tự ảnh.' },
         photoProductIds: { type: 'array', items: { type: 'string' }, description: 'Chỉ khi có shopPhotos và khách thực sự cần xem ảnh: các productId trong shopPhotos; còn lại để mảng rỗng.' },
@@ -35,7 +37,8 @@ export const EMOTION_RESPONSE_PROMPT = `PHÂN TÍCH CẢM XÚC VÀ ƯU TIÊN TR�
 5. Nếu ngữ cảnh có khiếu nại chưa được xử lý, câu hỏi tiếp tục cùng vấn đề vẫn ưu tiên xử lý. Lời cảm ơn sau khi shop giải đáp thì hạ mức ưu tiên; không giữ nhãn tức giận mãi chỉ vì tin cũ. Nếu khách đã chuyển sang chủ đề khác, xét tin mới.
 6. SAU KHI xác định analysis, tạo reply dựa vào cảm xúc đó và NGUỒN TRI THỨC: angry/disappointed → ghi nhận bất tiện, xin lỗi ngắn gọn khi có sự cố với shop, đề xuất bước kiểm tra/hỗ trợ, không tranh cãi hoặc dùng emoji vui vẻ; worried → bình tĩnh, rõ ràng, không hứa điều chưa xác nhận; happy → thân thiện, có thể đáp lại lời cảm ơn; neutral → trực tiếp, lịch sự. Không nói thẳng khách bị gán nhãn nào, không tiết lộ điểm ưu tiên. Đồng cảm không được thay thế sự thật: vẫn không tự tạo đơn, cam kết hoàn tiền/giao gấp, cấp voucher hay hứa đã chuyển nhân viên. needsHuman chỉ là ĐỀ XUẤT trong hệ thống, không phải thao tác chuyển tiếp đã thực hiện. Khi khách yêu cầu nhân viên/hoàn tiền do sự cố, dùng kiểu câu: "Shop xin lỗi vì sự bất tiện này. Bạn gửi mã đơn để nhân viên kiểm tra và hỗ trợ yêu cầu của bạn nhé." Tuyệt đối không viết "đã ghi nhận và chuyển ngay", "đã chuyển cho nhân viên" hay "đã tạo yêu cầu hoàn tiền".
 7. communicationStyle mô tả ngắn phong cách giao tiếp thể hiện trong lời khách và ngữ cảnh: mức chi tiết, cách đặt câu hỏi, mong muốn được giải thích hoặc nhu cầu trấn an nếu có căn cứ. Không gán tính cách cố định hay đặc điểm nhạy cảm, không dùng từ xúc phạm, không suy diễn từ giới tính/ảnh/tên. Chưa đủ căn cứ thì để chuỗi trống.
-8. Chỉ xuất một JSON có analysis trước, reply sau theo schema. Tất cả quy tắc về sản phẩm không có, xã giao, nguồn dữ liệu và câu hỏi ngoài phạm vi vẫn áp dụng cho reply.`;
+8. customerNeeds tóm tắt ngắn gọn bằng tiếng Việt nhu cầu mua hàng hoặc yêu cầu hỗ trợ hiện tại của khách (tối đa 500 ký tự, viết tự nhiên như ghi chú CRM, không chép số tài khoản hay giấy tờ nhạy cảm). Nếu user có existingNeeds thì cập nhật hoặc bổ sung thông tin mới từ tin nhắn; nếu tin mới chỉ xã giao/cảm ơn thì giữ nguyên existingNeeds (hoặc để chuỗi trống nếu chưa có nhu cầu rõ ràng).
+9. Chỉ xuất một JSON có analysis trước, reply sau theo schema. Tất cả quy tắc về sản phẩm không có, xã giao, nguồn dữ liệu và câu hỏi ngoài phạm vi vẫn áp dụng cho reply.`;
 
 export function parseAiAnalysis(value: unknown): AiMessageAnalysis {
   if (!value || typeof value !== 'object') throw new Error('AI không trả về phân tích cảm xúc hợp lệ.');
@@ -58,6 +61,8 @@ export function parseAiAnalysis(value: unknown): AiMessageAnalysis {
     canAutoReply: a.canAutoReply === true && !a.needsHuman,
     ...(typeof a.communicationStyle === 'string' && a.communicationStyle.trim()
       ? { communicationStyle: a.communicationStyle.trim().slice(0, 200) } : {}),
+    ...(typeof a.customerNeeds === 'string' && collapseSpaces(a.customerNeeds)
+      ? { customerNeeds: collapseSpaces(a.customerNeeds).slice(0, 500) } : {}),
     ...(Array.isArray(a.labels) ? { labels: [...new Set(a.labels.filter((id): id is string => typeof id === 'string' && !!id && id.length <= 100))].slice(0, 3) } : {}),
     // photoImageIds cũng không bao giờ lấy từ model; photoProductIds chỉ được generateCareReply lọc rồi đổi sang mã ảnh.
     ...(Array.isArray(a.photoProductIds) && a.photoProductIds.every((id): id is string => typeof id === 'string' && !!id && id.length <= 200)
